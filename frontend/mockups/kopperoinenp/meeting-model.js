@@ -26,6 +26,7 @@
     const selected = new Set(included.filter((id) => insightIds.includes(id)));
     return [
       "cover",
+      "overview",
       ...order.filter((id) => selected.has(id)),
       ...(selected.has("opportunity") ? ["opportunity"] : []),
       "plan",

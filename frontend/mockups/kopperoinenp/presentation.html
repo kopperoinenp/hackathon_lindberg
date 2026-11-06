@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="fi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Asiakasesitys · Lindström</title>
+    <link rel="stylesheet" href="presentation.css" />
+    <script src="presentation-viewer.js" defer></script>
+  </head>
+  <body>
+    <header class="viewer-bar">
+      <img src="assets/lindstrom-logo.webp" alt="Lindström" width="153" height="33" /><span
+        id="customer-name"
+        >Asiakasesitys</span
+      ><a
+        id="save-presentation"
+        class="icon-button"
+        aria-label="Lataa PowerPoint"
+        title="Lataa PowerPoint"
+        hidden
+        ><svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3v12m-5-5 5 5 5-5M5 16v5h14v-5" /></svg
+      ></a>
+    </header>
+    <main>
+      <div id="loading" role="status">
+        <span class="spinner" aria-hidden="true"></span>
+        <h1>Valmistellaan esitystä…</h1>
+        <p>Hetki vielä.</p>
+      </div>
+      <div id="slide-stage" aria-live="polite" hidden></div>
+      <nav id="slide-navigation" aria-label="Diojen selaus" hidden>
+        <button id="previous" class="icon-button" aria-label="Edellinen dia">←</button
+        ><span id="page-number"></span
+        ><button id="next" class="icon-button" aria-label="Seuraava dia">→</button>
+      </nav>
+    </main>
+  </body>
+</html>
