@@ -155,8 +155,6 @@
     $("#goal-form").hidden = !state.initialized;
     $("#story").hidden = !state.initialized;
     $("#open-review").hidden = !state.initialized;
-    $("#onboarding-customer").textContent =
-      context().customer.customer_name + " · valmistele ensimmäinen katsaus";
     for (const view of ["summary", "analysis"]) {
       const tab = $("#" + view + "-tab");
       tab.setAttribute("aria-selected", String(state.view === view));
