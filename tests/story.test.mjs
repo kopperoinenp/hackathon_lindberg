@@ -1,8 +1,9 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import "../frontend/mockups/kopperoinenp-v1/data.js";
-import "../frontend/mockups/kopperoinenp-v1/model.js";
-import "../frontend/mockups/kopperoinenp-v2/story-model.js";
+import "../frontend/mockups/kopperoinenp/data.js";
+import "../frontend/mockups/kopperoinenp/model.js";
+import "../frontend/mockups/kopperoinenp/story-model.js";
+import "../frontend/mockups/kopperoinenp/analysis-model.js";
 
 const data = globalThis.REVIEW_DATA;
 const { defaultPriority, storyContext } = globalThis.StoryModel;

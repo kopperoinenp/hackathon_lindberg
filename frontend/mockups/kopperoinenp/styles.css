@@ -936,3 +936,370 @@ dialog::backdrop {
     margin: 10mm;
   }
 }
+
+/* Two views, one scope. The summary keeps its composer visible while scrolling. */
+[hidden] {
+  display: none !important;
+}
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--paper);
+  max-width: none;
+  padding-left: max(28px, calc((100vw - 1088px) / 2));
+  padding-right: max(28px, calc((100vw - 1088px) / 2));
+  gap: 35px;
+}
+.view-tabs {
+  display: flex;
+  gap: 5px;
+  background: #e9eee5;
+  padding: 4px;
+  border-radius: 6px;
+}
+.view-tabs button {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  padding: 9px 20px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.view-tabs button[aria-selected="true"] {
+  background: white;
+  color: var(--ink);
+  box-shadow: 0 1px 4px #173c4310;
+  font-weight: 600;
+}
+main {
+  padding-bottom: 155px;
+}
+.intro {
+  padding-top: 37px;
+}
+.intro h1 {
+  font-size: clamp(34px, 4.5vw, 54px);
+}
+.chat-dock {
+  position: fixed;
+  z-index: 25;
+  bottom: 15px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(1000px, calc(100% - 48px));
+  margin: 0;
+  padding: 12px 18px;
+  box-shadow: 0 5px 35px #173c4324;
+  border-color: #b8cbb5;
+  background: #fffffffa;
+  backdrop-filter: blur(12px);
+}
+.chat-dock-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 7px;
+  gap: 15px;
+}
+.chat-dock > small {
+  margin-top: 5px;
+  font-size: 9px;
+}
+.chat-dock form {
+  padding: 4px;
+}
+.chat-dock input {
+  padding: 7px 10px;
+}
+.chat-dock #chat {
+  max-height: min(240px, 35dvh);
+  overflow: auto;
+  padding: 8px 0;
+}
+.chat-dock .message {
+  font-size: 12px;
+  margin-bottom: 8px;
+  padding: 12px;
+}
+.chat-dock .message.user {
+  margin-left: 80px;
+}
+.analysis-heading {
+  margin: 35px 0 24px;
+}
+.analysis-heading h1 {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+.analysis-heading p {
+  color: var(--muted);
+  font-size: 13px;
+}
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  background: white;
+  border: 1px solid var(--line);
+  padding: 22px;
+  border-radius: 8px;
+  align-items: end;
+}
+.filter-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.filter-grid select,
+.chart-heading select {
+  border: 1px solid var(--line);
+  padding: 9px;
+  border-radius: 4px;
+  color: var(--ink);
+  background: white;
+  font-size: 11px;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
+}
+.analysis-scope {
+  display: flex;
+  justify-content: space-between;
+  gap: 15px;
+  color: var(--muted);
+  font-size: 11px;
+  margin: 25px 0 15px;
+}
+.analysis-scope strong {
+  font-weight: 500;
+  color: var(--green);
+}
+.analysis-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.analysis-kpis article {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 18px;
+}
+.analysis-kpis span {
+  font-size: 10px;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 10px;
+}
+.analysis-kpis strong {
+  font-size: 23px;
+  font-weight: 500;
+  letter-spacing: -0.6px;
+}
+.analysis-charts {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 20px;
+}
+.analysis-card {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 25px;
+  margin-bottom: 20px;
+  min-width: 0;
+}
+.analysis-card h2 {
+  font:
+    17px "Segoe UI",
+    sans-serif;
+  font-weight: 600;
+  letter-spacing: 0;
+  margin: 0 0 20px;
+}
+.chart-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+}
+.chart-heading select {
+  width: auto;
+  max-width: 190px;
+}
+.trend-chart {
+  display: grid;
+  gap: 9px;
+  height: 210px;
+  margin: 20px 0;
+}
+.trend-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+.trend-column > span {
+  font-size: 8px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.trend-column small {
+  font-size: 9px;
+  color: var(--muted);
+  margin-top: 7px;
+}
+.trend-track {
+  height: 165px;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  background: #f5f7f1;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.trend-track i {
+  display: block;
+  width: 100%;
+  background: #7ea78d;
+  min-height: 1px;
+  border-radius: 2px 2px 0 0;
+}
+.country-row {
+  margin: 22px 0;
+}
+.country-row > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11px;
+  margin-bottom: 9px;
+}
+.country-row strong {
+  font-weight: 500;
+}
+.empty-state {
+  border: 1px solid var(--line);
+  background: white;
+  padding: 35px;
+  margin: 25px 0;
+  border-radius: 8px;
+}
+.empty-state p {
+  color: var(--muted);
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+@media (max-width: 850px) {
+  .topbar {
+    gap: 20px;
+    padding: 0 25px;
+  }
+  .view-tabs button {
+    padding: 9px 13px;
+  }
+  .analysis-charts {
+    grid-template-columns: 1fr;
+  }
+  .analysis-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .topbar {
+    height: auto;
+    min-height: 105px;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px 22px;
+  }
+  .brand {
+    font-size: 26px;
+  }
+  .demo-status {
+    order: 1;
+  }
+  .view-tabs {
+    order: 2;
+    flex: 1 1 100%;
+  }
+  .view-tabs button {
+    flex: 1;
+  }
+  .chat-dock {
+    width: calc(100% - 20px);
+    bottom: 8px;
+    padding: 10px 12px;
+  }
+  .chat-dock-heading {
+    font-size: 10px;
+  }
+  .chat-dock .text-button {
+    font-size: 9px;
+  }
+  .chat-dock input {
+    font-size: 11px;
+    padding-left: 6px;
+  }
+  .filter-grid {
+    padding: 16px;
+    gap: 12px;
+  }
+  .analysis-heading h1 {
+    font-size: 32px;
+  }
+  .analysis-kpis {
+    gap: 9px;
+  }
+  .analysis-kpis article {
+    padding: 15px;
+  }
+  .analysis-kpis strong {
+    font-size: 21px;
+  }
+  .analysis-scope {
+    flex-direction: column;
+    gap: 5px;
+  }
+  .analysis-card {
+    padding: 18px;
+  }
+  .trend-chart {
+    gap: 4px;
+  }
+  .trend-column > span {
+    font-size: 7px;
+  }
+  .chart-heading {
+    flex-direction: column;
+    gap: 5px;
+  }
+  .chart-heading h2 {
+    margin-bottom: 8px;
+  }
+  .chart-heading select {
+    max-width: none;
+    width: 100%;
+  }
+  main {
+    padding-bottom: 160px;
+  }
+}
+@media print {
+  .topbar,
+  .chat-dock {
+    display: none !important;
+  }
+}

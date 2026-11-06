@@ -8,5 +8,5 @@ approved Lindström customer claims. Do not add real customer data or credential
 The frontend fixture can be regenerated from the repository root:
 
 ```sh
-python frontend/mockups/kopperoinenp-v1/extract_fixture.py data/source/Lindstrom_SinceAI_Customer_Value_Synthetic_Data_Pack.xlsx
+python frontend/mockups/kopperoinenp/extract_fixture.py data/source/Lindstrom_SinceAI_Customer_Value_Synthetic_Data_Pack.xlsx
 ```

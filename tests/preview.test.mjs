@@ -27,13 +27,15 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
   });
   const page = await fetch(origin);
   assert.equal(page.status, 200);
-  assert.ok(page.url.endsWith("/kopperoinenp-v2/index.html"));
+  assert.ok(page.url.endsWith("/kopperoinenp/index.html"));
   const html = await page.text();
+  assert.ok(html.includes('new EventSource("/__preview_events")'));
   const assets = [...html.matchAll(/(?:src|href)="([^"#]+\.(?:js|css))"/g)].map((m) => m[1]);
   assert.deepEqual(assets.sort(), [
-    "../kopperoinenp-v1/data.js",
-    "../kopperoinenp-v1/model.js",
+    "analysis-model.js",
     "app.js",
+    "data.js",
+    "model.js",
     "story-model.js",
     "styles.css",
   ]);
@@ -44,4 +46,13 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
   }
   const escape = await fetch(`${origin}/%2e%2e%2fpackage.json`);
   assert.equal(escape.status, 404);
+  for (const old of ["kopperoinenp-v1", "kopperoinenp-v2"]) {
+    assert.equal((await fetch(`${origin}/${old}/index.html`)).status, 404);
+  }
+  const stream = await fetch(`${origin}/__preview_events`);
+  assert.match(stream.headers.get("content-type"), /text\/event-stream/);
+  const reader = stream.body.getReader();
+  const initial = await reader.read();
+  assert.match(new TextDecoder().decode(initial.value), /connected/);
+  await reader.cancel();
 });

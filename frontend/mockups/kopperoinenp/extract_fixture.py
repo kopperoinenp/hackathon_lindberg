@@ -1,7 +1,7 @@
 """Rebuild the browser fixture from the provided synthetic XLSX using stdlib only.
 
 Usage: python extract_fixture.py path/to/synthetic-pack.xlsx
-The workbook is read-only and is never copied into the repository.
+The source workbook is read-only; this script only rebuilds the derived fixture.
 """
 
 import argparse
