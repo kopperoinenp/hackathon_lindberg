@@ -57,9 +57,17 @@ Libre Franklin font and asset provenance are documented in [BRAND_REVIEW.md](BRA
 The supplied PowerPoint reference is retained unchanged in `docs/references/`.
 
 The meeting goal above the summary changes emphasis using explicit keyword rules,
-with industry defaults for unmatched goals and missing-data notices for unsupported
+with neutral ordering for unmatched goals and missing-data notices for unsupported
 financial/service goals. Every insight explains its relevance. No generative AI
 service is called.
+
+Each customer's first summary visit starts with a chat-style briefing screen.
+Submit meeting context/goals or explicitly choose the unweighted default review.
+Only then are the summary, charts, composer and presentation action shown. The
+completed briefing and goal are stored per customer in browser localStorage and
+restored on later visits; they are not shared between browsers or users. Technical
+data exploration remains independently accessible. Storage failure falls back to
+the current page session with a visible notice.
 
 `Avaa esitys` opens the current HTML slide draft in the browser without downloading.
 Navigate with arrows, keyboard arrow keys or the slide outline. Select insights,

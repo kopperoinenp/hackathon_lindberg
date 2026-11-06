@@ -2,7 +2,7 @@
   "use strict";
   const data = globalThis.REVIEW_DATA;
   const { escapeHtml: esc } = globalThis.ReviewModel;
-  const { storyContext, defaultPriority } = globalThis.StoryModel;
+  const { storyContext } = globalThis.StoryModel;
   const $ = (query) => document.querySelector(query);
   const f = (number, digits = 0) =>
     new Intl.NumberFormat("fi-FI", { maximumFractionDigits: digits }).format(number);
@@ -16,7 +16,8 @@
     view: "summary",
     site: "all",
     baseline: "B_LOCAL",
-    priority: "water",
+    priority: "neutral",
+    initialized: false,
     goal: "",
     included: [...globalThis.MeetingModel.insightIds],
     titleEdits: {},
@@ -25,6 +26,27 @@
     chat: [],
   };
   let statusTimer;
+  const briefKey = () => `lindstrom-meeting-brief-v1:${state.customer}`;
+  function restoreBrief() {
+    let saved = null;
+    try {
+      saved = globalThis.MeetingModel.parseBrief(localStorage.getItem(briefKey()));
+    } catch {
+      /* Storage may be unavailable. */
+    }
+    state.initialized = Boolean(saved);
+    state.goal = saved?.goal || "";
+    state.priority = globalThis.MeetingModel.goalFocus(state.goal, "neutral").priority;
+  }
+  function saveBrief() {
+    try {
+      localStorage.setItem(briefKey(), JSON.stringify({ completed: true, goal: state.goal }));
+    } catch {
+      status(
+        "Katsaus avattiin. Selain ei salli aloituksen tallennusta, joten sitä kysytään uudelleen sivun päivityksen jälkeen.",
+      );
+    }
+  }
   const context = () => storyContext(data, state);
   const baselineName = () =>
     ({
@@ -123,7 +145,13 @@
       $("#" + id).value = state[id];
     $("#summary-panel").hidden = state.view !== "summary";
     $("#analysis-panel").hidden = state.view !== "analysis";
-    $("#composer").hidden = state.view !== "summary";
+    $("#composer").hidden = state.view !== "summary" || !state.initialized;
+    $("#onboarding").hidden = state.initialized;
+    $("#goal-form").hidden = !state.initialized;
+    $("#story").hidden = !state.initialized;
+    $("#open-review").hidden = !state.initialized;
+    $("#onboarding-customer").textContent =
+      context().customer.customer_name + " · valmistele ensimmäinen katsaus";
     for (const view of ["summary", "analysis"]) {
       const tab = $("#" + view + "-tab");
       tab.setAttribute("aria-selected", String(state.view === view));
@@ -134,7 +162,7 @@
     const goalInfo = globalThis.MeetingModel.goalFocus(state.goal, state.priority);
     $("#goal-status").textContent = state.goal
       ? "Tavoite ohjaa nostojen painotusta tässä sääntöpohjaisessa mockissa. " + goalInfo.gap
-      : "Voit kirjata asiakkaan tavoitteen. Ilman tavoitetta käytämme toimialan oletuspainotusta.";
+      : "Yleiskatsaus ilman erillistä painotusta. Voit täydentää palaverin tavoitetta milloin tahansa.";
     renderStory();
     renderAnalysis();
   }
@@ -191,6 +219,8 @@
   }
   function opening() {
     return {
+      neutral:
+        "Tässä yleiskatsauksessa tarkastelemme vedenkäyttöä, pesun ja toimitusten päästöjä sekä korjaustoimintaa ilman erillistä painotusta. Lopuksi käymme läpi yhteisen kehitysehdotuksen.",
       water:
         context().customer.industry === "Food & Beverage"
           ? "Elintarvikeasiakkaan katsaukseen nostamme vedenkäytön ja tekstiilien huollon. Tässä näkyvät vuoden tärkeimmät havainnot."
@@ -513,13 +543,26 @@
   $("#goal-form").addEventListener("submit", (event) => {
     event.preventDefault();
     state.goal = $("#meeting-goal").value.trim();
-    state.priority = globalThis.MeetingModel.goalFocus(
-      state.goal,
-      defaultPriority(context().customer),
-    ).priority;
+    state.priority = globalThis.MeetingModel.goalFocus(state.goal, "neutral").priority;
+    saveBrief();
     render();
     status("Katsaus päivitetty palaverin tavoitteen mukaan.");
   });
+  function startReview(useDefaults) {
+    state.goal = useDefaults ? "" : $("#onboarding-brief").value.trim();
+    state.priority = globalThis.MeetingModel.goalFocus(state.goal, "neutral").priority;
+    state.initialized = true;
+    state.view = "summary";
+    saveBrief();
+    render();
+    $("#story h1").tabIndex = -1;
+    $("#story h1").focus();
+  }
+  $("#onboarding-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    startReview(false);
+  });
+  $("#default-review").addEventListener("click", () => startReview(true));
   $("#insight-picker").addEventListener("change", (event) => {
     const id = event.target.dataset.insight;
     if (!id) return;
@@ -608,15 +651,19 @@
     .join("");
   $("#customer").addEventListener("change", (event) => {
     state.customer = event.target.value;
-    state.goal = "";
+    $("#onboarding-brief").value = "";
     state.included = [...globalThis.MeetingModel.insightIds];
     state.site = "all";
     state.country = "all";
     state.continent = "all";
-    state.priority = defaultPriority(context().customer);
+    restoreBrief();
     clearScope();
     render();
-    status("Asiakkaan oma katsaus on valmis. Aiemmat muistiinpanot tyhjennettiin.");
+    status(
+      state.initialized
+        ? "Avattiin asiakkaan aiemmin aloitettu katsaus."
+        : "Kerro ensin palaverin lähtötiedot tai luo oletuskatsaus.",
+    );
   });
   for (const id of ["site", "baseline", "priority", "from", "to", "country", "continent"])
     $("#" + id).addEventListener("change", (event) => {
@@ -672,5 +719,6 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     status("HTML-katsaus ladattu.");
   });
+  restoreBrief();
   render();
 })();

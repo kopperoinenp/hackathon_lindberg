@@ -63,11 +63,13 @@
       .sort((a, b) => (a.utilization ?? Infinity) - (b.utilization ?? Infinity));
     const priority = selection.priority || root.StoryModel.defaultPriority(customer);
     const order =
-      priority === "emissions"
-        ? ["emissions", "water", "repairs"]
-        : priority === "water"
-          ? ["water", "repairs", "emissions"]
-          : ["repairs", "water", "emissions"];
+      priority === "neutral"
+        ? ["water", "emissions", "repairs"]
+        : priority === "emissions"
+          ? ["emissions", "water", "repairs"]
+          : priority === "water"
+            ? ["water", "repairs", "emissions"]
+            : ["repairs", "water", "emissions"];
     return {
       customer,
       baseline,

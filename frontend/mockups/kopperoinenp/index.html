@@ -49,6 +49,37 @@
         </button>
       </div>
       <section id="summary-panel" role="tabpanel" aria-labelledby="summary-tab">
+        <section id="onboarding" class="onboarding" aria-labelledby="onboarding-title">
+          <span class="section-kicker">ALOITETAAN ASIAKKAAN TAVOITTEESTA</span>
+          <h1 id="onboarding-title">Millainen palaveri valmistellaan?</h1>
+          <p id="onboarding-customer"></p>
+          <div class="brief-message">
+            Kerro palaverin lähtötiedot ja tavoite: mikä asiakkaalle on tärkeää, mistä haluatte
+            keskustella ja mitä haluatte sopia? Voit mainita myös toivotun painotuksen.
+          </div>
+          <form id="onboarding-form">
+            <label for="onboarding-brief" class="sr-only"
+              >Palaverin lähtötiedot ja tavoitteet</label
+            >
+            <textarea
+              id="onboarding-brief"
+              rows="4"
+              maxlength="1200"
+              placeholder="Esim. vuosipalaveri hankintajohtajan kanssa. Haluamme osoittaa ilmastovaikutuksen ja sopia ensi vuoden kehityskohteesta."
+            ></textarea>
+            <div class="onboarding-actions">
+              <button type="submit" class="primary">Luo asiakaskatsaus</button
+              ><button type="button" id="default-review" class="text-button">
+                Luo oletuskatsaus
+              </button>
+            </div>
+          </form>
+          <p class="quiet">
+            Voit jättää lähtötiedot tyhjäksi. Silloin luomme yleiskatsauksen ilman erillistä
+            painotusta. Valinta muistetaan asiakaskohtaisesti tässä selaimessa. Mockin apuri toimii
+            sääntöjen perusteella; tekstiä ei lähetetä AI-palveluun.
+          </p>
+        </section>
         <form id="goal-form" class="meeting-brief">
           <label for="meeting-goal">Mitä haluatte saavuttaa palaverissa?</label>
           <div>
@@ -90,6 +121,7 @@
             </select></label
           ><label for="priority"
             >Katsauksen painopiste<select id="priority">
+              <option value="neutral">Ei erillistä painotusta</option>
               <option value="water">Vesi</option>
               <option value="emissions">Päästöt</option>
               <option value="efficiency">Tekstiilien käyttö</option>

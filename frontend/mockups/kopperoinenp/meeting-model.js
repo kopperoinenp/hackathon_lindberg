@@ -2,6 +2,18 @@
 (function (root) {
   "use strict";
   const insightIds = ["water", "emissions", "repairs", "opportunity"];
+  function parseBrief(raw) {
+    try {
+      const value = JSON.parse(raw);
+      return value?.completed === true &&
+        typeof value.goal === "string" &&
+        value.goal.length <= 1200
+        ? { goal: value.goal }
+        : null;
+    } catch {
+      return null;
+    }
+  }
   function goalFocus(goal, fallback) {
     const text = goal.toLocaleLowerCase("fi");
     const priority = /vesi|veden|vettä/.test(text)
@@ -68,5 +80,5 @@
     if (/lisää|ota.*mukaan/.test(lower)) return { id, include: true };
     return null;
   }
-  root.MeetingModel = { insightIds, goalFocus, relevance, slideIds, selectionCommand };
+  root.MeetingModel = { insightIds, goalFocus, relevance, slideIds, selectionCommand, parseBrief };
 })(globalThis);
