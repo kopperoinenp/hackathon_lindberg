@@ -17,9 +17,6 @@
     site: "all",
     baseline: "B_LOCAL",
     priority: "neutral",
-    initialized: false,
-    goal: "",
-    briefingContext: "",
     included: [...globalThis.MeetingModel.insightIds],
     titleEdits: {},
     slideIndex: 0,
@@ -27,31 +24,6 @@
     chat: [],
   };
   let statusTimer;
-  const briefKey = () => `lindstrom-meeting-brief-v1:${state.customer}`;
-  function restoreBrief() {
-    let saved = null;
-    try {
-      saved = globalThis.MeetingModel.parseBrief(localStorage.getItem(briefKey()));
-    } catch {
-      /* Storage may be unavailable. */
-    }
-    state.initialized = Boolean(saved);
-    state.goal = saved?.goal || "";
-    state.briefingContext = saved?.context || "";
-    state.priority = globalThis.MeetingModel.goalFocus(state.goal, "neutral").priority;
-  }
-  function saveBrief() {
-    try {
-      localStorage.setItem(
-        briefKey(),
-        JSON.stringify({ completed: true, goal: state.goal, context: state.briefingContext }),
-      );
-    } catch {
-      status(
-        "Katsaus avattiin. Selain ei salli aloituksen tallennusta, joten sitä kysytään uudelleen sivun päivityksen jälkeen.",
-      );
-    }
-  }
   const context = () => storyContext(data, state);
   const baselineName = () =>
     ({
@@ -150,23 +122,13 @@
       $("#" + id).value = state[id];
     $("#summary-panel").hidden = state.view !== "summary";
     $("#analysis-panel").hidden = state.view !== "analysis";
-    $("#composer").hidden = state.view !== "summary" || !state.initialized;
-    $("#onboarding").hidden = state.initialized;
-    $("#goal-form").hidden = !state.initialized;
-    $("#story").hidden = !state.initialized;
-    $("#open-review").hidden = !state.initialized;
+    $("#composer").hidden = state.view !== "summary";
     for (const view of ["summary", "analysis"]) {
       const tab = $("#" + view + "-tab");
       tab.setAttribute("aria-selected", String(state.view === view));
       tab.tabIndex = state.view === view ? 0 : -1;
     }
     $("#open-review").disabled = !ctx.metrics.hasData;
-    $("#meeting-goal").value = state.goal;
-    $("#meeting-context").value = state.briefingContext;
-    const goalInfo = globalThis.MeetingModel.goalFocus(state.goal, state.priority);
-    $("#goal-status").textContent = state.goal
-      ? "Tavoite ohjaa nostojen painotusta tässä sääntöpohjaisessa mockissa. " + goalInfo.gap
-      : "Yleiskatsaus ilman erillistä painotusta. Voit täydentää palaverin tavoitetta milloin tahansa.";
     renderStory();
     renderAnalysis();
   }
@@ -305,11 +267,11 @@
       `<section class="intro"><span class="section-kicker">VUOSIPALAVERIN VALMISTELU</span><h1>${shortName} ${periodName()}.<br />Mitä saatiin aikaan?</h1><p>${opening()}</p><div class="scope"><strong>${esc(scopeName())}</strong> · ${m.sites} ${m.sites === 1 ? "toimipaikka" : "toimipaikkaa"} · Vertailu: ${baselineName()}</div></section><section class="story-section" aria-labelledby="results-title"><div class="section-heading"><span class="section-number">01</span><h2 id="results-title">Jakson tärkeimmät tulokset</h2></div><div class="results">${order
         .map((key) => {
           const card = cards[key];
-          return `<article class="result"><div class="result-name">${card.name}</div><div class="result-value">${card.value}</div><span class="result-unit">${card.unit}</span>${card.visual}<h3>${card.title}</h3><p>${card.text}</p><div class="relevance"><strong>Miksi tämä nostetaan?</strong><p>${esc(globalThis.MeetingModel.relevance(key, state.priority, Boolean(state.goal)))}</p></div><small>${card.boundary}</small></article>`;
+          return `<article class="result"><div class="result-name">${card.name}</div><div class="result-value">${card.value}</div><span class="result-unit">${card.unit}</span>${card.visual}<h3>${card.title}</h3><p>${card.text}</p><div class="relevance"><strong>Miksi tämä nostetaan?</strong><p>${esc(globalThis.MeetingModel.relevance(key, state.priority, false))}</p></div><small>${card.boundary}</small></article>`;
         })
         .join(
           "",
-        )}</div><p class="quiet">Synteettinen aineisto. Vertailu kuvaa vaihtoehtoista pesumallia samalla pestyllä määrällä, ei nimettyä kilpailijaa.</p>${summaryGraphics()}</section><section class="story-section" aria-labelledby="opportunity-title"><div class="section-heading"><span class="section-number">02</span><h2 id="opportunity-title">Tärkein asia selvitettäväksi</h2></div><div class="opportunity"><div><span class="section-kicker">${esc(focus.site_name)}</span><h3>Vastaako tekstiilien määrä todellista tarvetta?</h3><p>${f(focus.unscanned)} allokoidulle tekstiilille ei näy aktiivista skannausta ${snapshotName()}. Aloitetaan tästä toimipaikasta ja tarkistetaan tilanne yhdessä asiakkaan kanssa.</p></div><div class="opportunity-visual">${snapshotGraphic(focus)}</div></div><p class="relevance">${esc(globalThis.MeetingModel.relevance("opportunity", state.priority, Boolean(state.goal)))}</p>${siteBenchmark()}<details class="site-details"><summary>Katso myös muut toimipaikat</summary><div class="table-wrap"><table><thead><tr><th>Toimipaikka</th><th>Skannattu ${snapshotName()}</th><th>Allokoituja tekstiilejä</th></tr></thead><tbody>${sites.map((site) => `<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${f(site.utilization, 1)} %</td><td>${f(site.allocated)}</td></tr>`).join("")}</tbody></table></div><p class="quiet">Avaa toimipaikka nähdäksesi sen oman katsauksen. Palaa kokonaisuuteen pyytämällä apurilta ”näytä kaikki toimipaikat”.</p></details></section><section class="story-section" aria-labelledby="next-title"><div class="section-heading"><span class="section-number">03</span><h2 id="next-title">Yhteinen suunta ensi vuodelle</h2></div><div class="next-chapter"><div><h3>Yksi hyvä parannus<br />kerrallaan.</h3><p>Ota palaveriin mukaan selkeä keskustelunavaus. Nämä ovat ehdotuksia, joista sovitaan asiakkaan kanssa.</p></div><ol class="next-steps">${plan()
+        )}</div><p class="quiet">Synteettinen aineisto. Vertailu kuvaa vaihtoehtoista pesumallia samalla pestyllä määrällä, ei nimettyä kilpailijaa.</p>${summaryGraphics()}</section><section class="story-section" aria-labelledby="opportunity-title"><div class="section-heading"><span class="section-number">02</span><h2 id="opportunity-title">Tärkein asia selvitettäväksi</h2></div><div class="opportunity"><div><span class="section-kicker">${esc(focus.site_name)}</span><h3>Vastaako tekstiilien määrä todellista tarvetta?</h3><p>${f(focus.unscanned)} allokoidulle tekstiilille ei näy aktiivista skannausta ${snapshotName()}. Aloitetaan tästä toimipaikasta ja tarkistetaan tilanne yhdessä asiakkaan kanssa.</p></div><div class="opportunity-visual">${snapshotGraphic(focus)}</div></div><p class="relevance">${esc(globalThis.MeetingModel.relevance("opportunity", state.priority, false))}</p>${siteBenchmark()}<details class="site-details"><summary>Katso myös muut toimipaikat</summary><div class="table-wrap"><table><thead><tr><th>Toimipaikka</th><th>Skannattu ${snapshotName()}</th><th>Allokoituja tekstiilejä</th></tr></thead><tbody>${sites.map((site) => `<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${f(site.utilization, 1)} %</td><td>${f(site.allocated)}</td></tr>`).join("")}</tbody></table></div><p class="quiet">Avaa toimipaikka nähdäksesi sen oman katsauksen. Palaa kokonaisuuteen pyytämällä apurilta ”näytä kaikki toimipaikat”.</p></details></section><section class="story-section" aria-labelledby="next-title"><div class="section-heading"><span class="section-number">03</span><h2 id="next-title">Yhteinen suunta ensi vuodelle</h2></div><div class="next-chapter"><div><h3>Yksi hyvä parannus<br />kerrallaan.</h3><p>Ota palaveriin mukaan selkeä keskustelunavaus. Nämä ovat ehdotuksia, joista sovitaan asiakkaan kanssa.</p></div><ol class="next-steps">${plan()
         .map(([title, note]) => `<li>${esc(title)}<small>${esc(note)}</small></li>`)
         .join(
           "",
@@ -469,14 +431,14 @@
     let html = slide(
       "cover",
       customer.customer_name,
-      `<p>Jakson tärkeimmät tulokset ja yhteinen suunta vuodelle 2026.</p><div class="slide-value">${m.sites} ${m.sites === 1 ? "toimipaikka" : "toimipaikkaa"}</div><p>${opening()}</p>${state.briefingContext ? `<p class="note-text"><strong>Palaverin lähtötiedot:</strong> ${esc(state.briefingContext)}</p>` : ""}${state.goal ? `<p class="note-text"><strong>Palaverin tavoite:</strong> ${esc(state.goal)}</p>` : ""}`,
+      `<p>Jakson tärkeimmät tulokset ja yhteinen suunta vuodelle 2026.</p><div class="slide-value">${m.sites} ${m.sites === 1 ? "toimipaikka" : "toimipaikkaa"}</div><p>${opening()}</p>`,
     );
     for (const key of order) {
       const card = cards[key];
       html += slide(
         key,
         card.title,
-        `<div class="slide-value">${card.value}</div><p>${card.text}</p>${card.visual}<p class="relevance">${esc(globalThis.MeetingModel.relevance(key, state.priority, Boolean(state.goal)))}</p><small>${card.boundary}. Lähde: ${card.source}.</small>`,
+        `<div class="slide-value">${card.value}</div><p>${card.text}</p>${card.visual}<p class="relevance">${esc(globalThis.MeetingModel.relevance(key, state.priority, false))}</p><small>${card.boundary}. Lähde: ${card.source}.</small>`,
       );
     }
     html += slide(
@@ -544,31 +506,6 @@
     $("#print").disabled = empty;
     $("#download").disabled = empty;
   }
-  $("#goal-form").addEventListener("submit", (event) => {
-    event.preventDefault();
-    state.goal = $("#meeting-goal").value.trim();
-    state.briefingContext = $("#meeting-context").value.trim();
-    state.priority = globalThis.MeetingModel.goalFocus(state.goal, "neutral").priority;
-    saveBrief();
-    render();
-    status("Katsaus päivitetty palaverin tavoitteen mukaan.");
-  });
-  function startReview(useDefaults) {
-    state.goal = useDefaults ? "" : $("#onboarding-brief").value.trim();
-    state.briefingContext = useDefaults ? "" : $("#onboarding-context").value.trim();
-    state.priority = globalThis.MeetingModel.goalFocus(state.goal, "neutral").priority;
-    state.initialized = true;
-    state.view = "summary";
-    saveBrief();
-    render();
-    $("#story h1").tabIndex = -1;
-    $("#story h1").focus();
-  }
-  $("#onboarding-form").addEventListener("submit", (event) => {
-    event.preventDefault();
-    startReview(false);
-  });
-  $("#default-review").addEventListener("click", () => startReview(true));
   $("#insight-picker").addEventListener("change", (event) => {
     const id = event.target.dataset.insight;
     if (!id) return;
@@ -657,20 +594,14 @@
     .join("");
   $("#customer").addEventListener("change", (event) => {
     state.customer = event.target.value;
-    $("#onboarding-brief").value = "";
-    $("#onboarding-context").value = "";
     state.included = [...globalThis.MeetingModel.insightIds];
     state.site = "all";
     state.country = "all";
     state.continent = "all";
-    restoreBrief();
+    state.priority = "neutral";
     clearScope();
     render();
-    status(
-      state.initialized
-        ? "Avattiin asiakkaan aiemmin aloitettu katsaus."
-        : "Kerro ensin palaverin lähtötiedot tai luo oletuskatsaus.",
-    );
+    status("Asiakkaan oletuskatsaus on valmis.");
   });
   for (const id of ["site", "baseline", "priority", "from", "to", "country", "continent"])
     $("#" + id).addEventListener("change", (event) => {
@@ -726,6 +657,5 @@
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     status("HTML-katsaus ladattu.");
   });
-  restoreBrief();
   render();
 })();

@@ -2,39 +2,6 @@
 (function (root) {
   "use strict";
   const insightIds = ["water", "emissions", "repairs", "opportunity"];
-  function parseBrief(raw) {
-    try {
-      const value = JSON.parse(raw);
-      return value?.completed === true &&
-        typeof value.goal === "string" &&
-        value.goal.length <= 1200
-        ? {
-            goal: value.goal,
-            context: typeof value.context === "string" ? value.context.slice(0, 1200) : "",
-          }
-        : null;
-    } catch {
-      return null;
-    }
-  }
-  function goalFocus(goal, fallback) {
-    const text = goal.toLocaleLowerCase("fi");
-    const priority = /vesi|veden|vettä/.test(text)
-      ? "water"
-      : /päästö|ilmasto|hiili/.test(text)
-        ? "emissions"
-        : /korja|kierto|käyttöikä/.test(text)
-          ? "circularity"
-          : /käyt|mitoit|kustann|euro/.test(text)
-            ? "efficiency"
-            : fallback;
-    const gap = /kustann|euro|hinta/.test(text)
-      ? "Euromääräisiä säästöjä ei voida osoittaa nykyisillä lähtötiedoilla. Tarkastelemme käytön ja mitoituksen havaintoja."
-      : /toimitusvarmu|palvelutaso|hygienia/.test(text)
-        ? "Palvelutason tai hygienian toteutumista ei mitata tässä mockissa. Ne vaativat lisää lähtötietoja."
-        : "";
-    return { priority, gap };
-  }
   function relevance(id, priority, hasGoal) {
     const lead = hasGoal
       ? "Palaverin tavoitteen ja valitun painotuksen perusteella"
@@ -83,5 +50,5 @@
     if (/lisää|ota.*mukaan/.test(lower)) return { id, include: true };
     return null;
   }
-  root.MeetingModel = { insightIds, goalFocus, relevance, slideIds, selectionCommand, parseBrief };
+  root.MeetingModel = { insightIds, relevance, slideIds, selectionCommand };
 })(globalThis);

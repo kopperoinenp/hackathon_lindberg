@@ -49,68 +49,6 @@
         </button>
       </div>
       <section id="summary-panel" role="tabpanel" aria-labelledby="summary-tab">
-        <section id="onboarding" class="onboarding" aria-labelledby="onboarding-title">
-          <h1 id="onboarding-title">Millainen palaveri valmistellaan?</h1>
-          <form id="onboarding-form">
-            <div class="brief-fields">
-              <div class="brief-field">
-                <label for="onboarding-context">Palaverin lähtötiedot</label>
-                <p id="context-help">Kenelle katsaus tehdään ja mistä palaverissa keskustellaan?</p>
-                <textarea
-                  id="onboarding-context"
-                  rows="3"
-                  maxlength="1200"
-                  aria-describedby="context-help"
-                  placeholder="Esim. vuosipalaveri hankintajohtajan kanssa. Käymme läpi vuoden palvelut ja asiakkaan muuttuneet tarpeet."
-                ></textarea>
-              </div>
-              <div class="brief-field">
-                <label for="onboarding-brief">Palaverin tavoitteet</label>
-                <p id="goal-help">Mikä asiakkaalle on tärkeää ja mitä haluatte sopia?</p>
-                <textarea
-                  id="onboarding-brief"
-                  rows="3"
-                  maxlength="1200"
-                  aria-describedby="goal-help"
-                  placeholder="Esim. osoittaa ilmastovaikutus ja sopia ensi vuoden kehityskohteesta sekä seurannasta."
-                ></textarea>
-              </div>
-            </div>
-            <div class="onboarding-actions">
-              <button type="submit" class="primary">Luo asiakaskatsaus</button
-              ><button type="button" id="default-review" class="text-button">
-                Luo oletuskatsaus
-              </button>
-            </div>
-          </form>
-          <p class="quiet">
-            Voit jättää lähtötiedot tyhjäksi. Silloin luomme yleiskatsauksen ilman erillistä
-            painotusta. Valinta muistetaan asiakaskohtaisesti tässä selaimessa. Mockin apuri toimii
-            sääntöjen perusteella; tekstiä ei lähetetä AI-palveluun.
-          </p>
-        </section>
-        <form id="goal-form" class="meeting-brief">
-          <label for="meeting-context">Palaverin lähtötiedot</label>
-          <textarea
-            id="meeting-context"
-            rows="2"
-            maxlength="1200"
-            placeholder="Palaverin osallistujat, tilanne ja keskusteltavat asiat"
-          ></textarea>
-          <label for="meeting-goal">Palaverin tavoitteet</label>
-          <div>
-            <textarea
-              id="meeting-goal"
-              rows="2"
-              maxlength="1200"
-              placeholder="Esim. osoittaa asiakkaalle vedenkäytön tulokset ja sopia ensi vuoden parannuksesta"
-            ></textarea
-            ><button class="secondary" type="submit">Muodosta katsaus</button>
-          </div>
-          <p id="goal-status" class="quiet">
-            Voit kirjata asiakkaan tavoitteen. Ilman tavoitetta käytämme toimialan oletuspainotusta.
-          </p>
-        </form>
         <div id="story" aria-live="polite"></div>
       </section>
       <section id="analysis-panel" role="tabpanel" aria-labelledby="analysis-tab" hidden>
