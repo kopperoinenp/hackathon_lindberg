@@ -5,15 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Lindström — Asiakkuuden työpöytä</title>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="brand.css" />
     <script src="data.js" defer></script>
     <script src="model.js" defer></script>
     <script src="story-model.js" defer></script>
     <script src="analysis-model.js" defer></script>
+    <script src="summary-charts.js" defer></script>
     <script src="app.js" defer></script>
   </head>
   <body>
     <header class="topbar">
-      <a class="brand" href="#">Lindström</a>
+      <a class="brand" href="#" aria-label="Lindström — asiakkuuden työpöytä"
+        ><img src="assets/lindstrom-logo.webp" alt="Lindström" width="153" height="33"
+      /></a>
       <nav class="view-tabs" role="tablist" aria-label="Työpöydän näkymä">
         <button
           id="summary-tab"

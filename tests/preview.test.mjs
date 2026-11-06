@@ -34,16 +34,28 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
   assert.deepEqual(assets.sort(), [
     "analysis-model.js",
     "app.js",
+    "brand.css",
     "data.js",
     "model.js",
     "story-model.js",
     "styles.css",
+    "summary-charts.js",
   ]);
   for (const asset of assets) {
     const response = await fetch(new URL(asset, page.url));
     assert.equal(response.status, 200, `${asset} should be served`);
     assert.ok((await response.text()).length > 0);
   }
+  const font = await fetch(new URL("assets/libre-franklin.woff2", page.url));
+  assert.equal(font.status, 200);
+  assert.equal(font.headers.get("content-type"), "font/woff2");
+  assert.equal(
+    new TextDecoder().decode(new Uint8Array(await font.arrayBuffer()).slice(0, 4)),
+    "wOF2",
+  );
+  const logo = await fetch(new URL("assets/lindstrom-logo.webp", page.url));
+  assert.equal(logo.status, 200);
+  assert.equal(logo.headers.get("content-type"), "image/webp");
   const escape = await fetch(`${origin}/%2e%2e%2fpackage.json`);
   assert.equal(escape.status, 404);
   for (const old of ["kopperoinenp-v1", "kopperoinenp-v2"]) {

@@ -1,10 +1,10 @@
 :root {
-  --paper: #f7f8f4;
-  --ink: #173c43;
-  --muted: #61776f;
-  --green: #176f54;
-  --line: #dce4d9;
-  --soft: #e8f0e4;
+  --paper: #ffffff;
+  --ink: #222222;
+  --muted: #555555;
+  --green: #003f72;
+  --line: #dddddd;
+  --soft: #eaf2f7;
   --white: #fff;
   --serif: Georgia, "Times New Roman", serif;
   font:
@@ -191,7 +191,7 @@ main {
   margin: 0;
 }
 .section-number {
-  color: #8aa38f;
+  color: #003f72;
   font: 21px var(--serif);
 }
 .results {
@@ -260,11 +260,11 @@ main {
 }
 .bar-fill {
   height: 100%;
-  background: #71a28a;
+  background: #003f72;
   border-radius: 2px;
 }
 .bar-fill.alt {
-  background: #d3ddca;
+  background: #a9c1d4;
 }
 .result small {
   font-size: 9px;
@@ -302,8 +302,8 @@ main {
   transform: rotate(-7deg);
 }
 .opportunity {
-  background: #e9f0e3;
-  border: 1px solid #dbe5d3;
+  background: #eaf2f7;
+  border: 1px solid #d7e4ed;
   border-radius: 9px;
   padding: 35px;
   display: grid;
@@ -341,14 +341,14 @@ main {
 }
 .ratio-track {
   height: 16px;
-  background: #cad7c1;
+  background: #d7e4ed;
   border-radius: 3px;
   overflow: hidden;
   display: flex;
 }
 .ratio-track span {
   display: block;
-  background: #64927a;
+  background: #003f72;
   height: 100%;
 }
 .ratio-legend {
@@ -1168,7 +1168,7 @@ main {
 .trend-track i {
   display: block;
   width: 100%;
-  background: #7ea78d;
+  background: #003f72;
   min-height: 1px;
   border-radius: 2px 2px 0 0;
 }

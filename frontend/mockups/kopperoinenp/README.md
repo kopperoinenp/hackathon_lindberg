@@ -49,3 +49,9 @@ Ruff/ESLint/Prettier checks run with `pnpm check`. See root `QUALITY.md`.
 HTML review download and browser print/PDF are included. Native PowerPoint and
 final PDF layout verification remain future work. The current monthly fixture
 does not support product drill-down; add a source dimension before offering it.
+
+The summary includes a monthly actual-versus-baseline line chart, country shares,
+monthly repair bars and a final-month site scan benchmark/donut. Every chart
+uses the current scope. The public website-derived theme, actual logo, local
+Libre Franklin font and asset provenance are documented in [BRAND_REVIEW.md](BRAND_REVIEW.md).
+The supplied PowerPoint reference is retained unchanged in `docs/references/`.

@@ -174,7 +174,7 @@
         unit: "korjausta valitulla jaksolla",
         title: "Korjaaminen tukee pidempää käyttöä",
         text: "Tekstiilejä huollettiin korjaamalla. Määrä kertoo korjaustoiminnasta; vältettyjä hankintoja tai päästöjä siitä ei suoraan päätellä.",
-        visual: `<div class="repair-picture" aria-hidden="true">${"<span></span>".repeat(6)}</div>`,
+        visual: globalThis.SummaryCharts.repairBars(context()),
         source: "Repairs",
         boundary: "Synteettinen tapahtumamäärä · ei yksilöllisiä tekstiilejä",
       },
@@ -211,6 +211,42 @@
       ],
     ];
   }
+  function summaryGraphics() {
+    const ctx = context();
+    const metric =
+      state.priority === "emissions"
+        ? "emissions"
+        : ["circularity", "efficiency"].includes(state.priority)
+          ? "repairs"
+          : "water";
+    const def = globalThis.SummaryCharts.definitions[metric];
+    const points = globalThis.SummaryCharts.comparisonPoints(ctx, metric);
+    const peak = points.reduce(
+      (best, point) => (point.actual > best.actual ? point : best),
+      points[0],
+    );
+    const shares = globalThis.SummaryCharts.countryShares(data, ctx, metric);
+    const colors = ["#003f72", "#006f86", "#578200"];
+    let end = 0;
+    const stops = shares
+      .map((point, index) => {
+        const start = end;
+        end += point.share * 100;
+        return `${colors[index % colors.length]} ${start}% ${end}%`;
+      })
+      .join(", ");
+    const total = shares.reduce((sum, point) => sum + point.value, 0);
+    return `<div class="summary-graphics"><section class="summary-chart-card"><div class="graphic-heading"><div><span class="section-kicker">KEHITYS VALITULLA JAKSOLLA</span><h3>${metric === "repairs" ? "Korjaustoiminta kuukausittain" : def.label + " vertailumalliin nähden"}</h3></div><span class="chart-period">${esc(periodName())}</span></div><div class="chart-legend"><span><i class="legend-actual"></i>Lindström</span>${metric === "repairs" ? "" : '<span><i class="legend-baseline"></i>Valittu vertailumalli</span>'}</div>${globalThis.SummaryCharts.lineChart(ctx, metric)}<div class="chart-takeaway"><strong>Suurin kuukausimäärä: ${peak.month}</strong><span>${f(peak.actual / def.divisor, 1)} ${def.unit}</span></div><p class="quiet">${metric === "repairs" ? "Synteettiset korjaustapahtumat. Määrä ei ole yksilöllisten tekstiilien määrä." : "Laskennallinen arvio. Molemmissa malleissa on sama pesty kilomäärä. Kuukausien kokonaismäärät eivät yksin osoita tehokkuutta."}</p></section><section class="summary-chart-card geography-card"><span class="section-kicker">MISTÄ KOKONAISUUS MUODOSTUU?</span><h3>${metric === "water" ? "Vedenkäyttö" : metric === "emissions" ? "Päästöt" : "Korjaukset"} maittain</h3><div class="country-donut" style="background:conic-gradient(${total ? stops : "#e4e9ed 0% 100%"})" role="img" aria-label="${shares.map((point) => `${globalThis.WorkspaceModel.countryNames[point.country]} ${f(point.share * 100, 1)} prosenttia`).join(", ")}"><div><strong>${f(total / def.divisor)}</strong><span>${def.unit} yhteensä</span></div></div><div class="country-legend">${shares.map((point, index) => `<div><i style="background:${colors[index % colors.length]}"></i><span>${globalThis.WorkspaceModel.countryNames[point.country]}</span><strong>${f(point.share * 100, 1)} %</strong></div>`).join("")}</div><p class="quiet">Osuudet valitun jakson kokonaismäärästä. Toimipaikkojen määrä ja palvelun laajuus vaikuttavat jakaumaan.</p></section></div>`;
+  }
+  function snapshotGraphic(site) {
+    const ratio = Math.max(0, Math.min(site.utilization || 0, 100));
+    return `<div class="snapshot-ring" style="--scan-angle:${ratio * 3.6}deg" role="img" aria-label="Skannattu ${f(site.scanned)} tekstiiliä, ilman skannausta ${f(site.unscanned)}, allokoitu yhteensä ${f(site.allocated)}"><div><strong>${f(site.utilization, 1)} %</strong><span>skannausosuus</span></div></div><div class="snapshot-counts"><span><i></i>${f(site.scanned)} skannattu</span><span><i></i>${f(site.unscanned)} ilman skannausta</span></div><p class="ratio-caption">Tilanne ${snapshotName()}. Osuus kertoo skannaustiedosta; varatekstiilit, sesonki ja datan puutteet tarkistetaan ennen mitoituksen muutosta.</p>`;
+  }
+  function siteBenchmark() {
+    const ctx = context(),
+      shown = ctx.sites.filter((site) => site.utilization !== null).slice(0, 5);
+    return `<div class="site-benchmark"><div><h3>${shown.length === 1 ? "Valitun toimipaikan skannausosuus" : shown.length + " pienintä toimipaikan skannausosuutta"}</h3><p class="quiet">${snapshotName()} · Selvityksen lähtökohta, ei todistettu vajaakäyttö.</p></div><div class="site-ranking">${shown.map((site) => `<div><span>${esc(site.site_name)}</span><div><i style="width:${Math.min(site.utilization, 100)}%"></i></div><strong>${f(site.utilization, 1)} %</strong></div>`).join("")}</div></div>`;
+  }
   function renderStory() {
     const { metrics: m, focus, sites, order } = context();
     if (!m.hasData) {
@@ -230,7 +266,7 @@
         })
         .join(
           "",
-        )}</div><p class="quiet">Synteettinen aineisto. Vertailu kuvaa vaihtoehtoista pesumallia samalla pestyllä määrällä, ei nimettyä kilpailijaa.</p></section><section class="story-section" aria-labelledby="opportunity-title"><div class="section-heading"><span class="section-number">02</span><h2 id="opportunity-title">Tärkein asia selvitettäväksi</h2></div><div class="opportunity"><div><span class="section-kicker">${esc(focus.site_name)}</span><h3>Vastaako tekstiilien määrä todellista tarvetta?</h3><p>${f(focus.unscanned)} allokoidulle tekstiilille ei näy aktiivista skannausta ${snapshotName()}. Aloitetaan tästä toimipaikasta ja tarkistetaan tilanne yhdessä asiakkaan kanssa.</p></div><div class="opportunity-visual"><div class="ratio">${f(focus.utilization, 0)} %<span>tekstiileistä skannattu</span></div><div class="ratio-track" role="img" aria-label="${f(focus.utilization, 1)} prosenttia ${snapshotName()} tilanteen allokoiduista tekstiileistä skannattu"><span style="width:${Math.min(focus.utilization, 100)}%"></span></div><div class="ratio-legend"><small>${f(focus.scanned)} skannattu</small><small>${f(focus.unscanned)} ilman skannausta</small></div><div class="ratio-caption">Skannaustieto ei yksin osoita vajaakäyttöä. Taustalla voi olla esimerkiksi varatekstiilejä, sesonkitarvetta tai puuttuvaa dataa.</div></div></div><details class="site-details"><summary>Katso myös muut toimipaikat</summary><div class="table-wrap"><table><thead><tr><th>Toimipaikka</th><th>Skannattu ${snapshotName()}</th><th>Allokoituja tekstiilejä</th></tr></thead><tbody>${sites.map((site) => `<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${f(site.utilization, 1)} %</td><td>${f(site.allocated)}</td></tr>`).join("")}</tbody></table></div><p class="quiet">Avaa toimipaikka nähdäksesi sen oman katsauksen. Palaa kokonaisuuteen pyytämällä apurilta ”näytä kaikki toimipaikat”.</p></details></section><section class="story-section" aria-labelledby="next-title"><div class="section-heading"><span class="section-number">03</span><h2 id="next-title">Yhteinen suunta ensi vuodelle</h2></div><div class="next-chapter"><div><h3>Yksi hyvä parannus<br />kerrallaan.</h3><p>Ota palaveriin mukaan selkeä keskustelunavaus. Nämä ovat ehdotuksia, joista sovitaan asiakkaan kanssa.</p></div><ol class="next-steps">${plan()
+        )}</div><p class="quiet">Synteettinen aineisto. Vertailu kuvaa vaihtoehtoista pesumallia samalla pestyllä määrällä, ei nimettyä kilpailijaa.</p>${summaryGraphics()}</section><section class="story-section" aria-labelledby="opportunity-title"><div class="section-heading"><span class="section-number">02</span><h2 id="opportunity-title">Tärkein asia selvitettäväksi</h2></div><div class="opportunity"><div><span class="section-kicker">${esc(focus.site_name)}</span><h3>Vastaako tekstiilien määrä todellista tarvetta?</h3><p>${f(focus.unscanned)} allokoidulle tekstiilille ei näy aktiivista skannausta ${snapshotName()}. Aloitetaan tästä toimipaikasta ja tarkistetaan tilanne yhdessä asiakkaan kanssa.</p></div><div class="opportunity-visual">${snapshotGraphic(focus)}</div></div>${siteBenchmark()}<details class="site-details"><summary>Katso myös muut toimipaikat</summary><div class="table-wrap"><table><thead><tr><th>Toimipaikka</th><th>Skannattu ${snapshotName()}</th><th>Allokoituja tekstiilejä</th></tr></thead><tbody>${sites.map((site) => `<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${f(site.utilization, 1)} %</td><td>${f(site.allocated)}</td></tr>`).join("")}</tbody></table></div><p class="quiet">Avaa toimipaikka nähdäksesi sen oman katsauksen. Palaa kokonaisuuteen pyytämällä apurilta ”näytä kaikki toimipaikat”.</p></details></section><section class="story-section" aria-labelledby="next-title"><div class="section-heading"><span class="section-number">03</span><h2 id="next-title">Yhteinen suunta ensi vuodelle</h2></div><div class="next-chapter"><div><h3>Yksi hyvä parannus<br />kerrallaan.</h3><p>Ota palaveriin mukaan selkeä keskustelunavaus. Nämä ovat ehdotuksia, joista sovitaan asiakkaan kanssa.</p></div><ol class="next-steps">${plan()
         .map(([title, note]) => `<li>${esc(title)}<small>${esc(note)}</small></li>`)
         .join(
           "",
@@ -503,7 +539,7 @@
   });
   $("#print").addEventListener("click", () => window.print());
   $("#download").addEventListener("click", () => {
-    const content = `<!doctype html><html lang="fi"><meta charset="utf-8"><title>Asiakkaan vuosikatsaus 2025</title><style>body{font:15px/1.8 Arial;color:#173c43}.slide{padding:5vw;margin:3vw;background:#f7f8f4;break-after:page}h3{font:30px Georgia}.slide-value{font-size:40px;color:#176f54}small{display:block;font-size:11px;color:#61776f}.note-text{white-space:pre-wrap}.mini-chart{max-width:460px;margin:20px 0}.bar-label{display:flex;justify-content:space-between;font-size:11px}.bar-track{height:9px;background:#e0e8d9;margin:5px 0 12px}.bar-fill{background:#71a28a;height:100%}.bar-fill.alt{background:#bdceb1}.repair-picture{display:none}@media print{.slide{margin:0}.slide:last-child{break-after:auto}}@page{size:A4 landscape}</style>${reviewHtml()}</html>`;
+    const content = `<!doctype html><html lang="fi"><meta charset="utf-8"><title>Asiakkaan vuosikatsaus 2025</title><style>body{font:15px/1.8 Arial;color:#222222}.slide{padding:5vw;margin:3vw;background:#f4f4f4;break-after:page}h3{font:bold 30px Arial}.slide-value{font-size:40px;color:#003f72}small{display:block;font-size:11px;color:#61776f}.note-text{white-space:pre-wrap}.mini-chart{max-width:460px;margin:20px 0}.bar-label{display:flex;justify-content:space-between;font-size:11px}.bar-track{height:9px;background:#e0e8d9;margin:5px 0 12px}.bar-fill{background:#003f72;height:100%}.bar-fill.alt{background:#a9c1d4}.repair-picture{display:none}.repair-bars{display:flex;height:100px;gap:5px;max-width:460px;padding:10px 0 22px}.repair-bars>div{position:relative;flex:1;display:flex;align-items:flex-end}.repair-bars>div>span{display:block;width:100%;background:#578200}.repair-bars small{position:absolute;bottom:-20px;font-size:9px}.repair-bars i{display:none}@media print{.slide{margin:0}.slide:last-child{break-after:auto}}@page{size:A4 landscape}</style>${reviewHtml()}</html>`;
     const url = URL.createObjectURL(new Blob([content], { type: "text/html;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url;
