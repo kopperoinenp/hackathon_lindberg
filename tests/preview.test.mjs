@@ -36,6 +36,7 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
     "app.js",
     "brand.css",
     "data.js",
+    "meeting-model.js",
     "model.js",
     "story-model.js",
     "styles.css",

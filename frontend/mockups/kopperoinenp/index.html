@@ -11,6 +11,7 @@
     <script src="story-model.js" defer></script>
     <script src="analysis-model.js" defer></script>
     <script src="summary-charts.js" defer></script>
+    <script src="meeting-model.js" defer></script>
     <script src="app.js" defer></script>
   </head>
   <body>
@@ -44,10 +45,25 @@
       <div class="toolbar">
         <label for="customer">Asiakas<select id="customer"></select></label
         ><button id="open-review" class="primary">
-          Valmistele esitys <span aria-hidden="true">↗</span>
+          Avaa esitys <span aria-hidden="true">↗</span>
         </button>
       </div>
       <section id="summary-panel" role="tabpanel" aria-labelledby="summary-tab">
+        <form id="goal-form" class="meeting-brief">
+          <label for="meeting-goal">Mitä haluatte saavuttaa palaverissa?</label>
+          <div>
+            <textarea
+              id="meeting-goal"
+              rows="2"
+              maxlength="1200"
+              placeholder="Esim. osoittaa asiakkaalle vedenkäytön tulokset ja sopia ensi vuoden parannuksesta"
+            ></textarea
+            ><button class="secondary" type="submit">Muodosta katsaus</button>
+          </div>
+          <p id="goal-status" class="quiet">
+            Voit kirjata asiakkaan tavoitteen. Ilman tavoitetta käytämme toimialan oletuspainotusta.
+          </p>
+        </form>
         <div id="story" aria-live="polite"></div>
       </section>
       <section id="analysis-panel" role="tabpanel" aria-labelledby="analysis-tab" hidden>
@@ -121,15 +137,41 @@
     <dialog id="review" class="review-dialog" aria-labelledby="review-title">
       <div class="dialog-heading">
         <div>
-          <span class="section-kicker">ASIAKASPALAVERIN RUNKO</span>
-          <h2 id="review-title">Katsaus on koottu sinulle</h2>
+          <span class="section-kicker">NYKYINEN ESITYSLUONNOS</span>
+          <h2 id="review-title">Asiakasesitys selaimessa</h2>
         </div>
         <button class="close" data-close="review" aria-label="Sulje esitys">×</button>
       </div>
       <p class="quiet">
-        Tarkista sisältö ennen asiakaskäyttöä. PowerPoint-vienti kuuluu jatkokehitykseen.
+        Selaa ja muokkaa nykyistä esitystä ilman lataamista. Tämä on HTML-dialuonnos; varsinainen
+        PowerPoint-tiedosto ei vielä synny mockissa.
       </p>
-      <div id="slides"></div>
+      <div class="deck-workspace">
+        <aside class="deck-editor" aria-label="Esityksen viimeistely">
+          <h3>Mitä esitykseen tulee?</h3>
+          <div id="insight-picker"></div>
+          <p class="quiet">Lähteet ja tulkinnan rajat säilyvät aina mukana.</p>
+          <label for="edit-slide-title">Nykyisen dian otsikko</label
+          ><input id="edit-slide-title" maxlength="150" />
+          <label for="deck-note">Oma palaverimuistiinpano</label
+          ><textarea
+            id="deck-note"
+            maxlength="2000"
+            rows="4"
+            placeholder="Lisätään seuraavien askelten diaan"
+          ></textarea>
+          <div id="deck-warning" class="quiet" role="status"></div>
+        </aside>
+        <div class="deck-preview">
+          <div id="slides"></div>
+          <nav class="deck-controls" aria-label="Diojen selaus">
+            <button id="previous-slide" class="secondary" aria-label="Edellinen dia">←</button
+            ><span id="slide-counter" aria-live="polite"></span
+            ><button id="next-slide" class="secondary" aria-label="Seuraava dia">→</button>
+          </nav>
+          <div id="slide-outline" class="slide-outline" aria-label="Valitse dia"></div>
+        </div>
+      </div>
       <div class="export-actions">
         <button id="print" class="primary">Tulosta / tallenna PDF</button
         ><button id="download" class="secondary">Lataa HTML-katsaus</button>

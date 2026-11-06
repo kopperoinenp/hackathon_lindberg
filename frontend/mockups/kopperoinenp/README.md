@@ -55,3 +55,17 @@ monthly repair bars and a final-month site scan benchmark/donut. Every chart
 uses the current scope. The public website-derived theme, actual logo, local
 Libre Franklin font and asset provenance are documented in [BRAND_REVIEW.md](BRAND_REVIEW.md).
 The supplied PowerPoint reference is retained unchanged in `docs/references/`.
+
+The meeting goal above the summary changes emphasis using explicit keyword rules,
+with industry defaults for unmatched goals and missing-data notices for unsupported
+financial/service goals. Every insight explains its relevance. No generative AI
+service is called.
+
+`Avaa esitys` opens the current HTML slide draft in the browser without downloading.
+Navigate with arrows, keyboard arrow keys or the slide outline. Select insights,
+edit slide headings and add a meeting note before export. Evidence and limitations
+remain mandatory. Preview, HTML download and print/PDF use the same selected content.
+Draft edits remain in memory while this page is open; a reload clears them. Scope
+changes clear headings and notes, and a customer change also clears the goal and
+resets insight selections. Native `.pptx` generation remains future work. Browser
+print/PDF page layout has not been visually verified for every possible text length.

@@ -17,6 +17,10 @@
     site: "all",
     baseline: "B_LOCAL",
     priority: "water",
+    goal: "",
+    included: [...globalThis.MeetingModel.insightIds],
+    titleEdits: {},
+    slideIndex: 0,
     note: "",
     chat: [],
   };
@@ -126,6 +130,11 @@
       tab.tabIndex = state.view === view ? 0 : -1;
     }
     $("#open-review").disabled = !ctx.metrics.hasData;
+    $("#meeting-goal").value = state.goal;
+    const goalInfo = globalThis.MeetingModel.goalFocus(state.goal, state.priority);
+    $("#goal-status").textContent = state.goal
+      ? "Tavoite ohjaa nostojen painotusta tässä sääntöpohjaisessa mockissa. " + goalInfo.gap
+      : "Voit kirjata asiakkaan tavoitteen. Ilman tavoitetta käytämme toimialan oletuspainotusta.";
     renderStory();
     renderAnalysis();
   }
@@ -262,11 +271,11 @@
       `<section class="intro"><span class="section-kicker">VUOSIPALAVERIN VALMISTELU</span><h1>${shortName} ${periodName()}.<br />Mitä saatiin aikaan?</h1><p>${opening()}</p><div class="scope"><strong>${esc(scopeName())}</strong> · ${m.sites} ${m.sites === 1 ? "toimipaikka" : "toimipaikkaa"} · Vertailu: ${baselineName()}</div></section><section class="story-section" aria-labelledby="results-title"><div class="section-heading"><span class="section-number">01</span><h2 id="results-title">Jakson tärkeimmät tulokset</h2></div><div class="results">${order
         .map((key) => {
           const card = cards[key];
-          return `<article class="result"><div class="result-name">${card.name}</div><div class="result-value">${card.value}</div><span class="result-unit">${card.unit}</span>${card.visual}<h3>${card.title}</h3><p>${card.text}</p><small>${card.boundary}</small></article>`;
+          return `<article class="result"><div class="result-name">${card.name}</div><div class="result-value">${card.value}</div><span class="result-unit">${card.unit}</span>${card.visual}<h3>${card.title}</h3><p>${card.text}</p><div class="relevance"><strong>Miksi tämä nostetaan?</strong><p>${esc(globalThis.MeetingModel.relevance(key, state.priority, Boolean(state.goal)))}</p></div><small>${card.boundary}</small></article>`;
         })
         .join(
           "",
-        )}</div><p class="quiet">Synteettinen aineisto. Vertailu kuvaa vaihtoehtoista pesumallia samalla pestyllä määrällä, ei nimettyä kilpailijaa.</p>${summaryGraphics()}</section><section class="story-section" aria-labelledby="opportunity-title"><div class="section-heading"><span class="section-number">02</span><h2 id="opportunity-title">Tärkein asia selvitettäväksi</h2></div><div class="opportunity"><div><span class="section-kicker">${esc(focus.site_name)}</span><h3>Vastaako tekstiilien määrä todellista tarvetta?</h3><p>${f(focus.unscanned)} allokoidulle tekstiilille ei näy aktiivista skannausta ${snapshotName()}. Aloitetaan tästä toimipaikasta ja tarkistetaan tilanne yhdessä asiakkaan kanssa.</p></div><div class="opportunity-visual">${snapshotGraphic(focus)}</div></div>${siteBenchmark()}<details class="site-details"><summary>Katso myös muut toimipaikat</summary><div class="table-wrap"><table><thead><tr><th>Toimipaikka</th><th>Skannattu ${snapshotName()}</th><th>Allokoituja tekstiilejä</th></tr></thead><tbody>${sites.map((site) => `<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${f(site.utilization, 1)} %</td><td>${f(site.allocated)}</td></tr>`).join("")}</tbody></table></div><p class="quiet">Avaa toimipaikka nähdäksesi sen oman katsauksen. Palaa kokonaisuuteen pyytämällä apurilta ”näytä kaikki toimipaikat”.</p></details></section><section class="story-section" aria-labelledby="next-title"><div class="section-heading"><span class="section-number">03</span><h2 id="next-title">Yhteinen suunta ensi vuodelle</h2></div><div class="next-chapter"><div><h3>Yksi hyvä parannus<br />kerrallaan.</h3><p>Ota palaveriin mukaan selkeä keskustelunavaus. Nämä ovat ehdotuksia, joista sovitaan asiakkaan kanssa.</p></div><ol class="next-steps">${plan()
+        )}</div><p class="quiet">Synteettinen aineisto. Vertailu kuvaa vaihtoehtoista pesumallia samalla pestyllä määrällä, ei nimettyä kilpailijaa.</p>${summaryGraphics()}</section><section class="story-section" aria-labelledby="opportunity-title"><div class="section-heading"><span class="section-number">02</span><h2 id="opportunity-title">Tärkein asia selvitettäväksi</h2></div><div class="opportunity"><div><span class="section-kicker">${esc(focus.site_name)}</span><h3>Vastaako tekstiilien määrä todellista tarvetta?</h3><p>${f(focus.unscanned)} allokoidulle tekstiilille ei näy aktiivista skannausta ${snapshotName()}. Aloitetaan tästä toimipaikasta ja tarkistetaan tilanne yhdessä asiakkaan kanssa.</p></div><div class="opportunity-visual">${snapshotGraphic(focus)}</div></div><p class="relevance">${esc(globalThis.MeetingModel.relevance("opportunity", state.priority, Boolean(state.goal)))}</p>${siteBenchmark()}<details class="site-details"><summary>Katso myös muut toimipaikat</summary><div class="table-wrap"><table><thead><tr><th>Toimipaikka</th><th>Skannattu ${snapshotName()}</th><th>Allokoituja tekstiilejä</th></tr></thead><tbody>${sites.map((site) => `<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${f(site.utilization, 1)} %</td><td>${f(site.allocated)}</td></tr>`).join("")}</tbody></table></div><p class="quiet">Avaa toimipaikka nähdäksesi sen oman katsauksen. Palaa kokonaisuuteen pyytämällä apurilta ”näytä kaikki toimipaikat”.</p></details></section><section class="story-section" aria-labelledby="next-title"><div class="section-heading"><span class="section-number">03</span><h2 id="next-title">Yhteinen suunta ensi vuodelle</h2></div><div class="next-chapter"><div><h3>Yksi hyvä parannus<br />kerrallaan.</h3><p>Ota palaveriin mukaan selkeä keskustelunavaus. Nämä ovat ehdotuksia, joista sovitaan asiakkaan kanssa.</p></div><ol class="next-steps">${plan()
         .map(([title, note]) => `<li>${esc(title)}<small>${esc(note)}</small></li>`)
         .join(
           "",
@@ -280,10 +289,21 @@
   }
   function clearScope() {
     state.note = "";
+    state.titleEdits = {};
+    state.slideIndex = 0;
     state.chat = [];
   }
   function reply(question) {
     const text = question.toLocaleLowerCase("fi");
+    const selection = globalThis.MeetingModel.selectionCommand(question);
+    if (selection) {
+      state.included = selection.include
+        ? [...new Set([...state.included, selection.id])]
+        : state.included.filter((id) => id !== selection.id);
+      return selection.include
+        ? "Nosto on mukana nykyisessä esityksessä. Avaa esitys tarkistaaksesi kokonaisuuden."
+        : "Poistin noston esityksestä. Se säilyy katsauksen taustatietona. Lähteet ja tulkinnan rajat pysyvät mukana.";
+    }
     let change = "";
     if (/lisää (esitykseen|katsaukseen|muistiinpano)/.test(text)) {
       state.note = question.replace(
@@ -407,24 +427,31 @@
     const { customer, metrics: m, focus, order } = context();
     const cards = results();
     let number = 0;
-    const slide = (title, content) =>
-      `<section class="slide"><div class="slide-number">LINDSTRÖM · ASIAKASKATSAUS · ${esc(periodName())} · ${++number}</div><h3>${esc(title)}</h3>${content}<small>Synteettinen aineisto · ${esc(scopeName())} · ${esc(periodName())} · Vertailu: ${baselineName()}</small></section>`;
+    const selected = globalThis.MeetingModel.slideIds(order, state.included);
+    const slide = (id, title, content) =>
+      !selected.includes(id)
+        ? ""
+        : `<section class="slide" data-slide-id="${id}"><div class="slide-number">LINDSTRÖM · ASIAKASKATSAUS · ${esc(periodName())} · ${++number}</div><h3>${esc(state.titleEdits[id] || title)}</h3>${content}<small>Synteettinen aineisto · ${esc(scopeName())} · ${esc(periodName())} · Vertailu: ${baselineName()}</small></section>`;
     let html = slide(
+      "cover",
       customer.customer_name,
-      `<p>Jakson tärkeimmät tulokset ja yhteinen suunta vuodelle 2026.</p><div class="slide-value">${m.sites} ${m.sites === 1 ? "toimipaikka" : "toimipaikkaa"}</div><p>${opening()}</p>`,
+      `<p>Jakson tärkeimmät tulokset ja yhteinen suunta vuodelle 2026.</p><div class="slide-value">${m.sites} ${m.sites === 1 ? "toimipaikka" : "toimipaikkaa"}</div><p>${opening()}</p>${state.goal ? `<p class="note-text"><strong>Palaverin tavoite:</strong> ${esc(state.goal)}</p>` : ""}`,
     );
     for (const key of order) {
       const card = cards[key];
       html += slide(
+        key,
         card.title,
-        `<div class="slide-value">${card.value}</div><p>${card.text}</p>${card.visual}<small>${card.boundary}. Lähde: ${card.source}.</small>`,
+        `<div class="slide-value">${card.value}</div><p>${card.text}</p>${card.visual}<p class="relevance">${esc(globalThis.MeetingModel.relevance(key, state.priority, Boolean(state.goal)))}</p><small>${card.boundary}. Lähde: ${card.source}.</small>`,
       );
     }
     html += slide(
+      "opportunity",
       "Tarkistetaan tekstiilien todellinen tarve",
       `<p>${esc(focus.site_name)}: ${f(focus.utilization, 1)} % ${snapshotName()} tilanteen allokoiduista tekstiileistä näkyy aktiivisissa skannauksissa. ${f(focus.unscanned)} tekstiiliä jää ilman skannausta.</p><p>Selvitetään varatekstiilien ja sesongin tarve sekä skannausdatan kattavuus. Havainto ei yksin todista vajaakäyttöä.</p><small>Lähde: Service_Activity, ${snapshotName()}.</small>`,
     );
     html += slide(
+      "plan",
       "Yhteinen suunta vuodelle 2026",
       `<ol>${plan()
         .map(([title, note]) => `<li><p>${esc(title)} ${esc(note)}</p></li>`)
@@ -434,15 +461,110 @@
     );
     const { baseline: b, compare: c } = context();
     html += slide(
+      "sources",
       "Mihin luvut perustuvat?",
       `<p>Lähde: Lindstrom_SinceAI_Customer_Value_Synthetic_Data_Pack.xlsx. Customers, Sites, Service_Activity, Customer_Impacts, Repairs ja Baselines. Jakso ${periodName()}.</p><p>Virrat summataan valitulta jaksolta. Allokointi ja aktiiviset skannaukset ovat ${snapshotName()} lopun tilanne. Korjausten määrä ei tarkoita yksilöllisiä korjattuja tekstiilejä.</p><p>Vesiero: ${f(m.kg, 1)} pestyä kg × ${f(b.water_l_per_kg, 2)} l/kg − ${f(m.water)} l = ${f(c.waterDifference)} l. Päästöero: samat pestyt kilot × ${f(b.process_kgco2e_per_kg + b.delivery_kgco2e_per_kg, 3)} kg CO₂e/kg − ${f(m.emissions)} kg CO₂e = ${f(c.emissionsDifference)} kg CO₂e.</p>`,
     );
     html += slide(
+      "limits",
       "Tulkinnan rajat",
       "<p>Kaikki asiakasluvut ovat synteettisiä. Vesi ja päästöt ovat lisäksi pesulatasolta allokoituja arvioita. Vertailumalli on havainnollistava vaihtoehto, ei nimetty kilpailija.</p><p>Rajaus kattaa pesun vedenkulutuksen sekä pesun ja toimitusten päästöt, ei koko elinkaarta. Korjausten oletettua kädenjälkeä ei lisätä päästöeroon. Herkkyysväliä ei vielä lasketa.</p><p>Skannausosuus ei todista vajaakäyttöä. Käyttäjämääriä tai euromääräisiä säästöjä ei lasketa puutteellisista lähtötiedoista. Toimialapainotus ei ole compliance-arvio.</p>",
     );
     return html;
   }
+  function renderDeck() {
+    $("#slides").innerHTML = reviewHtml();
+    const slides = [...document.querySelectorAll("#slides .slide")];
+    state.slideIndex = Math.max(0, Math.min(state.slideIndex, slides.length - 1));
+    slides.forEach((slide, index) => {
+      slide.hidden = index !== state.slideIndex;
+    });
+    const current = slides[state.slideIndex];
+    $("#slide-counter").textContent = `Dia ${state.slideIndex + 1} / ${slides.length}`;
+    $("#previous-slide").disabled = state.slideIndex === 0;
+    $("#next-slide").disabled = state.slideIndex === slides.length - 1;
+    $("#edit-slide-title").value = current.querySelector("h3").textContent;
+    $("#deck-note").value = state.note;
+    $("#slide-outline").innerHTML = slides
+      .map(
+        (slide, index) =>
+          `<button data-slide-index="${index}" aria-current="${index === state.slideIndex ? "step" : "false"}">${index + 1}. ${esc(slide.querySelector("h3").textContent)}</button>`,
+      )
+      .join("");
+    const labels = {
+      water: "Vedenkäyttö",
+      emissions: "Ilmastovaikutus",
+      repairs: "Tekstiilien huolto",
+      opportunity: "Kehitysehdotus",
+    };
+    $("#insight-picker").innerHTML = globalThis.MeetingModel.insightIds
+      .map(
+        (id) =>
+          `<label><input type="checkbox" data-insight="${id}" ${state.included.includes(id) ? "checked" : ""} />${labels[id]}</label>`,
+      )
+      .join("");
+    const empty = state.included.length === 0;
+    $("#deck-warning").textContent = empty
+      ? "Valitse vähintään yksi nosto ennen vientiä."
+      : "Muutokset säilyvät tässä välilehdessä. Otsikoiden muokkaus ei muuta laskettuja lukuja.";
+    $("#print").disabled = empty;
+    $("#download").disabled = empty;
+  }
+  $("#goal-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    state.goal = $("#meeting-goal").value.trim();
+    state.priority = globalThis.MeetingModel.goalFocus(
+      state.goal,
+      defaultPriority(context().customer),
+    ).priority;
+    render();
+    status("Katsaus päivitetty palaverin tavoitteen mukaan.");
+  });
+  $("#insight-picker").addEventListener("change", (event) => {
+    const id = event.target.dataset.insight;
+    if (!id) return;
+    state.included = event.target.checked
+      ? [...new Set([...state.included, id])]
+      : state.included.filter((key) => key !== id);
+    renderDeck();
+  });
+  $("#edit-slide-title").addEventListener("input", (event) => {
+    const current = $("#slides .slide:not([hidden])");
+    state.titleEdits[current.dataset.slideId] = event.target.value.trim();
+    current.querySelector("h3").textContent = event.target.value;
+  });
+  $("#edit-slide-title").addEventListener("change", renderDeck);
+  $("#deck-note").addEventListener("input", (event) => {
+    state.note = event.target.value;
+    $("#slides").innerHTML = reviewHtml();
+    document.querySelectorAll("#slides .slide").forEach((slide, index) => {
+      slide.hidden = index !== state.slideIndex;
+    });
+    const note = $("#meeting-note");
+    if (note) note.value = state.note;
+  });
+  function moveSlide(delta) {
+    state.slideIndex += delta;
+    renderDeck();
+  }
+  $("#previous-slide").addEventListener("click", () => moveSlide(-1));
+  $("#next-slide").addEventListener("click", () => moveSlide(1));
+  $("#slide-outline").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-slide-index]");
+    if (button) {
+      state.slideIndex = Number(button.dataset.slideIndex);
+      renderDeck();
+    }
+  });
+  $("#review").addEventListener("keydown", (event) => {
+    if (
+      event.target.matches("input,textarea,select") ||
+      !["ArrowLeft", "ArrowRight"].includes(event.key)
+    )
+      return;
+    event.preventDefault();
+    moveSlide(event.key === "ArrowRight" ? 1 : -1);
+  });
   $("#toggle-chat").addEventListener("click", () => {
     $("#chat").hidden = !$("#chat").hidden;
     updateChatToggle();
@@ -486,6 +608,8 @@
     .join("");
   $("#customer").addEventListener("change", (event) => {
     state.customer = event.target.value;
+    state.goal = "";
+    state.included = [...globalThis.MeetingModel.insightIds];
     state.site = "all";
     state.country = "all";
     state.continent = "all";
@@ -534,7 +658,7 @@
     $("#evidence").showModal();
   });
   $("#open-review").addEventListener("click", () => {
-    $("#slides").innerHTML = reviewHtml();
+    renderDeck();
     $("#review").showModal();
   });
   $("#print").addEventListener("click", () => window.print());
