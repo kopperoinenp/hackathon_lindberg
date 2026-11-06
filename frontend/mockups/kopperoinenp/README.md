@@ -61,10 +61,10 @@ with neutral ordering for unmatched goals and missing-data notices for unsupport
 financial/service goals. Every insight explains its relevance. No generative AI
 service is called.
 
-Each customer's first summary visit starts with a chat-style briefing screen.
+Each customer's first summary visit starts with one briefing form containing separate context and goal fields.
 Submit meeting context/goals or explicitly choose the unweighted default review.
 Only then are the summary, charts, composer and presentation action shown. The
-completed briefing and goal are stored per customer in browser localStorage and
+completed briefing, context and goal are stored per customer in browser localStorage and
 restored on later visits; they are not shared between browsers or users. Technical
 data exploration remains independently accessible. Storage failure falls back to
 the current page session with a visible notice.

@@ -8,7 +8,10 @@
       return value?.completed === true &&
         typeof value.goal === "string" &&
         value.goal.length <= 1200
-        ? { goal: value.goal }
+        ? {
+            goal: value.goal,
+            context: typeof value.context === "string" ? value.context.slice(0, 1200) : "",
+          }
         : null;
     } catch {
       return null;

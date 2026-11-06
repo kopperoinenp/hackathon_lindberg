@@ -53,20 +53,35 @@
           <span class="section-kicker">ALOITETAAN ASIAKKAAN TAVOITTEESTA</span>
           <h1 id="onboarding-title">Millainen palaveri valmistellaan?</h1>
           <p id="onboarding-customer"></p>
-          <div class="brief-message">
-            Kerro palaverin lähtötiedot ja tavoite: mikä asiakkaalle on tärkeää, mistä haluatte
-            keskustella ja mitä haluatte sopia? Voit mainita myös toivotun painotuksen.
-          </div>
+          <p class="brief-intro">
+            Kerro palaverin lähtötiedot ja mitä haluatte saavuttaa. Näiden pohjalta muodostamme
+            asiakkaan katsauksen.
+          </p>
           <form id="onboarding-form">
-            <label for="onboarding-brief" class="sr-only"
-              >Palaverin lähtötiedot ja tavoitteet</label
-            >
-            <textarea
-              id="onboarding-brief"
-              rows="4"
-              maxlength="1200"
-              placeholder="Esim. vuosipalaveri hankintajohtajan kanssa. Haluamme osoittaa ilmastovaikutuksen ja sopia ensi vuoden kehityskohteesta."
-            ></textarea>
+            <div class="brief-fields">
+              <div class="brief-field">
+                <label for="onboarding-context">Palaverin lähtötiedot</label>
+                <p id="context-help">Kenelle katsaus tehdään ja mistä palaverissa keskustellaan?</p>
+                <textarea
+                  id="onboarding-context"
+                  rows="4"
+                  maxlength="1200"
+                  aria-describedby="context-help"
+                  placeholder="Esim. vuosipalaveri hankintajohtajan kanssa. Käymme läpi vuoden palvelut ja asiakkaan muuttuneet tarpeet."
+                ></textarea>
+              </div>
+              <div class="brief-field">
+                <label for="onboarding-brief">Palaverin tavoitteet</label>
+                <p id="goal-help">Mikä asiakkaalle on tärkeää ja mitä haluatte sopia?</p>
+                <textarea
+                  id="onboarding-brief"
+                  rows="4"
+                  maxlength="1200"
+                  aria-describedby="goal-help"
+                  placeholder="Esim. osoittaa ilmastovaikutus ja sopia ensi vuoden kehityskohteesta sekä seurannasta."
+                ></textarea>
+              </div>
+            </div>
             <div class="onboarding-actions">
               <button type="submit" class="primary">Luo asiakaskatsaus</button
               ><button type="button" id="default-review" class="text-button">
@@ -81,7 +96,14 @@
           </p>
         </section>
         <form id="goal-form" class="meeting-brief">
-          <label for="meeting-goal">Mitä haluatte saavuttaa palaverissa?</label>
+          <label for="meeting-context">Palaverin lähtötiedot</label>
+          <textarea
+            id="meeting-context"
+            rows="2"
+            maxlength="1200"
+            placeholder="Palaverin osallistujat, tilanne ja keskusteltavat asiat"
+          ></textarea>
+          <label for="meeting-goal">Palaverin tavoitteet</label>
           <div>
             <textarea
               id="meeting-goal"

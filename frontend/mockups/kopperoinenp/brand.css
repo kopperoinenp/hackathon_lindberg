@@ -1055,3 +1055,84 @@ button:disabled {
     text-align: center;
   }
 }
+
+/* Shared briefing form: separate context and goal fields. */
+.onboarding .brief-intro {
+  max-width: 640px;
+  margin: 22px auto 30px;
+  font-size: 15px;
+}
+#onboarding-form {
+  padding: 26px;
+  text-align: left;
+}
+.brief-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+.brief-field {
+  min-width: 0;
+}
+.brief-field label {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: #003f72;
+  margin-bottom: 8px;
+}
+.brief-field p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #687680;
+  min-height: 38px;
+  margin: 0 0 12px;
+}
+#onboarding-form .brief-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 165px;
+  padding: 15px;
+  border: 1px solid #c9d5de !important;
+  border-radius: 12px;
+  background: #fafcfd;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.8;
+  resize: vertical;
+  outline: none;
+  margin: 0;
+  box-shadow: none !important;
+}
+#onboarding-form .brief-field textarea:focus {
+  border-color: #003f72 !important;
+  box-shadow: 0 0 0 3px #003f7210 !important;
+  background: white;
+}
+#onboarding-form:focus-within {
+  border-color: #c9d5de;
+  box-shadow: 0 10px 40px #003f720d;
+}
+#onboarding-form .onboarding-actions {
+  margin-top: 20px;
+  padding: 0;
+}
+#meeting-context {
+  width: 100%;
+  margin-bottom: 20px;
+}
+@media (max-width: 650px) {
+  .brief-fields {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .brief-field p {
+    min-height: 0;
+  }
+  #onboarding-form {
+    padding: 20px;
+  }
+  #onboarding-form .brief-field textarea {
+    min-height: 125px;
+  }
+}

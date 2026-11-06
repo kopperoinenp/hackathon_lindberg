@@ -19,6 +19,7 @@
     priority: "neutral",
     initialized: false,
     goal: "",
+    briefingContext: "",
     included: [...globalThis.MeetingModel.insightIds],
     titleEdits: {},
     slideIndex: 0,
@@ -36,11 +37,15 @@
     }
     state.initialized = Boolean(saved);
     state.goal = saved?.goal || "";
+    state.briefingContext = saved?.context || "";
     state.priority = globalThis.MeetingModel.goalFocus(state.goal, "neutral").priority;
   }
   function saveBrief() {
     try {
-      localStorage.setItem(briefKey(), JSON.stringify({ completed: true, goal: state.goal }));
+      localStorage.setItem(
+        briefKey(),
+        JSON.stringify({ completed: true, goal: state.goal, context: state.briefingContext }),
+      );
     } catch {
       status(
         "Katsaus avattiin. Selain ei salli aloituksen tallennusta, joten sitä kysytään uudelleen sivun päivityksen jälkeen.",
@@ -159,6 +164,7 @@
     }
     $("#open-review").disabled = !ctx.metrics.hasData;
     $("#meeting-goal").value = state.goal;
+    $("#meeting-context").value = state.briefingContext;
     const goalInfo = globalThis.MeetingModel.goalFocus(state.goal, state.priority);
     $("#goal-status").textContent = state.goal
       ? "Tavoite ohjaa nostojen painotusta tässä sääntöpohjaisessa mockissa. " + goalInfo.gap
@@ -465,7 +471,7 @@
     let html = slide(
       "cover",
       customer.customer_name,
-      `<p>Jakson tärkeimmät tulokset ja yhteinen suunta vuodelle 2026.</p><div class="slide-value">${m.sites} ${m.sites === 1 ? "toimipaikka" : "toimipaikkaa"}</div><p>${opening()}</p>${state.goal ? `<p class="note-text"><strong>Palaverin tavoite:</strong> ${esc(state.goal)}</p>` : ""}`,
+      `<p>Jakson tärkeimmät tulokset ja yhteinen suunta vuodelle 2026.</p><div class="slide-value">${m.sites} ${m.sites === 1 ? "toimipaikka" : "toimipaikkaa"}</div><p>${opening()}</p>${state.briefingContext ? `<p class="note-text"><strong>Palaverin lähtötiedot:</strong> ${esc(state.briefingContext)}</p>` : ""}${state.goal ? `<p class="note-text"><strong>Palaverin tavoite:</strong> ${esc(state.goal)}</p>` : ""}`,
     );
     for (const key of order) {
       const card = cards[key];
@@ -543,6 +549,7 @@
   $("#goal-form").addEventListener("submit", (event) => {
     event.preventDefault();
     state.goal = $("#meeting-goal").value.trim();
+    state.briefingContext = $("#meeting-context").value.trim();
     state.priority = globalThis.MeetingModel.goalFocus(state.goal, "neutral").priority;
     saveBrief();
     render();
@@ -550,6 +557,7 @@
   });
   function startReview(useDefaults) {
     state.goal = useDefaults ? "" : $("#onboarding-brief").value.trim();
+    state.briefingContext = useDefaults ? "" : $("#onboarding-context").value.trim();
     state.priority = globalThis.MeetingModel.goalFocus(state.goal, "neutral").priority;
     state.initialized = true;
     state.view = "summary";
@@ -652,6 +660,7 @@
   $("#customer").addEventListener("change", (event) => {
     state.customer = event.target.value;
     $("#onboarding-brief").value = "";
+    $("#onboarding-context").value = "";
     state.included = [...globalThis.MeetingModel.insightIds];
     state.site = "all";
     state.country = "all";

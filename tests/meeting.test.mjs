@@ -6,8 +6,17 @@ test("onboarding distinguishes an explicitly chosen default from an unstarted cu
   assert.equal(model.parseBrief(null), null);
   assert.equal(model.parseBrief("invalid"), null);
   assert.equal(model.parseBrief('{"completed":false,"goal":"Vesi"}'), null);
-  assert.deepEqual(model.parseBrief('{"completed":true,"goal":""}'), { goal: "" });
-  assert.deepEqual(model.parseBrief('{"completed":true,"goal":"Ilmasto"}'), { goal: "Ilmasto" });
+  assert.deepEqual(model.parseBrief('{"completed":true,"goal":""}'), { goal: "", context: "" });
+  assert.deepEqual(model.parseBrief('{"completed":true,"goal":"Ilmasto"}'), {
+    goal: "Ilmasto",
+    context: "",
+  });
+  assert.deepEqual(
+    model.parseBrief(
+      JSON.stringify({ completed: true, goal: "Ilmasto", context: "Vuosipalaveri" }),
+    ),
+    { goal: "Ilmasto", context: "Vuosipalaveri" },
+  );
   assert.equal(model.goalFocus("", "neutral").priority, "neutral");
 });
 test("meeting goals select a relevant priority without inventing financial data", () => {
