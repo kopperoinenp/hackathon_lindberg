@@ -1,9 +1,13 @@
-// Loopback-only static preview. No uploads, backend or dependency required.
+// Loopback-only workspace and presentation API. Provider secrets stay server-side.
 import { createServer } from "node:http";
-import { watch } from "node:fs";
+import { watch, existsSync } from "node:fs";
+import { handlePresentationApi } from "../backend/presentation-api.mjs";
 import { readFile, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+
+const envFile = fileURLToPath(new URL("../.env", import.meta.url));
+if (existsSync(envFile)) process.loadEnvFile(envFile);
 
 const root = fileURLToPath(new URL("../frontend/mockups/", import.meta.url));
 const mime = {
@@ -17,7 +21,12 @@ const mime = {
 const port = Number(process.env.PORT || 4173);
 const clients = new Set();
 let reloadTimer;
-watch(root, { recursive: true }, () => {
+watch(root, { recursive: true }, (_event, filename) => {
+  if (
+    !filename ||
+    ![".html", ".js", ".css", ".webp", ".woff2"].includes(path.extname(String(filename)))
+  )
+    return;
   clearTimeout(reloadTimer);
   reloadTimer = setTimeout(() => {
     for (const client of clients) client.write("data: reload\n\n");
@@ -26,6 +35,7 @@ watch(root, { recursive: true }, () => {
 const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url, "http://127.0.0.1");
+    if (await handlePresentationApi(request, response, url)) return;
     if (url.pathname === "/__preview_events") {
       response.writeHead(200, {
         "Content-Type": "text/event-stream",

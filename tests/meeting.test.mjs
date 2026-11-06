@@ -5,13 +5,20 @@ const model = globalThis.MeetingModel;
 test("presentation selection retains evidence and respects insight order", () => {
   assert.deepEqual(model.slideIds(["emissions", "water", "repairs"], ["water", "opportunity"]), [
     "cover",
+    "overview",
     "water",
     "opportunity",
     "plan",
     "sources",
     "limits",
   ]);
-  assert.deepEqual(model.slideIds(["water"], []), ["cover", "plan", "sources", "limits"]);
+  assert.deepEqual(model.slideIds(["water"], []), [
+    "cover",
+    "overview",
+    "plan",
+    "sources",
+    "limits",
+  ]);
 });
 test("simulated presentation commands distinguish adding notes from selecting insights", () => {
   assert.deepEqual(model.selectionCommand("Poista vesidia esityksestä"), {

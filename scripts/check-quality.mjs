@@ -19,6 +19,7 @@ const steps = [
     [
       "node_modules/eslint/bin/eslint.js",
       "frontend/mockups",
+      "backend",
       "scripts",
       "tests",
       "eslint.config.mjs",
@@ -30,6 +31,7 @@ const steps = [
       "node_modules/prettier/bin/prettier.cjs",
       "--check",
       "frontend/mockups",
+      "backend",
       "scripts",
       "tests",
       "package.json",

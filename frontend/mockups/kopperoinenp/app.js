@@ -19,7 +19,8 @@
     priority: "neutral",
     included: [...globalThis.MeetingModel.insightIds],
     titleEdits: {},
-    slideIndex: 0,
+    generating: false,
+    readyPresentation: null,
     note: "",
     chat: [],
   };
@@ -95,6 +96,7 @@
         )}</select></div><div class="trend-chart" style="grid-template-columns:repeat(${points.length}, minmax(0,1fr))" role="img" aria-label="${def.label}: ${points.map((point) => `${point.month} ${f(point.value / def.divisor, 1)} ${def.unit}`).join(", ")}">${points.map((point) => `<div class="trend-column"><span>${f(point.value / def.divisor)}</span><div class="trend-track"><i style="height:${(point.value / max) * 100}%"></i></div><small>${point.month.slice(5)}</small></div>`).join("")}</div><p class="quiet">${def.label} (${def.unit}) · Synteettinen ${state.metric === "repairs" ? "tapahtumamäärä" : "allokoitu arvio"}. Kuukausien kokonaismäärät, ei tehokkuusvertailu.</p></section><section class="analysis-card"><h2>Jakauma maittain</h2>${countries.map((point) => `<div class="country-row"><div><span>${globalThis.WorkspaceModel.countryNames[point.country]}</span><strong>${f(point.value / def.divisor, 1)} ${def.unit}</strong></div><div class="bar-track"><div class="bar-fill" style="width:${(point.value / countryMax) * 100}%"></div></div></div>`).join("")}<p class="quiet">${def.label} valitulta ajalta. Maakohtainen kokonaismäärä riippuu myös palvelun laajuudesta.</p></section></div><section class="analysis-card"><h2>Toimipaikat ja tekstiilien käyttö</h2><p class="quiet">Tilanne ${snapshotName()}. Skannausosuus ei yksin osoita vajaakäyttöä. Vesi ja korjaukset ovat koko valitulta jaksolta.</p><div class="table-wrap"><table><thead><tr><th>Toimipaikka</th><th>Maa</th><th>Skannattu</th><th>Allokoitu</th><th>Vesi, m³</th><th>Korjaukset</th></tr></thead><tbody>${ctx.sites.map((site) => `<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${globalThis.WorkspaceModel.countryNames[site.country]}</td><td>${site.utilization == null ? "Ei tietoa" : f(site.utilization, 1) + " %"}</td><td>${f(site.allocated)}</td><td>${f(site.water / 1000)}</td><td>${f(site.repairs)}</td></tr>`).join("")}</tbody></table></div></section>`;
   }
   function render() {
+    invalidatePowerPoint();
     const ctx = context();
     const months = [...new Set(data.records.map((row) => row.month))].sort();
     for (const id of ["from", "to"]) {
@@ -128,7 +130,7 @@
       tab.setAttribute("aria-selected", String(state.view === view));
       tab.tabIndex = state.view === view ? 0 : -1;
     }
-    $("#open-review").disabled = !ctx.metrics.hasData;
+    $("#open-review").disabled = !ctx.metrics.hasData || state.generating || !state.included.length;
     renderStory();
     renderAnalysis();
   }
@@ -286,7 +288,6 @@
   function clearScope() {
     state.note = "";
     state.titleEdits = {};
-    state.slideIndex = 0;
     state.chat = [];
   }
   function reply(question) {
@@ -296,6 +297,7 @@
       state.included = selection.include
         ? [...new Set([...state.included, selection.id])]
         : state.included.filter((id) => id !== selection.id);
+      render();
       return selection.include
         ? "Nosto on mukana nykyisessä esityksessä. Avaa esitys tarkistaaksesi kokonaisuuden."
         : "Poistin noston esityksestä. Se säilyy katsauksen taustatietona. Lähteet ja tulkinnan rajat pysyvät mukana.";
@@ -419,138 +421,6 @@
     $("#chat").hidden = false;
     updateChatToggle();
   }
-  function reviewHtml() {
-    const { customer, metrics: m, focus, order } = context();
-    const cards = results();
-    let number = 0;
-    const selected = globalThis.MeetingModel.slideIds(order, state.included);
-    const slide = (id, title, content) =>
-      !selected.includes(id)
-        ? ""
-        : `<section class="slide" data-slide-id="${id}"><div class="slide-number">LINDSTRÖM · ASIAKASKATSAUS · ${esc(periodName())} · ${++number}</div><h3>${esc(state.titleEdits[id] || title)}</h3>${content}<small>Synteettinen aineisto · ${esc(scopeName())} · ${esc(periodName())} · Vertailu: ${baselineName()}</small></section>`;
-    let html = slide(
-      "cover",
-      customer.customer_name,
-      `<p>Jakson tärkeimmät tulokset ja yhteinen suunta vuodelle 2026.</p><div class="slide-value">${m.sites} ${m.sites === 1 ? "toimipaikka" : "toimipaikkaa"}</div><p>${opening()}</p>`,
-    );
-    for (const key of order) {
-      const card = cards[key];
-      html += slide(
-        key,
-        card.title,
-        `<div class="slide-value">${card.value}</div><p>${card.text}</p>${card.visual}<p class="relevance">${esc(globalThis.MeetingModel.relevance(key, state.priority, false))}</p><small>${card.boundary}. Lähde: ${card.source}.</small>`,
-      );
-    }
-    html += slide(
-      "opportunity",
-      "Tarkistetaan tekstiilien todellinen tarve",
-      `<p>${esc(focus.site_name)}: ${f(focus.utilization, 1)} % ${snapshotName()} tilanteen allokoiduista tekstiileistä näkyy aktiivisissa skannauksissa. ${f(focus.unscanned)} tekstiiliä jää ilman skannausta.</p><p>Selvitetään varatekstiilien ja sesongin tarve sekä skannausdatan kattavuus. Havainto ei yksin todista vajaakäyttöä.</p><small>Lähde: Service_Activity, ${snapshotName()}.</small>`,
-    );
-    html += slide(
-      "plan",
-      "Yhteinen suunta vuodelle 2026",
-      `<ol>${plan()
-        .map(([title, note]) => `<li><p>${esc(title)} ${esc(note)}</p></li>`)
-        .join(
-          "",
-        )}</ol>${state.note ? `<p class="note-text">Account managerin muistiinpano: ${esc(state.note)}</p>` : ""}<small>Keskusteluehdotuksia, eivät vielä sovittuja toimenpiteitä.</small>`,
-    );
-    const { baseline: b, compare: c } = context();
-    html += slide(
-      "sources",
-      "Mihin luvut perustuvat?",
-      `<p>Lähde: Lindstrom_SinceAI_Customer_Value_Synthetic_Data_Pack.xlsx. Customers, Sites, Service_Activity, Customer_Impacts, Repairs ja Baselines. Jakso ${periodName()}.</p><p>Virrat summataan valitulta jaksolta. Allokointi ja aktiiviset skannaukset ovat ${snapshotName()} lopun tilanne. Korjausten määrä ei tarkoita yksilöllisiä korjattuja tekstiilejä.</p><p>Vesiero: ${f(m.kg, 1)} pestyä kg × ${f(b.water_l_per_kg, 2)} l/kg − ${f(m.water)} l = ${f(c.waterDifference)} l. Päästöero: samat pestyt kilot × ${f(b.process_kgco2e_per_kg + b.delivery_kgco2e_per_kg, 3)} kg CO₂e/kg − ${f(m.emissions)} kg CO₂e = ${f(c.emissionsDifference)} kg CO₂e.</p>`,
-    );
-    html += slide(
-      "limits",
-      "Tulkinnan rajat",
-      "<p>Kaikki asiakasluvut ovat synteettisiä. Vesi ja päästöt ovat lisäksi pesulatasolta allokoituja arvioita. Vertailumalli on havainnollistava vaihtoehto, ei nimetty kilpailija.</p><p>Rajaus kattaa pesun vedenkulutuksen sekä pesun ja toimitusten päästöt, ei koko elinkaarta. Korjausten oletettua kädenjälkeä ei lisätä päästöeroon. Herkkyysväliä ei vielä lasketa.</p><p>Skannausosuus ei todista vajaakäyttöä. Käyttäjämääriä tai euromääräisiä säästöjä ei lasketa puutteellisista lähtötiedoista. Toimialapainotus ei ole compliance-arvio.</p>",
-    );
-    return html;
-  }
-  function renderDeck() {
-    $("#slides").innerHTML = reviewHtml();
-    const slides = [...document.querySelectorAll("#slides .slide")];
-    state.slideIndex = Math.max(0, Math.min(state.slideIndex, slides.length - 1));
-    slides.forEach((slide, index) => {
-      slide.hidden = index !== state.slideIndex;
-    });
-    const current = slides[state.slideIndex];
-    $("#slide-counter").textContent = `Dia ${state.slideIndex + 1} / ${slides.length}`;
-    $("#previous-slide").disabled = state.slideIndex === 0;
-    $("#next-slide").disabled = state.slideIndex === slides.length - 1;
-    $("#edit-slide-title").value = current.querySelector("h3").textContent;
-    $("#deck-note").value = state.note;
-    $("#slide-outline").innerHTML = slides
-      .map(
-        (slide, index) =>
-          `<button data-slide-index="${index}" aria-current="${index === state.slideIndex ? "step" : "false"}">${index + 1}. ${esc(slide.querySelector("h3").textContent)}</button>`,
-      )
-      .join("");
-    const labels = {
-      water: "Vedenkäyttö",
-      emissions: "Ilmastovaikutus",
-      repairs: "Tekstiilien huolto",
-      opportunity: "Kehitysehdotus",
-    };
-    $("#insight-picker").innerHTML = globalThis.MeetingModel.insightIds
-      .map(
-        (id) =>
-          `<label><input type="checkbox" data-insight="${id}" ${state.included.includes(id) ? "checked" : ""} />${labels[id]}</label>`,
-      )
-      .join("");
-    const empty = state.included.length === 0;
-    $("#deck-warning").textContent = empty
-      ? "Valitse vähintään yksi nosto ennen vientiä."
-      : "Muutokset säilyvät tässä välilehdessä. Otsikoiden muokkaus ei muuta laskettuja lukuja.";
-    $("#print").disabled = empty;
-    $("#download").disabled = empty;
-  }
-  $("#insight-picker").addEventListener("change", (event) => {
-    const id = event.target.dataset.insight;
-    if (!id) return;
-    state.included = event.target.checked
-      ? [...new Set([...state.included, id])]
-      : state.included.filter((key) => key !== id);
-    renderDeck();
-  });
-  $("#edit-slide-title").addEventListener("input", (event) => {
-    const current = $("#slides .slide:not([hidden])");
-    state.titleEdits[current.dataset.slideId] = event.target.value.trim();
-    current.querySelector("h3").textContent = event.target.value;
-  });
-  $("#edit-slide-title").addEventListener("change", renderDeck);
-  $("#deck-note").addEventListener("input", (event) => {
-    state.note = event.target.value;
-    $("#slides").innerHTML = reviewHtml();
-    document.querySelectorAll("#slides .slide").forEach((slide, index) => {
-      slide.hidden = index !== state.slideIndex;
-    });
-    const note = $("#meeting-note");
-    if (note) note.value = state.note;
-  });
-  function moveSlide(delta) {
-    state.slideIndex += delta;
-    renderDeck();
-  }
-  $("#previous-slide").addEventListener("click", () => moveSlide(-1));
-  $("#next-slide").addEventListener("click", () => moveSlide(1));
-  $("#slide-outline").addEventListener("click", (event) => {
-    const button = event.target.closest("[data-slide-index]");
-    if (button) {
-      state.slideIndex = Number(button.dataset.slideIndex);
-      renderDeck();
-    }
-  });
-  $("#review").addEventListener("keydown", (event) => {
-    if (
-      event.target.matches("input,textarea,select") ||
-      !["ArrowLeft", "ArrowRight"].includes(event.key)
-    )
-      return;
-    event.preventDefault();
-    moveSlide(event.key === "ArrowRight" ? 1 : -1);
-  });
   $("#toggle-chat").addEventListener("click", () => {
     $("#chat").hidden = !$("#chat").hidden;
     updateChatToggle();
@@ -620,7 +490,10 @@
       field.value = "";
     });
   document.addEventListener("input", (event) => {
-    if (event.target.id === "meeting-note") state.note = event.target.value;
+    if (event.target.id === "meeting-note") {
+      state.note = event.target.value;
+      invalidatePowerPoint();
+    }
   });
   document.addEventListener("click", (event) => {
     const button = event.target.closest("button");
@@ -642,20 +515,94 @@
     $("#evidence-content").innerHTML = evidenceHtml();
     $("#evidence").showModal();
   });
-  $("#open-review").addEventListener("click", () => {
-    renderDeck();
-    $("#review").showModal();
-  });
-  $("#print").addEventListener("click", () => window.print());
-  $("#download").addEventListener("click", () => {
-    const content = `<!doctype html><html lang="fi"><meta charset="utf-8"><title>Asiakkaan vuosikatsaus 2025</title><style>body{font:15px/1.8 Arial;color:#222222}.slide{padding:5vw;margin:3vw;background:#f4f4f4;break-after:page}h3{font:bold 30px Arial}.slide-value{font-size:40px;color:#003f72}small{display:block;font-size:11px;color:#61776f}.note-text{white-space:pre-wrap}.mini-chart{max-width:460px;margin:20px 0}.bar-label{display:flex;justify-content:space-between;font-size:11px}.bar-track{height:9px;background:#e0e8d9;margin:5px 0 12px}.bar-fill{background:#003f72;height:100%}.bar-fill.alt{background:#a9c1d4}.repair-picture{display:none}.repair-bars{display:flex;height:100px;gap:5px;max-width:460px;padding:10px 0 22px}.repair-bars>div{position:relative;flex:1;display:flex;align-items:flex-end}.repair-bars>div>span{display:block;width:100%;background:#578200}.repair-bars small{position:absolute;bottom:-20px;font-size:9px}.repair-bars i{display:none}@media print{.slide{margin:0}.slide:last-child{break-after:auto}}@page{size:A4 landscape}</style>${reviewHtml()}</html>`;
-    const url = URL.createObjectURL(new Blob([content], { type: "text/html;charset=utf-8" }));
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${state.customer}-vuosikatsaus-2025.html`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    status("HTML-katsaus ladattu.");
+  function invalidatePowerPoint(force = false) {
+    const ready = state.readyPresentation;
+    if (
+      !force &&
+      ready &&
+      ready.request === JSON.stringify(presentationRequest()) &&
+      Date.now() < ready.expires
+    )
+      return;
+    state.readyPresentation = null;
+    const link = $("#download-powerpoint");
+    link.removeAttribute("href");
+    link.setAttribute("aria-disabled", "true");
+    link.title = "Luo esitys ensin";
+  }
+  function presentationRequest() {
+    const scope = Object.fromEntries(
+      ["customer", "from", "to", "country", "continent", "site", "baseline", "priority"].map(
+        (key) => [key, state[key]],
+      ),
+    );
+    return { scope, included: state.included, titleEdits: state.titleEdits, note: state.note };
+  }
+  $("#open-review").addEventListener("click", async () => {
+    if (state.generating) return;
+    invalidatePowerPoint();
+    const viewer = window.open("/kopperoinenp/presentation.html", "_blank");
+    if (!viewer) {
+      status("Salli esityksen avautuminen uuteen välilehteen ja yritä uudelleen.");
+      return;
+    }
+    viewer.opener = null;
+    const request = JSON.stringify(presentationRequest());
+    const button = $("#open-review");
+    state.generating = true;
+    button.disabled = true;
+    button.textContent = "Valmistellaan…";
+    try {
+      if (state.readyPresentation) {
+        const available = await fetch(`/api/presentations/${state.readyPresentation.id}`);
+        if (available.ok) {
+          if (!viewer.closed) viewer.location.replace(state.readyPresentation.viewUrl);
+          return;
+        }
+        invalidatePowerPoint(true);
+      }
+      const response = await fetch("/api/presentations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: request,
+      });
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result.error || "Esitystä ei voitu luoda. Yritä uudelleen.");
+      if (request !== JSON.stringify(presentationRequest()))
+        throw new Error(
+          "Katsaus muuttui valmistelun aikana. Avaa esitys uudelleen nykyisillä valinnoilla.",
+        );
+      const viewUrl = `/kopperoinenp/presentation.html?id=${encodeURIComponent(result.id)}`;
+      state.readyPresentation = {
+        id: result.id,
+        viewUrl,
+        request,
+        expires: Date.now() + result.expiresInSeconds * 1000,
+      };
+      const link = $("#download-powerpoint");
+      link.href = result.downloadUrl;
+      link.setAttribute("aria-disabled", "false");
+      link.title = "Lataa PowerPoint";
+      setTimeout(
+        () => {
+          if (state.readyPresentation?.id === result.id) invalidatePowerPoint();
+        },
+        result.expiresInSeconds * 1000 + 100,
+      );
+      if (!viewer.closed) viewer.location.replace(viewUrl);
+    } catch (error) {
+      const message = error.message || "Esitystä ei voitu luoda. Yritä uudelleen.";
+      status(message);
+      if (!viewer.closed)
+        viewer.location.replace(
+          `/kopperoinenp/presentation.html?error=${encodeURIComponent(message)}`,
+        );
+    } finally {
+      state.generating = false;
+      button.innerHTML = 'Avaa esitys <span aria-hidden="true">↗</span>';
+      button.disabled = !context().metrics.hasData || !state.included.length;
+    }
   });
   render();
 })();

@@ -1141,3 +1141,39 @@ button:disabled {
     padding: 16px;
   }
 }
+
+.toolbar {
+  justify-content: flex-start;
+  gap: 12px;
+}
+.toolbar > label {
+  margin-right: auto;
+}
+.download-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #dce2e7;
+  border-radius: 50%;
+  color: #003f72;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.download-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.download-icon:hover {
+  background: #eef4f8;
+}
+.download-icon[aria-disabled="true"] {
+  opacity: 0.35;
+  pointer-events: none;
+}

@@ -46,8 +46,8 @@ data/source/Lindstrom_SinceAI_Customer_Value_Synthetic_Data_Pack.xlsx` (one comm
 The Node reference tests, filter/stock/chart tests, preview smoke test and normal
 Ruff/ESLint/Prettier checks run with `pnpm check`. See root `QUALITY.md`.
 
-HTML review download and browser print/PDF are included. Native PowerPoint and
-final PDF layout verification remain future work. The current monthly fixture
+HTML review download and browser print/PDF are included. Editable native PowerPoint export is available through the local presentation
+service. Final PDF layout verification remains future work. The current monthly fixture
 does not support product drill-down; add a source dimension before offering it.
 
 The summary includes a monthly actual-versus-baseline line chart, country shares,
@@ -61,10 +61,13 @@ briefing form or required goals. Previously saved browser briefings are ignored.
 Users can adjust emphasis through the simulated chat or detailed analysis controls.
 Every insight explains its relevance. No generative AI service is called.
 
-`Avaa esitys` opens the current HTML slide draft in the browser without downloading.
-Navigate with arrows, keyboard arrow keys or the slide outline. Select insights,
-edit slide headings and add a meeting note before export. Evidence and limitations
-remain mandatory. Preview, HTML download and print/PDF use the same selected content.
-Draft edits remain in memory while this page is open; a reload clears them. Scope
-changes clear headings and notes, and a customer change resets insight selections and emphasis. Native `.pptx` generation remains future work. Browser
-print/PDF page layout has not been visually verified for every possible text length.
+`Avaa esitys` prepares the current review and opens it in a separate browser tab.
+The adjacent icon downloads the genuine editable PowerPoint. The viewer shows
+one slide at a time with arrows and a download icon, using the same validated
+content as the PPTX. Content/scope changes invalidate an older download link.
+Ready unchanged reviews are reused for ten minutes without another model call.
+
+The current interface is approved as the product baseline (docs/UI_BASELINE.md).
+OpenAI and Copilot are interchangeable behind the backend presentation-plan
+contract. The main summary chat remains simulated; only presentation planning
+is connected to AI in this first integration. API keys never enter this frontend.

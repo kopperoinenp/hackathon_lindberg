@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 
 test("preview redirects to the mock and serves every relative asset", async (t) => {
   const child = spawn(process.execPath, ["scripts/preview.mjs"], {
-    env: { ...process.env, PORT: "0" },
+    env: { ...process.env, PORT: "0", PRESENTATION_PROVIDER: "deterministic" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   t.after(() => child.kill());
@@ -62,6 +62,60 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
   for (const old of ["kopperoinenp-v1", "kopperoinenp-v2"]) {
     assert.equal((await fetch(`${origin}/${old}/index.html`)).status, 404);
   }
+  const config = await (await fetch(`${origin}/api/presentations/config`)).json();
+  assert.equal(config.provider, "deterministic");
+  assert.ok(!Object.hasOwn(config, "OPENAI_API_KEY"));
+  const denied = await fetch(`${origin}/api/presentations`, {
+    method: "POST",
+    headers: { Origin: "https://untrusted.example", "Content-Type": "application/json" },
+    body: "{}",
+  });
+  assert.equal(denied.status, 403);
+  const oversized = await fetch(`${origin}/api/presentations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ note: "x".repeat(34000) }),
+  });
+  assert.equal(oversized.status, 413);
+  const invalid = await fetch(`${origin}/api/presentations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ included: [] }),
+  });
+  assert.equal(invalid.status, 400);
+  const created = await fetch(`${origin}/api/presentations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scope: { customer: "CUST003" }, included: ["repairs"] }),
+  });
+  assert.equal(created.status, 201);
+  const presentation = await created.json();
+  assert.deepEqual(
+    presentation.slides.map((slide) => slide.id),
+    ["cover", "overview", "repairs", "plan", "sources", "limits"],
+  );
+  const reused = await fetch(`${origin}/api/presentations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scope: { customer: "CUST003" }, included: ["repairs"] }),
+  });
+  assert.equal(reused.status, 200);
+  assert.equal((await reused.json()).id, presentation.id);
+  const viewer = await fetch(`${origin}/kopperoinenp/presentation.html?id=${presentation.id}`);
+  assert.equal(viewer.status, 200);
+  assert.match(await viewer.text(), /presentation-viewer.js/);
+  const preview = await (await fetch(`${origin}/api/presentations/${presentation.id}`)).json();
+  assert.deepEqual(
+    preview.slides.map((slide) => slide.id),
+    presentation.slides.map((slide) => slide.id),
+  );
+  assert.equal(preview.standard.story, "customer-value-story-v1");
+  assert.equal(preview.standard.template, "lindstrom-reference-2026-11-06-v1");
+  const download = await fetch(`${origin}${presentation.downloadUrl}`);
+  assert.equal(download.status, 200);
+  assert.match(download.headers.get("content-type"), /presentationml/);
+  assert.match(download.headers.get("content-disposition"), /CUST003/);
+  assert.ok((await download.arrayBuffer()).byteLength > 10000);
   const stream = await fetch(`${origin}/__preview_events`);
   assert.match(stream.headers.get("content-type"), /text\/event-stream/);
   const reader = stream.body.getReader();
