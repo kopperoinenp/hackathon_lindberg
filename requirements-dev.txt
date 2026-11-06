@@ -1,0 +1,2 @@
+# Development tooling only; no backend runtime dependencies.
+ruff==0.17.4

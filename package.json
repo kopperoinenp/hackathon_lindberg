@@ -1,0 +1,23 @@
+{
+  "name": "lindstrom-frontend-mocks",
+  "private": true,
+  "packageManager": "pnpm@11.25.0",
+  "description": "Development checks for independent, buildless frontend prototypes",
+  "scripts": {
+    "check": "node scripts/check-quality.mjs",
+    "lint": "eslint frontend/mockups scripts tests eslint.config.mjs",
+    "format:check": "prettier --check frontend/mockups scripts tests package.json eslint.config.mjs .prettierrc.json .github/workflows/quality.yml",
+    "format": "prettier --write frontend/mockups scripts tests package.json eslint.config.mjs .prettierrc.json .github/workflows/quality.yml",
+    "test": "node --test tests/*.test.mjs",
+    "preview": "node scripts/preview.mjs"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.14.0",
+    "globals": "17.14.0",
+    "prettier": "3.9.10"
+  }
+}

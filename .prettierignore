@@ -1,0 +1,4 @@
+# Generated from the source workbook, reproducible with extract_fixture.py.
+**/data.js
+node_modules/
+.venv/
