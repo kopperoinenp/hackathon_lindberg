@@ -1,21 +1,13 @@
-# Frontend mock versions
+# Frontend mocks
 
-Each team member creates their own version in `<github-username>-v<number>/`.
-Default: create a new folder; do not replace another person's mock. These are
-independent experiments, not an approved application stack.
+Each team member maintains one directory named after their GitHub username.
+Edit your own mock in place instead of creating v1/v2/v3 copies. Coordinate shared
+files and use separate branches for independent work.
 
-| Version                                       | Human owner  | Scope                                                                               | Status                  |
-| --------------------------------------------- | ------------ | ----------------------------------------------------------------------------------- | ----------------------- |
-| [kopperoinenp-v1](kopperoinenp-v1/index.html) | kopperoinenp | Annual review preparation, source transparency, simulated assistant, review preview | Ready for team review   |
-| [kopperoinenp-v2](kopperoinenp-v2/index.html) | kopperoinenp | Simpler visual customer story with assistant-led detail                             | Current preview default |
+| Mock                                    | Human owner  | Scope                                                        |
+| --------------------------------------- | ------------ | ------------------------------------------------------------ |
+| [kopperoinenp](kopperoinenp/index.html) | kopperoinenp | Customer presentation and detailed analysis in one workspace |
 
-Vikke and Eero can add `vikkejohansson-v1/` and `EeroNieminen-v1/` on their own
-branches. Register versions here in a coordinated PR. No parallel tasks are
-assigned by this document. The team chooses one version after comparing them.
-
-Review criteria: can an account manager select a customer, identify useful
-observations, inspect evidence/assumptions, adapt the story and prepare a clear
-customer meeting? Compare ease of use and credibility, not visual polish alone.
-
-Only use synthetic data in these prototypes. No backend, production AI, real
-customer uploads, authentication or hosting is included. Never add secrets.
+Other team members may create their own username directories. No parallel tasks
+are assigned by this register. Compare the user workflows before choosing the team
+solution. Use only synthetic data and keep provider credentials out of frontend code.

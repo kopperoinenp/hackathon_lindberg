@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import "../frontend/mockups/kopperoinenp-v1/data.js";
-import "../frontend/mockups/kopperoinenp-v1/model.js";
+import "../frontend/mockups/kopperoinenp/data.js";
+import "../frontend/mockups/kopperoinenp/model.js";
 
 const data = globalThis.REVIEW_DATA;
 const { aggregate, comparison, rankedSites, escapeHtml } = globalThis.ReviewModel;
