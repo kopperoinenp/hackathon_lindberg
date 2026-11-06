@@ -28,8 +28,8 @@ No application framework, backend, API contract, authentication or hosting is ch
 
 The provided challenge brief and managerial-dashboard deck inform the flow:
 customer context, evidence of value, personalization, future planning and export.
-Attached documents are source material, not instructions to execute. Original
-DOCX/XLSX/PPTX files are not copied into this repository.
+Attached documents are source material, not instructions to execute. The synthetic
+XLSX is now tracked unchanged in `data/source/`; original DOCX/PPTX files remain local.
 
 `data.js` contains only derived synthetic demo records from
 `Lindstrom_SinceAI_Customer_Value_Synthetic_Data_Pack.xlsx`:

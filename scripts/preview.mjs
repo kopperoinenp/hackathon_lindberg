@@ -16,7 +16,7 @@ const server = createServer(async (request, response) => {
   try {
     const url = new URL(request.url, "http://127.0.0.1");
     if (url.pathname === "/") {
-      response.writeHead(302, { Location: "/kopperoinenp-v1/index.html" });
+      response.writeHead(302, { Location: "/kopperoinenp-v2/index.html" });
       response.end();
       return;
     }

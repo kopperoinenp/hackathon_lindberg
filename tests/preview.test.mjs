@@ -27,10 +27,16 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
   });
   const page = await fetch(origin);
   assert.equal(page.status, 200);
-  assert.ok(page.url.endsWith("/kopperoinenp-v1/index.html"));
+  assert.ok(page.url.endsWith("/kopperoinenp-v2/index.html"));
   const html = await page.text();
   const assets = [...html.matchAll(/(?:src|href)="([^"#]+\.(?:js|css))"/g)].map((m) => m[1]);
-  assert.deepEqual(assets.sort(), ["app.js", "data.js", "model.js", "styles.css"]);
+  assert.deepEqual(assets.sort(), [
+    "../kopperoinenp-v1/data.js",
+    "../kopperoinenp-v1/model.js",
+    "app.js",
+    "story-model.js",
+    "styles.css",
+  ]);
   for (const asset of assets) {
     const response = await fetch(new URL(asset, page.url));
     assert.equal(response.status, 200, `${asset} should be served`);
