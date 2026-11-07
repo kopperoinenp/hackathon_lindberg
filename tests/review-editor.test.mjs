@@ -23,6 +23,7 @@ test("the workspace is one page and folds rarely used settings away", async () =
   const app = await readFile(new URL("app.js", root), "utf8");
   assert.doesNotMatch(app, /view-tabs/);
   assert.doesNotMatch(page, /view-tabs/);
+  assert.doesNotMatch(page, /Find slides to add|Hide usage from the customer/);
   const more = page.indexOf('id="more-settings"');
   for (const id of ["filters", "reset-dashboard"])
     assert.ok(page.indexOf(`id="${id}"`) > more, `${id} is in More settings`);
@@ -52,6 +53,7 @@ test("approval is the main action and teammates' sections stay reachable", async
   assert.match(page, /id="download-powerpoint" class="primary"/);
   assert.doesNotMatch(page, /approve-review|back-today|customer-profile-kpis|relationship-status/);
   const editor = page.indexOf('id="review-editor"');
-  for (const id of ["upsell-proposals", "review-basics-picker"])
+  assert.doesNotMatch(page, /id="upsell-proposals"/);
+  for (const id of ["review-area-picker", "review-basics-picker"])
     assert.ok(page.indexOf(`id="${id}"`) > editor, `${id} is in the panel`);
 });

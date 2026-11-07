@@ -135,6 +135,9 @@ test("PowerPoint export contains editable chart data, sources, notes and scope",
   assert.match(xml, /2025-01/);
   assert.match(xml, /About the figures/);
   assert.match(xml, /Sovitaan seuranta/);
+  assert.match(xml, /Counting them per 100 washes helps compare periods/);
+  assert.match(xml, /Where the service could improve/);
+  assert.match(xml, /Track repairs per 100 washes for the same textile types/);
   const types = await zip.file("[Content_Types].xml").async("string");
   for (const match of types.matchAll(/<Override\b[^>]*PartName="([^"]+)"/g))
     assert.ok(zip.file(match[1].slice(1)), `Missing OOXML part: ${match[1]}`);

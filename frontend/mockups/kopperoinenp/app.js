@@ -112,7 +112,7 @@
   let deckRequest = "";
   let deckSlides = [];
   let deckFooter = "";
-  let searchIndex = 0;
+  let searchIndex = -1;
   let storageMessage;
   const reviewSignature = (workspace) => JSON.stringify({ ...workspace, view: undefined });
   function storageStatus(fi, en) {
@@ -325,11 +325,11 @@
     ["locations", "List of all locations"],
   ];
   const basicsPresets = [
-    ["brief", "Brief", "Key results only", []],
-    ["standard", "Standard", "Selected areas", ["scope", "year"]],
-    ["full", "Full", "All available areas", basicsSections.map(([id]) => id)],
+    ["brief", "Brief", []],
+    ["standard", "Standard", ["scope", "year"]],
+    ["full", "Full", basicsSections.map(([id]) => id)],
   ];
-  const customerBasics = () => state.customerBasics ?? basicsPresets[1][3];
+  const customerBasics = () => state.customerBasics ?? basicsPresets[1][2];
   function applyBasicsSelection() {
     const chosen = customerBasics();
     const overview = $("#customer-overview");
@@ -349,8 +349,8 @@
     const same = (ids) => ids.length === chosen.length && ids.every((id) => chosen.includes(id));
     const options = basicsPresets
       .map(
-        ([id, label, hint, ids]) =>
-          `<option value="${id}" ${same(ids) ? "selected" : ""}>${t(label)} – ${t(hint)}</option>`,
+        ([id, label, ids]) =>
+          `<option value="${id}" ${same(ids) ? "selected" : ""}>${t(label)}</option>`,
       )
       .join("");
     return `<fieldset class="area-picker meeting-advice"><legend>${t("Presentation length")}</legend><select id="basics-level" aria-label="${t("Presentation length")}">${options}</select></fieldset>`;
@@ -713,7 +713,6 @@
     renderCustomerOverview();
     renderReviewContent();
     renderStory();
-    renderUpsells();
     renderDashboardEdits();
     renderDashboardLayout();
     if ($("#analysis-panel").open) renderAnalysis();
@@ -745,38 +744,6 @@
       : `Investigate long service cycles at ${site} and agree a pilot to track its effect on P90.`;
     return { title, headline, comparison, recurrence, boundary, action, finding };
   }
-  function renderUpsells() {
-    const proposals = globalThis.UpsellModel.proposals(data, state, language);
-    const accepted = globalThis.UpsellModel.approved(proposals, state.approvedUpsells);
-    const stale = state.approvedUpsells.length - accepted.length;
-    const disabled = state.asking || state.generating ? "disabled" : "";
-    const rows = proposals
-      .map(
-        (proposal) =>
-          `<label class="kpi-checkbox"><input type="checkbox" data-upsell-id="${esc(proposal.id)}" ${accepted.some((item) => item.id === proposal.id) ? "checked" : ""} ${disabled} /><span title="${esc(proposal.benefit)}"><strong>${esc(proposal.title)}</strong><small>${esc(proposal.benefit)}</small></span></label>`,
-      )
-      .join("");
-    $("#upsell-proposals").hidden = !proposals.length;
-    $("#upsell-proposals").innerHTML = proposals.length
-      ? `<h3>${esc(t("Offer in the presentation"))}</h3>${rows}${stale ? `<button type="button" id="clear-upsell-approvals" class="text-button">${esc(t("Clear all opportunity approvals for this customer"))}</button>` : ""}`
-      : "";
-  }
-  $("#upsell-proposals").addEventListener("change", (event) => {
-    const id = event.target.dataset.upsellId;
-    if (!id || state.asking || state.generating) return;
-    const proposal = globalThis.UpsellModel.proposals(data, state, language).find(
-      (row) => row.id === id,
-    );
-    if (!proposal) return;
-    state.approvedUpsells = state.approvedUpsells.filter((row) => row.id !== id);
-    if (event.target.checked) state.approvedUpsells.push({ id, evidenceKey: proposal.evidenceKey });
-    render();
-  });
-  $("#upsell-proposals").addEventListener("click", (event) => {
-    if (event.target.id !== "clear-upsell-approvals" || state.asking || state.generating) return;
-    state.approvedUpsells = [];
-    render();
-  });
   function customerKpis() {
     return state.contractKpis;
   }
@@ -1687,9 +1654,10 @@
     return [...kept, state.included.find((id) => id !== "opportunity") ?? "water"];
   }
   function deckAreas() {
+    if (state.evidenceAreas !== null) return customerAreas();
     const chosen = customerBasics();
     const level = basicsPresets.find(
-      ([, , , ids]) => ids.length === chosen.length && ids.every((id) => chosen.includes(id)),
+      ([, , ids]) => ids.length === chosen.length && ids.every((id) => chosen.includes(id)),
     )?.[0];
     if (level === "brief") return [];
     if (level !== "full") return customerAreas();
@@ -1708,7 +1676,12 @@
         .trim();
     return deckAreas()
       .filter((id) => !["scorecard", ...Object.values(areaSlides)].includes(id))
-      .filter((id) => !evidence[id]?.missing || kpis.some((kpi) => kpi.area === id && kpi.actual))
+      .filter(
+        (id) =>
+          !evidence[id]?.missing ||
+          state.evidenceAreas?.includes(id) ||
+          kpis.some((kpi) => kpi.area === id && kpi.actual),
+      )
       .map((id) => {
         if (id === "performance" && steering) {
           const { title, headline, comparison, recurrence, boundary, finding } = steering;
@@ -1749,9 +1722,12 @@
           headline: plain(
             block.missing && kpi ? `${kpi.label}: ${kpi.actual}` : (block.headline ?? ""),
           ).slice(0, 400),
-          points: (block.stats ?? [])
-            .slice(0, 4)
-            .map(([value, label]) => plain(`${value} ${label}`).slice(0, 160)),
+          points:
+            block.missing && !kpi
+              ? [block.text.slice(0, 160)]
+              : (block.stats ?? [])
+                  .slice(0, 4)
+                  .map(([value, label]) => plain(`${value} ${label}`).slice(0, 160)),
           stats:
             block.missing && kpi
               ? [{ value: kpi.actual.slice(0, 40), label: kpi.label.slice(0, 80) }]
@@ -1823,7 +1799,7 @@
   function slideKind(id) {
     if (id.startsWith("area-")) return "area";
     if (id.startsWith("upsell-")) return "upsell";
-    if (id === "summary") return "summary";
+    if (id === "summary" || id === "prior-goals") return "summary";
     return "main";
   }
   function slideNote(id) {
@@ -1850,7 +1826,7 @@
           const { id } = slide;
           const position = main.indexOf(id);
           const titled = !["upsell", "summary"].includes(slideKind(id));
-          const noted = titled;
+          const noted = titled && id !== "cover";
           return `<div class="deck-item" data-slide="${esc(id)}">${globalThis.SlideRender.html(slide, deckFooter, t, { editableTitle: titled })}<div class="deck-actions">${noted ? `<button type="button" data-slide-action="note">${t("Add text")}</button>` : ""}<button type="button" data-slide-action="ask">${t("Ask the assistant")}</button>${movable(id) && movable(main[position - 1] ?? "cover") ? `<button type="button" data-slide-action="up" aria-label="${t("Move up")}">↑</button>` : ""}${movable(id) && movable(main[position + 1] ?? "limits") ? `<button type="button" data-slide-action="down" aria-label="${t("Move down")}">↓</button>` : ""}${removable(id) ? `<button type="button" data-slide-action="remove">${t("Remove slide")}</button>` : ""}</div>${noted ? `<textarea class="slide-note" data-slide-note="${esc(id)}" maxlength="2000" aria-label="${t("Add text")}" ${open.has(id) ? "" : "hidden"}>${esc(slideNote(id))}</textarea>` : ""}</div>`;
         })
         .join("") +
@@ -2069,7 +2045,7 @@
       keywords: `${customer.industry} ${industryKeywords[customer.industry] ?? ""}`,
     }));
     const found = globalThis.SalesModel.matchCustomers(rows, query, rows.length);
-    searchIndex = Math.min(searchIndex, Math.max(found.length - 1, 0));
+    searchIndex = Math.min(searchIndex, found.length - 1);
     $("#today-label").textContent = query.trim()
       ? found.length
         ? ""
@@ -2081,38 +2057,53 @@
           `<button type="button" id="customer-option-${index}" class="customer-option" role="option" aria-selected="${index === searchIndex}" data-open-customer="${esc(id)}"><strong>${esc(name)}</strong><small>${esc(industry)}</small></button>`,
       )
       .join("");
-    $("#customer-search").setAttribute(
-      "aria-activedescendant",
-      found.length ? `customer-option-${searchIndex}` : "",
-    );
+    const search = $("#customer-search");
+    if (searchIndex < 0) search.removeAttribute("aria-activedescendant");
+    else search.setAttribute("aria-activedescendant", `customer-option-${searchIndex}`);
   }
   $("#customer-search").addEventListener("input", () => {
-    searchIndex = 0;
+    searchIndex = -1;
     renderToday();
   });
   $("#customer-search").addEventListener("keydown", (event) => {
     const options = [...document.querySelectorAll(".customer-option")];
     if (event.key === "Enter") {
       event.preventDefault();
-      options.at(searchIndex)?.click();
+      options[searchIndex]?.click();
       return;
     }
     if (!["ArrowDown", "ArrowUp"].includes(event.key) || !options.length) return;
     event.preventDefault();
     const step = event.key === "ArrowDown" ? 1 : -1;
-    searchIndex = (searchIndex + step + options.length) % options.length;
+    const start = searchIndex < 0 && step < 0 ? 0 : searchIndex;
+    searchIndex = (start + step + options.length) % options.length;
     renderToday();
+    document.getElementById(`customer-option-${searchIndex}`).scrollIntoView({ block: "nearest" });
   });
-  // The customising panel stays closed behind a settings button at the page edge.
+  const panelToggle = $("#panel-toggle");
+  const reviewEditor = $("#review-editor");
+  const topbar = $(".topbar");
+  const syncDrawerTop = () =>
+    $("#workspace").style.setProperty("--review-header-height", `${topbar.offsetHeight}px`);
+  syncDrawerTop();
+  new ResizeObserver(syncDrawerTop).observe(topbar, { box: "border-box" });
+  function updatePanelToggle(open) {
+    const label = t(open ? "Close" : "Customise the review");
+    panelToggle.setAttribute("aria-expanded", String(open));
+    panelToggle.setAttribute("aria-label", label);
+    panelToggle.title = label;
+    panelToggle.firstElementChild.textContent = open ? "×" : "⚙";
+  }
   function setPanel(open) {
     document.body.classList.toggle("panel-open", open);
-    $("#panel-toggle").setAttribute("aria-expanded", String(open));
-    $("#review-editor").inert = !open;
-    $(open ? "#panel-close" : "#panel-toggle").focus();
+    if (!open) panelToggle.focus({ preventScroll: true });
+    reviewEditor.inert = !open;
+    updatePanelToggle(open);
   }
-  $("#review-editor").inert = true;
-  $("#panel-toggle").addEventListener("click", () => setPanel(true));
-  $("#panel-close").addEventListener("click", () => setPanel(false));
+  reviewEditor.inert = true;
+  panelToggle.addEventListener("click", () =>
+    setPanel(!document.body.classList.contains("panel-open")),
+  );
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && document.body.classList.contains("panel-open")) setPanel(false);
   });
@@ -2157,23 +2148,22 @@
   function renderReviewContent() {
     renderMeetingAdvice();
     $("#review-basics-picker").innerHTML = basicsPickerHtml();
-    const chosen = customerAreas();
+    const chosen = deckAreas();
     const evidence = context().metrics.hasData ? areaEvidence() : {};
     const kpis = customerKpis();
-    // Every pill is one slide: areas that cannot produce a slide are not offered.
-    const offered = evidenceAreas
-      .map(([id]) => id)
-      .filter(
-        (id) =>
-          !["scorecard", "future"].includes(id) &&
-          (!evidence[id]?.missing || kpis.some((kpi) => kpi.area === id && kpi.actual)),
-      );
-    const pill = (id) =>
-      `<label class="area-pill"><input type="checkbox" data-area-toggle="${id}" ${chosen.includes(id) ? "checked" : ""} /><span>${t(evidenceAreas.find(([area]) => area === id)[1])}</span></label>`;
-    const selected = offered.filter((id) => chosen.includes(id));
-    const available = offered.filter((id) => !chosen.includes(id));
+    const options = evidenceAreas
+      .filter(([id]) => !["scorecard", "future"].includes(id))
+      .map(([id, label]) => {
+        const checked =
+          chosen.includes(id) &&
+          (!evidence[id]?.missing ||
+            state.evidenceAreas?.includes(id) ||
+            kpis.some((kpi) => kpi.area === id && kpi.actual));
+        return `<label><input type="checkbox" data-area-toggle="${id}" ${checked ? "checked" : ""} /><span>${t(label)}</span></label>`;
+      })
+      .join("");
     $("#review-area-picker").innerHTML =
-      `<fieldset class="area-picker"><legend>${t("What to show this customer")}</legend><div class="area-pills">${selected.map(pill).join("")}</div>${available.length ? `<div class="area-pills is-available">${available.map(pill).join("")}</div>` : ""}</fieldset>`;
+      `<fieldset class="area-picker area-options"><legend>${t("What to show this customer")}</legend>${options}</fieldset>`;
   }
   function renderStory() {
     const { metrics: m, focus, sites, order, customer } = context();
@@ -2306,7 +2296,7 @@
   }
   document.addEventListener("change", (event) => {
     if (event.target.id !== "basics-level") return;
-    state.customerBasics = [...basicsPresets.find(([id]) => id === event.target.value)[3]];
+    state.customerBasics = [...basicsPresets.find(([id]) => id === event.target.value)[2]];
     state.chatRevision += 1;
     render();
     $("#basics-level")?.focus();
@@ -2314,9 +2304,9 @@
   document.addEventListener("change", (event) => {
     const area = event.target.dataset?.areaToggle;
     if (!area) return;
-    const chosen = new Set(customerAreas());
-    if (event.target.checked) chosen.add(area);
-    else chosen.delete(area);
+    const chosen = new Set(customerAreas().filter((id) => id === "scorecard" || id === "future"));
+    for (const input of document.querySelectorAll("[data-area-toggle]:checked"))
+      chosen.add(input.dataset.areaToggle);
     if (area === "adoption" && event.target.checked) state.hideUsage = false;
     state.evidenceAreas = areaOrder(chosen);
     state.chatRevision += 1;
@@ -2696,7 +2686,6 @@
       state.chat.push({ user: false, text: text });
     } finally {
       state.asking = false;
-      renderUpsells();
       renderChat();
       updateChatToggle();
     }
@@ -3029,6 +3018,7 @@
   });
   function applyLanguage() {
     updateLanguage();
+    updatePanelToggle(document.body.classList.contains("panel-open"));
     if (storageMessage) storageStatus(storageMessage.fi, storageMessage.en);
     updateChatToggle();
     render();

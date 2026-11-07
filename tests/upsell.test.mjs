@@ -116,7 +116,11 @@ test("chat can reorder review slides while approved opportunities stay before th
     {
       generate: async ({ input }) => {
         const context = JSON.parse(input);
-        assert.equal(context.presentationSlides.length, before.length - 2);
+        assert.equal(context.presentationSlides.length, before.length - 3);
+        assert.deepEqual(
+          context.presentationSlides.slice(0, 2).map(({ id }) => id),
+          ["cover", "overview"],
+        );
         assert.equal(context.workspace.cooperationDescription, undefined);
         assert.equal(context.workspace.cooperationReason, undefined);
         return {
@@ -131,7 +135,7 @@ test("chat can reorder review slides while approved opportunities stay before th
   const after = buildPresentation(result.workspace).slides;
   assert.deepEqual(
     after.map(({ id }) => id),
-    [before[2], before[0], before[1], ...before.slice(3)].map(({ id }) => id),
+    [before[3], before[0], before[1], before[2], ...before.slice(4)].map(({ id }) => id),
   );
   assert.equal(result.workspace.cooperationDescription, workspace.cooperationDescription);
   assert.equal(result.workspace.cooperationReason, workspace.cooperationReason);

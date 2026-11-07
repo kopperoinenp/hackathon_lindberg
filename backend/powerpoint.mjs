@@ -146,23 +146,98 @@ export async function renderPowerPoint(deck) {
         margin: 0,
       });
       item.kpis.forEach((kpi, i) => tile(kpi, 0.6 + i * 4.05, 3.35, 3.8, 1.9, true));
+    } else if (layout === "goals") {
+      item.kpis.forEach((goal, i) => {
+        const y = 2.13 + i * 1.27;
+        const tone = goal.tone === "better" ? "17602F" : "9C1C1C";
+        const goalText = (text, x, offset, w, h, options) =>
+          slide.addText(text, {
+            x,
+            y: y + offset,
+            w,
+            h,
+            margin: 0,
+            color: templateStandard.blue,
+            fit: "shrink",
+            ...options,
+          });
+        slide.addShape(pptx.ShapeType.roundRect, {
+          x: 0.6,
+          y,
+          w: 12.1,
+          h: 1.13,
+          rectRadius: 0.08,
+          line: { color: "F2F6F9" },
+          fill: { color: "F2F6F9" },
+        });
+        goalText(goal.label, 0.85, 0.2, 3.1, 0.7, { fontSize: 18, bold: true });
+        goalText(t("Target"), 4.05, 0.15, 2.55, 0.24, { fontSize: 12 });
+        goalText(goal.target, 4.05, 0.43, 2.55, 0.36, { fontSize: 19, bold: true });
+        goalText("→", 6.7, 0.12, 2, 0.32, { fontSize: 22, align: "center" });
+        goalText(`${goal.delta} ${t("vs target")}`, 6.7, 0.51, 2, 0.4, {
+          fontSize: 13,
+          bold: true,
+          align: "center",
+          color: tone,
+        });
+        goalText(t("Actual"), 8.95, 0.15, 3.45, 0.24, { fontSize: 12 });
+        goalText(goal.value, 8.95, 0.43, 3.45, 0.36, { fontSize: 19, bold: true });
+        goalText(
+          t(goal.tone === "better" ? "Target met" : "Target missed"),
+          8.95,
+          0.82,
+          3.45,
+          0.2,
+          {
+            fontSize: 11,
+            color: tone,
+          },
+        );
+      });
     } else if (layout === "kpis") {
-      item.kpis.forEach((kpi, i) => tile(kpi, 0.6 + i * 3.05, 2.6, 2.85, 2.3, false));
+      if (item.kpis.length > 4)
+        item.kpis.forEach((kpi, i) =>
+          tile(kpi, 0.6 + (i % 3) * 4.05, 2.15 + Math.floor(i / 3) * 1.85, 3.8, 1.65, false),
+        );
+      else item.kpis.forEach((kpi, i) => tile(kpi, 0.6 + i * 3.05, 2.6, 2.85, 2.3, false));
     } else if (layout === "steps") {
+      const top = item.lead ? 3.15 : 2.3;
+      if (item.lead) {
+        slide.addText([item.lead, ...(item.fine ?? [])].join("\n"), {
+          x: 0.6,
+          y: 2.05,
+          w: 11.8,
+          h: 0.62,
+          fontSize: 16,
+          color: "33475A",
+          margin: 0,
+          fit: "shrink",
+        });
+        slide.addText(t("Next steps"), {
+          x: 0.6,
+          y: 2.76,
+          w: 11.8,
+          h: 0.3,
+          fontSize: 16,
+          bold: true,
+          color: templateStandard.blue,
+          margin: 0,
+        });
+      }
       item.steps.forEach((step, i) => {
         const x = 0.6 + i * 4.05;
         slide.addShape(pptx.ShapeType.roundRect, {
           x,
-          y: 2.3,
+          y: top,
           w: 3.8,
-          h: 3.4,
+          h: 5.7 - top,
           rectRadius: 0.12,
           line: { color: "F2F6F9" },
           fill: { color: "F2F6F9" },
         });
         slide.addText(String(i + 1), {
           x: x + 0.3,
-          y: 2.5,
+          y: top + 0.2,
           w: 1,
           h: 0.8,
           fontSize: 40,
@@ -172,9 +247,9 @@ export async function renderPowerPoint(deck) {
         });
         slide.addText(step, {
           x: x + 0.3,
-          y: 3.35,
+          y: top + 1.05,
           w: 3.2,
-          h: 2.15,
+          h: 5.5 - top - 1.05,
           fontSize: 20,
           color: templateStandard.blue,
           margin: 0,
@@ -348,15 +423,21 @@ export async function renderPowerPoint(deck) {
       });
     if (item.boundary || item.source)
       slide.addText(
-        [item.boundary, item.source ? t`Source: ${item.source}` : ""].filter(Boolean).join(" · "),
+        [
+          item.boundary ? `${t("Context")}: ${item.boundary}` : "",
+          item.source ? t`Source: ${item.source}` : "",
+        ]
+          .filter(Boolean)
+          .join(" · "),
         {
           x: 0.6,
           y: 6.25,
           w: 12.1,
-          h: 0.3,
-          fontSize: 10,
-          color: cover ? "FFFFFF" : "5F707D",
-          margin: 0,
+          h: 0.46,
+          fontSize: 12,
+          color: cover ? "FFFFFF" : "33475A",
+          fill: { color: cover ? "174E79" : "F2F6F9" },
+          margin: [3, 8, 3, 8],
           fit: "shrink",
         },
       );

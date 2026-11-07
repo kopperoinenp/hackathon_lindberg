@@ -1,8 +1,11 @@
 import "../frontend/mockups/kopperoinenp/language.js";
 import { dataset as data } from "./dataset.mjs";
+import { demoCooperation2025 } from "./demo-cooperation.mjs";
+import { priorGoalsSlide } from "./prior-review.mjs";
 import "../frontend/mockups/kopperoinenp/model.js";
 import "../frontend/mockups/kopperoinenp/story-model.js";
 import "../frontend/mockups/kopperoinenp/analysis-model.js";
+import "../frontend/mockups/kopperoinenp/analysis-tools.js";
 import "../frontend/mockups/kopperoinenp/meeting-model.js";
 import "../frontend/mockups/kopperoinenp/upsell-model.js";
 
@@ -32,6 +35,11 @@ const defaults = {
   baseline: "B_LOCAL",
   priority: "neutral",
 };
+function periodLabel({ from, to }) {
+  if (from === to) return from;
+  const year = from.slice(0, 4);
+  return from === `${year}-01` && to === `${year}-12` ? year : `${from}–${to}`;
+}
 function validAreaStats(stats) {
   return (
     Array.isArray(stats) &&
@@ -226,6 +234,27 @@ export function buildPresentation(input) {
         : t("All sites");
   const footer = t`Synthetic data · ${scopeName} · ${period} · Baseline: ${baseline}`;
   const difference = (delta, pct) => `${delta >= 0 ? "−" : "+"}${f(Math.abs(pct))} %`;
+  const repairRate = (metrics) => (metrics?.washed ? (metrics.repairs / metrics.washed) * 100 : 0);
+  const cycle = globalThis.WorkspaceModel.serviceCycleFinding(data, request.scope);
+  const finding = cycle
+    ? t`${cycle.site}: 90% of service cycles finished within ${f(cycle.actual, 1)} h. The median for other sites was ${f(cycle.reference, 1)} h.`
+    : m.washed
+      ? t`The selected period had ${f(repairRate(m), 1)} repairs per 100 washes.`
+      : t("The selected period has too little wash data to compare repair rates.");
+  const investigation = cycle
+    ? t("Check whether delays cluster around pickup or return before changing the schedule.")
+    : t("Compare repair rates by site and textile type, then check which repair reasons recur.");
+  const nextSteps = cycle
+    ? [
+        t`Review a sample of the longest cycles at ${cycle.site}.`,
+        t("If a recurring delay is confirmed, assign an owner to test a change at that handoff."),
+        t("Compare the time within which 90% of cycles finish before and after the trial."),
+      ]
+    : [
+        t("Review the repair reasons for the textile types with the highest repair rates."),
+        t("If a wear pattern recurs, assign an owner to test a change in handling or care."),
+        t("Track repairs per 100 washes for the same textile types after the trial."),
+      ];
   const slides = {
     cover: {
       id: "cover",
@@ -259,7 +288,6 @@ export function buildPresentation(input) {
         ),
       ],
       source: t("Service and repair records"),
-      boundary: t("Shared evidence · inventory snapshots and period totals"),
     },
     water: {
       id: "water",
@@ -284,7 +312,7 @@ export function buildPresentation(input) {
         unit: "m³",
       },
       source: t("Customer environmental data and comparison model"),
-      boundary: t("Calculated estimate · water used for washing"),
+      boundary: t("Comparing the same wash volume shows how much water the laundry model uses."),
     },
     emissions: {
       id: "emissions",
@@ -309,7 +337,9 @@ export function buildPresentation(input) {
         unit: "t CO₂e",
       },
       source: t("Customer environmental data and comparison model"),
-      boundary: t("Calculated estimate · laundry and delivery"),
+      boundary: t(
+        "The estimate compares the climate impact of washing and delivery at the same wash volume.",
+      ),
     },
     repairs: {
       id: "repairs",
@@ -331,7 +361,9 @@ export function buildPresentation(input) {
         unit: "items",
       },
       source: t("Repair records"),
-      boundary: t("Synthetic count of repair events"),
+      boundary: t(
+        "Repairs keep textiles in use longer. Counting them per 100 washes helps compare periods with different wash volumes.",
+      ),
     },
     opportunity: {
       id: "opportunity",
@@ -355,25 +387,22 @@ export function buildPresentation(input) {
         unit: "items",
       },
       source: `${t("Service records")}, ${m.snapshotMonth}`,
-      boundary: t("Snapshot for investigation"),
+      boundary: t(
+        "Scan coverage helps identify sites where textile circulation is worth reviewing.",
+      ),
     },
     plan: {
       id: "plan",
       kind: "text",
-      title: t("Shared priorities for 2026"),
-      paragraphs: [
-        t`Review ${focus.site_name} together. Check garment availability and scan coverage.`,
-        t("Agree on one improvement and assign an owner."),
-        t(
-          "Review progress at the next meeting. Estimate potential savings once the inputs have been agreed.",
-        ),
-      ],
-      boundary: t("Proposals for discussion."),
+      title: t("Where the service could improve"),
+      paragraphs: [finding, investigation, ...nextSteps],
+      boundary: t("Agree on an owner and a follow-up date so each priority can be tracked."),
     },
     sources: {
       id: "sources",
       kind: "text",
       title: t("Sources and calculations"),
+      boundary: t("Use these sources and assumptions when comparing results across periods."),
       paragraphs: [
         t("Source: ") + t("Lindström service and environmental data") + ".",
         t`Period totals sum activity across the selected months. Allocations and scans reflect the end of ${m.snapshotMonth}. Repairs count events.`,
@@ -384,6 +413,7 @@ export function buildPresentation(input) {
       id: "limits",
       kind: "text",
       title: t("Interpretation limits"),
+      boundary: t("The scope and assumptions determine which conclusions the figures support."),
       paragraphs: [
         t(
           "All customer figures are synthetic. Water and emissions are allocated estimates from laundry-level data. The baseline represents an illustrative laundry model.",
@@ -405,16 +435,14 @@ export function buildPresentation(input) {
     }
   const delta = (value) => f(Math.abs(value));
   const kpi = (value, label, change = null) => ({ value, label, ...change });
-  // The same months a year earlier; better says which direction is good, if either is.
-  const earlierYear = Number(request.scope.from.slice(0, 4)) - 1;
-  const earlierScope = {
-    ...request.scope,
-    from: `${earlierYear}${request.scope.from.slice(4)}`,
-    to: `${earlierYear}${request.scope.to.slice(4)}`,
-  };
-  const earlier = globalThis.WorkspaceModel.buildContext(data, earlierScope).metrics;
+  const previous = globalThis.ReviewAnalysisTools.periodComparison(data, request.scope, "yoy");
+  const earlier = previous
+    ? globalThis.WorkspaceModel.buildContext(data, { ...request.scope, ...previous.previousPeriod })
+        .metrics
+    : null;
+  const previousLabel = previous && periodLabel(previous.previousPeriod);
   const change = (now, before, better = null) => {
-    if (!earlier.hasData || !before) return null;
+    if (now == null || !before || !previousLabel) return null;
     const percent = Number((((now - before) / before) * 100).toFixed(1));
     const amount = new Intl.NumberFormat(t("en-GB"), {
       maximumFractionDigits: 1,
@@ -427,24 +455,51 @@ export function buildPresentation(input) {
         : percent > 0 === (better === "higher")
           ? "better"
           : "worse";
-    return { delta: `${arrow} ${amount} % ${t("vs")} ${earlierYear}`, tone };
+    return { delta: `${arrow} ${amount} % ${t("vs")} ${previousLabel}`, tone };
   };
-  const yearChange = (key, better = null) => change(m[key], earlier[key], better);
-  const repairRate = (metrics) => (metrics.washed ? (metrics.repairs / metrics.washed) * 100 : 0);
+  const yearChange = (key, better = null) => change(m[key], earlier?.[key], better);
   Object.assign(slides.cover, {
     layout: "cover",
     kicker: t("Customer review"),
     lead: t("Key results and shared priorities for 2026."),
     kpis: [],
   });
+  const { service } = globalThis.WorkspaceModel.analyzeDetails(data, request.scope);
+  const { from, to, country, continent, site } = request.scope;
+  const wholeYear =
+    from === "2025-01" &&
+    to === "2025-12" &&
+    [country, continent, site].every((part) => part === "all");
+  const cooperation = wholeYear ? demoCooperation2025.get(request.scope.customer) : null;
   Object.assign(slides.overview, {
     layout: "kpis",
     kicker: t("The service in numbers"),
     kpis: [
       kpi(f(m.sites), t("Sites")),
-      kpi(f(m.allocated), t("Textiles in service"), yearChange("allocated")),
-      kpi(`${f(m.kg / 1000)} t`, t("Washed"), yearChange("kg")),
+      kpi(f(m.allocated), t("Textiles in service"), yearChange("allocated", "higher")),
+      kpi(`${f(m.kg / 1000)} t`, t("Washed"), yearChange("kg", "higher")),
+      kpi(
+        service.latePct == null ? "—" : `${f(100 - service.latePct, 1)} %`,
+        t("On-time service cycles"),
+      ),
+      kpi(
+        cooperation ? `${f(cooperation.invoicedEur)} €` : "—",
+        t("Service costs"),
+        cooperation && m.kg
+          ? { delta: t`${f(cooperation.invoicedEur / m.kg, 2)} € per washed kg` }
+          : null,
+      ),
+      kpi(
+        cooperation ? `${f(cooperation.satisfaction, 1)} / 5` : "—",
+        t("User feedback"),
+        cooperation ? { delta: t`${f(cooperation.responses)} survey responses` } : null,
+      ),
     ],
+    boundary: t(
+      cooperation
+        ? "Timeliness comes from recorded service cycles. Costs and survey results are fictional full-year examples."
+        : "Timeliness comes from recorded service cycles. Demo costs and surveys cover the full year and all customer sites.",
+    ),
   });
   Object.assign(slides.water, {
     layout: "hero",
@@ -486,8 +541,10 @@ export function buildPresentation(input) {
   slides.opportunity.chart.type = "donut";
   Object.assign(slides.plan, {
     layout: "steps",
-    kicker: t("Next steps"),
-    steps: slides.plan.paragraphs.slice(0, 3).map((text) => text.split(/(?<=\.)\s/)[0]),
+    kicker: t("Improvement opportunities"),
+    lead: finding,
+    fine: [investigation],
+    steps: nextSteps,
   });
   Object.assign(slides.sources, {
     layout: "notes",
@@ -527,6 +584,18 @@ export function buildPresentation(input) {
   );
   const usage = /scan|skann/iu;
   const visible = (text) => text && !(request.hideUsage && usage.test(text));
+  const areaContexts = new Map([
+    [
+      "experience",
+      "Customer feedback helps identify what to preserve and where service needs attention.",
+    ],
+    ["performance", "Service reliability matters because delays can affect textile availability."],
+    [
+      "financial",
+      "Agreed costs and savings measures help assess the value of the service over time.",
+    ],
+    ["improvement", "Tracking recurring issues and actions helps show whether fixes are working."],
+  ]);
   const areaSlides = request.reviewAreas
     .map((area) => {
       const stats = area.stats.filter((stat) => visible(`${stat.value} ${stat.label}`));
@@ -545,12 +614,21 @@ export function buildPresentation(input) {
             kpi(value, label, delta ? { delta, tone } : null),
           ),
         chart: area.chart,
+        boundary: t(
+          areaContexts.get(area.id) ??
+            "Agree which result to track and how to review progress with the customer.",
+        ),
         added: area.note ? [area.note] : [],
         paragraphs: [area.headline, ...area.points, area.note].filter(visible),
       };
     })
-    // An area with nothing to show stays out rather than leaving an empty slide.
-    .filter((slide) => slide.hero || slide.chart || slide.added.length);
+    .filter(
+      (slide) =>
+        slide.hero ||
+        slide.chart ||
+        slide.added.length ||
+        (slide.lead && slide.paragraphs.length > 1),
+    );
   const summaryPoints = [
     c.waterDifference > 0 && c.emissionsDifference > 0
       ? t`What worked: ${slides.water.value} water and ${slides.emissions.value} emissions against the comparison.`
@@ -566,6 +644,7 @@ export function buildPresentation(input) {
     layout: "steps",
     kicker: t("Summary"),
     title: t("The review in brief"),
+    boundary: t("Start with what worked, then agree what to improve and how to follow up."),
     steps: summaryPoints,
     paragraphs: summaryPoints,
     added: [],
@@ -582,6 +661,9 @@ export function buildPresentation(input) {
       kicker: t("Service opportunity"),
       fine: [proposal.observation, proposal.benefit, proposal.nextStep],
       title: proposal.title,
+      boundary: t(
+        "Use the customer evidence to decide whether the proposed service is worth exploring.",
+      ),
       paragraphs: [proposal.observation, proposal.siteSummary, proposal.benefit, proposal.nextStep],
       source: t("Service and repair records"),
     }));
@@ -590,12 +672,13 @@ export function buildPresentation(input) {
     customer: { name: customer.customer_name, industry: customer.industry },
     period,
     footer,
-    slides: withSummary(
+    slides: withOpening(
       withReviewAreas(
         order.map((id) => ({ ...slides[id] })),
         [...areaSlides, ...upsellSlides],
       ),
       summary,
+      priorGoalsSlide(request.scope.customer, t),
     ),
   };
 }
@@ -606,10 +689,10 @@ function withReviewAreas(slides, areas) {
   const place = at < 0 ? slides.length : at;
   return [...slides.slice(0, place), ...areas, ...slides.slice(place)];
 }
-// The summary follows the cover, so the main message is clear before the detail.
-function withSummary(slides, summary) {
+function withOpening(slides, summary, goals) {
   const place = slides.findIndex((slide) => slide.id === "cover") + 1;
-  return [...slides.slice(0, place), summary, ...slides.slice(place)];
+  const opening = goals ? [goals, summary] : [summary];
+  return [...slides.slice(0, place), ...opening, ...slides.slice(place)];
 }
 function orderedSlides(defaultIds, override = []) {
   return [
@@ -661,7 +744,7 @@ export function applyPlan(deck, plan) {
   ];
   return {
     ...deck,
-    slides: withSummary(
+    slides: withOpening(
       withReviewAreas(
         orderedSlides(ids, deck.request.slideOrder).map((id) => {
           const slide = byId.get(id);
@@ -675,6 +758,7 @@ export function applyPlan(deck, plan) {
         deck.slides.filter((slide) => /^(area|upsell)-/.test(slide.id)),
       ),
       deck.slides.find((slide) => slide.id === "summary"),
+      deck.slides.find((slide) => slide.id === "prior-goals"),
     ),
   };
 }

@@ -84,6 +84,9 @@
 .layout-kpis .card-kpis {
   margin-top: 0;
 }
+.layout-kpis .card-kpis:has(> :nth-child(5)) {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+}
 .layout-kpis .card-kpis dd {
   font-size: 40px;
 }
@@ -103,6 +106,81 @@
 .layout-cover .card-lead {
   color: #d9e6ef;
 }
+.card-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 24px 0 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #f2f6f9;
+  color: #33475a;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.card-context span {
+  flex: 1 1 220px;
+}
+.card-archive {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-top: 14px;
+}
+.card-archive a {
+  color: #003f72;
+  font-weight: 700;
+}
+.card-goals {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+.card-goals > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2.35fr);
+  align-items: center;
+  gap: 10px 24px;
+  padding: 14px 20px;
+  border-radius: 8px;
+  background: #f2f6f9;
+}
+.card-goals dt {
+  color: #003f72;
+  font-weight: 700;
+}
+.card-goals dd {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(68px, 0.6fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 6px 12px;
+  margin: 0;
+}
+.card-goals dd > div {
+  display: grid;
+  gap: 4px;
+  font-size: 14px;
+}
+.card-goals dd > div:not(.goal-difference) strong {
+  color: #003f72;
+  font-size: clamp(16px, 2vw, 22px);
+  line-height: 1.2;
+}
+.goal-difference {
+  justify-items: center;
+  text-align: center;
+}
+.goal-difference > span {
+  color: #4f5d68;
+  font-size: 24px;
+  line-height: 1;
+}
+@media (max-width: 700px) {
+  .card-goals > div {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px;
+  }
+}
 .layout-cover .card-kpis > div {
   background: #ffffff1a;
 }
@@ -111,6 +189,22 @@
 }
 .layout-cover .card-kpis dt {
   color: #d9e6ef;
+}
+.card-findings {
+  margin-bottom: 24px;
+}
+.card-findings .card-lead {
+  margin: 0;
+  font-weight: 700;
+}
+.card-findings p + p {
+  margin: 8px 0 0;
+  color: #33475a;
+}
+.card-steps-heading {
+  margin: 0 0 12px;
+  color: #003f72;
+  font-size: 18px;
 }
 .card-steps {
   display: grid;

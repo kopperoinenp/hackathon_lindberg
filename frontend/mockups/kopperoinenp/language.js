@@ -244,14 +244,86 @@
       "Jatkotoimet sovitaan yhdessä tässä tapaamisessa.",
     "List of all locations": "Kaikkien sijaintien lista",
     Brief: "Lyhyt",
-    "Key results only": "Vain päätulokset",
     Standard: "Perus",
-    "Selected areas": "Valitut osa-alueet",
     Full: "Laaja",
-    "All available areas": "Kaikki saatavilla olevat osa-alueet",
+    Context: "Tausta",
+    "Previous review": "Edellinen katselmus",
+    "On-time service cycles": "Ajallaan valmistuneet palvelukierrot",
+    "Service costs": "Palvelun kustannukset",
+    "User feedback": "Käyttäjäpalaute",
+    "Timeliness comes from recorded service cycles. Costs and survey results are fictional full-year examples.":
+      "Täsmällisyys perustuu kirjattuihin palvelukiertoihin. Kustannukset ja kyselytulokset ovat kuvitteellisia koko vuoden esimerkkejä.",
+    "Timeliness comes from recorded service cycles. Demo costs and surveys cover the full year and all customer sites.":
+      "Täsmällisyys perustuu kirjattuihin palvelukiertoihin. Demoaineiston kustannukset ja kyselyt kattavat koko vuoden ja kaikki asiakkaan toimipaikat.",
+    " € per washed kg": " € per pesty kilo",
+    " survey responses": " kyselyvastausta",
+    "Goals and results": "Tavoitteet ja tulokset",
+    "vs target": "tavoitteeseen verrattuna",
+    "Water per kg washed": "Vettä per pesty kilo",
+    "Emissions per kg washed": "Päästöt per pesty kilo",
+    "Recorded repairs": "Kirjatut korjaukset",
+    "Target met": "Tavoite saavutettu",
+    "Target missed": "Tavoite jäi saavuttamatta",
+    "The figures cover all Apex sites in 2024. The targets are fictional examples.":
+      "Luvut kattavat Apexin kaikki toimipaikat vuonna 2024. Tavoitteet ovat kuvitteellisia.",
+    "2024 PowerPoint": "Vuoden 2024 PowerPoint",
+    "2024 report (PDF)": "Vuoden 2024 raportti (PDF)",
+    "Comparing the same wash volume shows how much water the laundry model uses.":
+      "Samalla pesumäärällä nähdään, paljonko vettä eri pesulamallit käyttävät.",
+    "The estimate compares the climate impact of washing and delivery at the same wash volume.":
+      "Arvio vertaa pesun ja kuljetusten ilmastovaikutuksia samalla pesumäärällä.",
+    "Repairs keep textiles in use longer. Counting them per 100 washes helps compare periods with different wash volumes.":
+      "Korjaukset pidentävät tekstiilien käyttöikää. Korjaukset sataa pesua kohti auttavat vertaamaan jaksoja, joiden pesumäärät eroavat.",
+    "Scan coverage helps identify sites where textile circulation is worth reviewing.":
+      "Skannauskattavuus auttaa tunnistamaan toimipaikat, joissa tekstiilien kiertoa kannattaa tutkia.",
+    "Agree on an owner and a follow-up date so each priority can be tracked.":
+      "Sopikaa vastuuhenkilö ja seuranta-ajankohta, jotta toimien etenemistä voi seurata.",
+    "Use these sources and assumptions when comparing results across periods.":
+      "Huomioi nämä lähteet ja oletukset, kun vertaat eri jaksojen tuloksia.",
+    "The scope and assumptions determine which conclusions the figures support.":
+      "Rajaus ja oletukset määrittävät, millaisia johtopäätöksiä luvuista voi tehdä.",
+    "Customer feedback helps identify what to preserve and where service needs attention.":
+      "Asiakaspalaute auttaa tunnistamaan, mikä toimii ja mitä palvelussa kannattaa kehittää.",
+    "Service reliability matters because delays can affect textile availability.":
+      "Palvelun luotettavuus on tärkeää, sillä viiveet voivat vaikuttaa tekstiilien saatavuuteen.",
+    "Agreed costs and savings measures help assess the value of the service over time.":
+      "Sovitut kustannus- ja säästömittarit auttavat seuraamaan palvelun arvoa.",
+    "Tracking recurring issues and actions helps show whether fixes are working.":
+      "Toistuvien ongelmien ja toimien seuranta auttaa näkemään, tehoavatko korjaukset.",
+    "Agree which result to track and how to review progress with the customer.":
+      "Sopikaa asiakkaan kanssa seurattava tulos ja tapa arvioida edistymistä.",
+    "Start with what worked, then agree what to improve and how to follow up.":
+      "Käykää ensin läpi onnistumiset ja sopikaa sitten, mitä kehitetään ja miten sitä seurataan.",
+    "Use the customer evidence to decide whether the proposed service is worth exploring.":
+      "Arvioikaa asiakaskohtaisten havaintojen perusteella, kannattaako ehdotettua palvelua tutkia tarkemmin.",
+    "Where the service could improve": "Missä palvelua voisi tehostaa",
+    "Improvement opportunities": "Kehitysmahdollisuudet",
+    ": 90% of service cycles finished within ": ": 90 % palvelukierroista valmistui ajassa ",
+    " h. The median for other sites was ": " h. Muiden toimipaikkojen mediaani oli ",
+    "The selected period had ": "Valitulla jaksolla kirjattiin ",
+    " repairs per 100 washes.": " korjausta sataa pesua kohden.",
+    "The selected period has too little wash data to compare repair rates.":
+      "Valitulla jaksolla on liian vähän pesudataa korjausasteiden vertailuun.",
+    "Check whether delays cluster around pickup or return before changing the schedule.":
+      "Selvittäkää, painottuvatko viiveet noutoon vai palautukseen ennen aikataulun muuttamista.",
+    "Compare repair rates by site and textile type, then check which repair reasons recur.":
+      "Vertailkaa korjausasteita toimipaikoittain ja tekstiilityypeittäin ja selvittäkää, mitkä korjaussyyt toistuvat.",
+    "Review a sample of the longest cycles at ":
+      "Käykää läpi otos pisimmistä palvelukierroista kohteessa ",
+    "If a recurring delay is confirmed, assign an owner to test a change at that handoff.":
+      "Jos viive toistuu samassa vaiheessa, nimetkää vastuuhenkilö kokeilemaan siihen muutosta.",
+    "Compare the time within which 90% of cycles finish before and after the trial.":
+      "Verratkaa aikaa, jossa 90 % palvelukierroista valmistuu, ennen kokeilua ja sen jälkeen.",
+    "Review the repair reasons for the textile types with the highest repair rates.":
+      "Käykää läpi korjaussyyt niissä tekstiilityypeissä, joissa korjausaste on korkein.",
+    "If a wear pattern recurs, assign an owner to test a change in handling or care.":
+      "Jos sama kuluminen toistuu, nimetkää vastuuhenkilö kokeilemaan muutosta käsittelyyn tai huoltoon.",
+    "Track repairs per 100 washes for the same textile types after the trial.":
+      "Seuratkaa kokeilun jälkeen samojen tekstiilityyppien korjauksia sataa pesua kohden.",
     "Presentation length": "Esityksen laajuus",
     "Repairs per 100 washes": "Korjausta 100 pesua kohden",
     "Customise the review": "Muokkaa katsausta",
+    Close: "Sulje",
     "More figures": "Tarkemmat luvut",
     "Name, industry, textiles, sites and countries are always shown.":
       "Nimi, toimiala, tekstiilit, toimipaikat ja maat näytetään aina.",
@@ -337,7 +409,6 @@
     "Keep internal": "Pidä sisäisenä",
     "Your call": "Oma harkinta",
     "Show usage to the customer": "Näytä käyttö asiakkaalle",
-    "Hide usage from the customer": "Piilota käyttö asiakkaalta",
     "Usage figures are hidden from the review and presentation.":
       "Käyttöluvut on piilotettu katsauksesta ja esityksestä.",
     "Usage figures are visible to the customer.": "Käyttöluvut näkyvät asiakkaalle.",
