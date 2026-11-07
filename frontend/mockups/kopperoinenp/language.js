@@ -2,6 +2,33 @@
 (function (root) {
   "use strict";
   const finnish = {
+    "Preparing dashboard metrics in the background…":
+      "Dashboardin mittareita valmistellaan taustalla…",
+    "Shared customer data": "Yhteinen asiakasdata",
+    "Import the project's synthetic data through the background pipeline. Your own review is preserved.":
+      "Tuo projektin feikkidata taustalla toimivan tuontiputken kautta. Oma katsauksesi säilyy.",
+    "Import demo data": "Tuo feikkidata",
+    "Load published data": "Lataa julkaistu data",
+    "Could not import demo data.": "Feikkidatan tuonti epäonnistui.",
+    "Could not load import status.": "Tuonnin tilaa ei saatu haettua.",
+    "Checking import status…": "Haetaan tuonnin tilaa…",
+    "Save your review before reloading.": "Tallenna katsaus ennen uudelleenlatausta.",
+    "Queued for background processing": "Jonossa taustakäsittelyyn",
+    "Published – checks passed": "Julkaistu – tarkistukset hyväksytty",
+    "Import failed – previous data preserved": "Tuonti epäonnistui – edellinen data säilyi",
+    "A newer version has already been published": "Uudempi versio on jo julkaistu",
+    "No pipeline import yet. The initial demo dataset is in use.":
+      "Ei vielä putken kautta tehtyä tuontia. Käytössä on alustava demodata.",
+    "Prototype profile (no sign-in)": "Prototyypin käyttäjä (ei kirjautumista)",
+    "Read-only profile – changes are not saved.": "Vain luku – muutoksia ei tallenneta.",
+    "PostgreSQL · shared data, personal reviews": "PostgreSQL · yhteinen data, omat katsaukset",
+    "Could not change prototype profile.": "Prototyypin käyttäjää ei voitu vaihtaa.",
+    "Shared database unavailable": "Yhteiseen tietokantaan ei saada yhteyttä",
+    "Restart the shared prototype and reload this page.":
+      "Käynnistä yhteinen prototyyppi ja lataa sivu uudelleen.",
+    "No customers assigned to this profile.": "Tälle käyttäjälle ei ole määritelty asiakkaita.",
+    "No access to this customer.": "Ei käyttöoikeutta tähän asiakkaaseen.",
+    "This prototype profile is read-only.": "Tällä prototyyppikäyttäjällä on vain lukuoikeus.",
     "Source data cannot be edited through the assistant. Use a KAM note or estimate instead.":
       "Lähdeaineistoa ei voi muuttaa apurilla. Voit lisätä KAM:in muistiinpanon tai arvion.",
     "Approved service proposals stay at the end of the presentation.":

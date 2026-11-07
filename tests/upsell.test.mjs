@@ -4,7 +4,7 @@ import JSZip from "jszip";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { dataset } from "../backend/dataset.mjs";
+import { dataset, fixtureDataset } from "../backend/dataset.mjs";
 import {
   buildPresentation,
   applyPlan,
@@ -49,7 +49,7 @@ test("approval survives language changes but scope or changed evidence requires 
   const selected = proposals().map(approval);
   assert.equal(model.approved(proposals(scope, "fi"), selected).length, selected.length);
   assert.equal(model.approved(proposals({ ...scope, to: "2025-06" }), selected).length, 0);
-  const modified = structuredClone(dataset);
+  const modified = structuredClone(fixtureDataset);
   modified.records
     .filter((r) => r.customer === scope.customer)
     .forEach((r) => {

@@ -17,4 +17,12 @@ Deterministic mode supports local presentation generation. See
 [backend setup](../backend/README.md) and [analysis tools](ANALYSIS_TOOLS.md).
 
 React with TypeScript and Python with FastAPI remain proposals.
-Production sign-in, persistent customer workspaces and deployment are open decisions.
+The optional [PostgreSQL prototype](POSTGRES_PROTOTYPE.md) persists shared customer
+datasets and personal reviews with selectable demo profiles; it deliberately has no sign-in.
+The [phase-two fixture pipeline](FIXTURE_IMPORT_PIPELINE.md) stages repository-owned
+synthetic data in PostgreSQL, processes a durable queue in a separate Node worker and
+atomically publishes validated customer versions without altering personal reviews.
+Production sign-in, large-file ingestion and deployment remain open decisions.
+The [dashboard metrics API](DASHBOARD_METRICS.md) reads scoped results prepared by the
+PostgreSQL worker. The shared dashboard fetches customer metadata and versioned results.
+The file preview remains available as a standalone synthetic demo.

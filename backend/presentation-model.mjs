@@ -72,7 +72,9 @@ export function validateRequest(input) {
     throw new PresentationError("Invalid presentation request.");
   const scope = {};
   for (const [key, fallback] of Object.entries(defaults)) {
-    scope[key] = input.scope?.[key] ?? fallback;
+    scope[key] =
+      input.scope?.[key] ??
+      (key === "customer" ? (data.customers[0]?.customer_id ?? fallback) : fallback);
     if (typeof scope[key] !== "string" || scope[key].length > 80)
       throw new PresentationError("Invalid filters.");
   }

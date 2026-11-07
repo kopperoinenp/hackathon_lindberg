@@ -7,6 +7,7 @@ import {
 } from "./presentation-model.mjs";
 import { generateStructured, providerConfig } from "./ai-provider.mjs";
 import { dataset as data } from "./dataset.mjs";
+import { requestContext } from "./request-context.mjs";
 import { cleanQuery, dataQuerySchema, refineQuery, runDataQuery } from "./data-query.mjs";
 import "../frontend/mockups/kopperoinenp/analysis-tools.js";
 const analysis = globalThis.ReviewAnalysisTools;
@@ -35,6 +36,18 @@ const scopeChoices = {
   priority: ["neutral", "water", "emissions", "efficiency", "circularity"],
 };
 const nullableEnum = (values) => ({ type: ["string", "null"], enum: [...values, null] });
+function scopedSchema(schema) {
+  if (!requestContext.getStore()) return schema;
+  const result = structuredClone(schema);
+  const customers = data.customers.map((c) => c.customer_id),
+    sites = data.sites.map((s) => s.site_id);
+  result.properties.scope.properties.customer = nullableEnum(customers);
+  result.properties.scope.properties.site = nullableEnum(["all", ...sites]);
+  const query = result.properties.dataQuery.anyOf.find((item) => item.type === "object");
+  query.properties.customer = nullableEnum(customers);
+  query.properties.site = nullableEnum(sites);
+  return result;
+}
 const kpiAreas = [
   "scorecard",
   "experience",
@@ -823,7 +836,11 @@ export async function runReviewChat(
       city: s.city,
       country: s.country,
     })),
-    scopeChoices,
+    scopeChoices: {
+      ...scopeChoices,
+      customer: data.customers.map((c) => c.customer_id),
+      site: ["all", ...data.sites.map((s) => s.site_id)],
+    },
   };
   const providerWorkspace = { ...request.workspace };
   delete providerWorkspace.cooperationDescription;
@@ -845,7 +862,7 @@ export async function runReviewChat(
         instructions +
         " Routing clarifications: a short country follow-up such as Entä Suomessa? after a workspace filtering command continues that command: set scope.country and dataQuery=null, preserving the period and KAM edits. If lastQuery is present, continue the read-only query instead. Explicit muistiinpano/muistiinpanoksi/note commands set note using the exact supplied text; do not turn these into nextSteps. When the manager explicitly asks to open or filter the detailed analysis view with evidence, choose one to three analysisTools from the supplied catalog, set supported=true and view=analysis, and set dataQuery=null. Use the scope fields to specify the requested scope. For direct data questions and ordinary workspace edits, set analysisTools=null. A comparison with the same months last year overrides the direct-question route: select only yoy in analysisTools, set view=analysis and dataQuery=null. Keep the current selection unless the user requests a different 2025 period. Use only one route per request. For customer review customization, evidenceAreas selects visible blocks in the results module using the schema IDs, customerBasics selects the detail shown above the blocks (Brief: empty list; Standard: scope and year; Full: all IDs), areaEdit changes the title or commentary of one block, and nextSteps replaces the list of up to five customer-facing steps. Keep existing steps and fields unless asked to change them. New titles, notes, step text, owners and timelines must come verbatim from the current instruction. Use empty strings for omitted owners and timelines. Keep these fields null for data queries and internal analysis.",
       input: JSON.stringify({ ...inputContext, analysisCatalog: analysis.catalog }),
-      schema: analysisChatSchema,
+      schema: scopedSchema(analysisChatSchema),
       name: "review_workspace_analysis_request",
     },
     options,
@@ -895,7 +912,7 @@ export async function runReviewChat(
         proposedPatch: patch,
         analysisResults: results,
       }),
-      schema: chatSchema,
+      schema: scopedSchema(chatSchema),
       name: "review_workspace_patch_v1",
     },
     options,
