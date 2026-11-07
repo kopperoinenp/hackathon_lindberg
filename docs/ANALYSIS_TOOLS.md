@@ -76,7 +76,7 @@ Agentti valitsee enintään kolme nimettyä työkalua. Palvelin validoi ensin
 ehdotetun rajauksen, ajaa laskennan ja antaa tulokset agentin viimeiseen
 rakenteiseen vastaukseen. Viimeinen muutos voi avata analyysin vain samalla
 aineistorajauksella. Keskustelu säilyttää lyhyen kuittauksen. Luvut ja
-tarkistuskysymykset näkyvät Tutki dataa -välilehdellä.
+tarkistuskysymykset näkyvät apurin vastauksessa.
 
 Kaksivaiheinen analyysi käyttää samaa 90 sekunnin aikarajaa molemmille kutsuille.
 Tavalliset muokkauspyynnöt käyttävät yhtä kutsua. HTTP-sopimukseen ei lisätty

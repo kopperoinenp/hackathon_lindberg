@@ -4,7 +4,7 @@ These rules apply to all AI coding agents throughout this repository. Human cont
 
 ## Current phase
 
-- The Lindström account-manager customer-review demo is under active development. The current two-tab interface is approved; preserve it unless the task owner requests a change.
+- The Lindström account-manager customer-review demo is under active development. The current single-page interface is approved; preserve it unless the task owner requests a change.
 - The existing demo uses buildless HTML/CSS/JavaScript and a local Node 24 backend. OpenAI integration is approved; Copilot uses an interchangeable backend adapter and awaits live tenant testing. React/TypeScript and Python/FastAPI remain proposals.
 - Confirm requirements before introducing new frameworks, infrastructure or major architecture. Implement task-owner-authorized features within the existing stack.
 

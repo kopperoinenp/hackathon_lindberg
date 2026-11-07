@@ -148,13 +148,13 @@
     if (volume != null)
       signals.push({
         id: "volume",
-        label: say("Pesumäärä viime vuodesta", "Washes compared with last year"),
+        label: say("Pesut vs. viime vuosi", "Washes vs last year"),
         value: `${signed(volume, language)} %`,
       });
     if (revenue != null)
       signals.push({
         id: "revenue",
-        label: say("Asiakkaan liikevaihto, demoluku", "Customer revenue, demo figure"),
+        label: say("Liikevaihto (demo)", "Revenue (demo)"),
         value: `${signed(revenue, language)} %`,
       });
     if (siteName)

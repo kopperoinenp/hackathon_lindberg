@@ -65,7 +65,7 @@ configured provider. Never overwrite the user's saved reviews for a test.
    selected proposal and absence of relationship badges.
 4. Switch customers and back, then reload. Verify changes belong only to the edited customer.
 5. Ask for a missing financial fact; confirm a clear refusal and unchanged dashboard.
-6. Open Explore data; ask for a same-month year-on-year comparison and confirm the
+6. Ask for a same-month year-on-year comparison and confirm the
    analysis uses available prior-year data instead of claiming it is missing.
 
 ## Limits
