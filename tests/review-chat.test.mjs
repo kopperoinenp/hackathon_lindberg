@@ -17,6 +17,33 @@ const patch = (changes = {}) => ({
   ...changes,
 });
 const scoped = (changes) => patch({ scope: { ...patch().scope, ...changes } });
+test("customer review selections and exact-text edits survive scope changes", () => {
+  const nextSteps = [{ title: "Review reserve stock", owner: "", due: "" }];
+  const result = applyChatPatch(
+    workspace(),
+    patch({
+      evidenceAreas: ["performance", "sustainability"],
+      customerBasics: [],
+      nextSteps,
+      areaEdit: { id: "performance", title: "Delivery review", text: null },
+    }),
+    "Show a brief review. Add Review reserve stock and call the block Delivery review.",
+  );
+  assert.deepEqual(result.workspace.evidenceAreas, ["performance", "sustainability"]);
+  assert.deepEqual(result.workspace.customerBasics, []);
+  assert.deepEqual(result.workspace.nextSteps, nextSteps);
+  assert.equal(result.workspace.areaTitles.performance, "Delivery review");
+  const filtered = applyChatPatch(result.workspace, scoped({ country: "Finland" }), "Show Finland");
+  assert.deepEqual(filtered.workspace.nextSteps, nextSteps);
+  assert.equal(filtered.workspace.areaTitles.performance, "Delivery review");
+  const switched = applyChatPatch(result.workspace, scoped({ customer: "CUST002" }), "Show Apex");
+  assert.equal(switched.workspace.evidenceAreas, null);
+  assert.deepEqual(switched.workspace.nextSteps, []);
+  assert.throws(
+    () => applyChatPatch(workspace(), patch({ nextSteps }), "Show a brief review."),
+    /must come from your instruction/,
+  );
+});
 test("chat changes scope atomically and export retains the same selection", () => {
   const current = workspace(),
     before = structuredClone(current);

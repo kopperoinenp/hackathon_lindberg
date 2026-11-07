@@ -20,10 +20,13 @@ const scopeKeys = [
   "baseline",
   "priority",
 ];
+const reviewMonths = [...new Set(data?.records.map((row) => row.month))]
+  .filter((month) => month.startsWith(data.year + "-"))
+  .sort();
 const scopeChoices = {
   customer: data?.customers.map((c) => c.customer_id) ?? [],
-  from: [...new Set(data?.records.map((r) => r.month))].sort(),
-  to: [...new Set(data?.records.map((r) => r.month))].sort(),
+  from: reviewMonths,
+  to: reviewMonths,
   country: ["all", "Finland", "Sweden", "Poland"],
   continent: ["all", "Europe"],
   site: ["all", ...(data?.sites.map((s) => s.site_id) ?? [])],
@@ -31,6 +34,22 @@ const scopeChoices = {
   priority: ["neutral", "water", "emissions", "efficiency", "circularity"],
 };
 const nullableEnum = (values) => ({ type: ["string", "null"], enum: [...values, null] });
+const kpiAreas = [
+  "scorecard",
+  "experience",
+  "performance",
+  "adoption",
+  "operations",
+  "financial",
+  "sustainability",
+  "improvement",
+  "future",
+];
+const basicsIds = ["scope", "year", "siteTypes", "countries", "products", "locations"];
+const stepLimits = { title: 160, owner: 80, due: 40 };
+const nullableList = (values) => ({
+  anyOf: [{ type: "array", items: { type: "string", enum: values } }, { type: "null" }],
+});
 const nullableIds = {
   anyOf: [{ type: "array", items: { type: "string", enum: insightIds } }, { type: "null" }],
 };
@@ -54,10 +73,47 @@ export const chatSchema = {
     "slideEdit",
     "dashboardLayout",
     "dataQuery",
+    "evidenceAreas",
+    "customerBasics",
+    "nextSteps",
+    "areaEdit",
   ],
   properties: {
     supported: { type: "boolean" },
     dataQuery: dataQuerySchema,
+    evidenceAreas: nullableList(kpiAreas),
+    customerBasics: nullableList(basicsIds),
+    nextSteps: {
+      anyOf: [
+        {
+          type: "array",
+          items: {
+            type: "object",
+            additionalProperties: false,
+            required: Object.keys(stepLimits),
+            properties: Object.fromEntries(
+              Object.keys(stepLimits).map((key) => [key, { type: "string" }]),
+            ),
+          },
+        },
+        { type: "null" },
+      ],
+    },
+    areaEdit: {
+      anyOf: [
+        {
+          type: "object",
+          additionalProperties: false,
+          required: ["id", "title", "text"],
+          properties: {
+            id: { type: "string", enum: kpiAreas },
+            title: { type: ["string", "null"] },
+            text: { type: ["string", "null"] },
+          },
+        },
+        { type: "null" },
+      ],
+    },
     slideSwap: {
       anyOf: [
         {
@@ -157,17 +213,35 @@ function boundedText(value, maximum) {
     throw new PresentationError("Invalid text field.");
   return value;
 }
-const kpiAreas = [
-  "scorecard",
-  "experience",
-  "performance",
-  "adoption",
-  "operations",
-  "financial",
-  "sustainability",
-  "improvement",
-  "future",
-];
+function reviewSelection(value, ids, min) {
+  if (value == null) return null;
+  if (
+    !Array.isArray(value) ||
+    value.length < min ||
+    new Set(value).size !== value.length ||
+    value.some((id) => !ids.includes(id))
+  )
+    throw new PresentationError("Invalid customer review selection.");
+  return [...value];
+}
+function reviewAreaTexts(value, limit) {
+  if (!object(value) || Object.keys(value).some((id) => !kpiAreas.includes(id)))
+    throw new PresentationError("Invalid evidence block text.");
+  return Object.fromEntries(
+    Object.entries(value).map(([id, text]) => [id, boundedText(text, limit)]),
+  );
+}
+function reviewSteps(value) {
+  if (!Array.isArray(value) || value.length > 5)
+    throw new PresentationError("Use up to five next steps.");
+  return value.map((step) => {
+    if (!object(step) || Object.keys(step).length !== 3)
+      throw new PresentationError("Invalid next step.");
+    return Object.fromEntries(
+      Object.entries(stepLimits).map(([key, limit]) => [key, boundedText(step[key], limit)]),
+    );
+  });
+}
 function validateContractKpis(input) {
   if (!Array.isArray(input) || input.length > 12)
     throw new PresentationError("Invalid contract KPIs.");
@@ -220,6 +294,11 @@ export function normalizeWorkspace(input, { allowEmpty = false } = {}) {
     summaryMetric,
     visibleInsights: selectedIds(input.visibleInsights ?? insightIds),
     heading: boundedText(input.heading ?? "", 150),
+    evidenceAreas: reviewSelection(input.evidenceAreas, kpiAreas, 1),
+    customerBasics: reviewSelection(input.customerBasics, basicsIds, 0),
+    nextSteps: reviewSteps(input.nextSteps ?? []),
+    areaTitles: reviewAreaTexts(input.areaTitles ?? {}, 150),
+    areaNotes: reviewAreaTexts(input.areaNotes ?? {}, 2000),
     contractKpis: validateContractKpis(input.contractKpis ?? []),
     includeContractAgenda: input.includeContractAgenda ?? false,
     dashboardLayout: input.dashboardLayout ?? globalThis.WorkspaceModel.defaultDashboardLayout(),
@@ -348,6 +427,11 @@ export function applyChatPatch(current, patch, message) {
       heading: "",
       contractKpis: [],
       includeContractAgenda: false,
+      evidenceAreas: null,
+      customerBasics: null,
+      nextSteps: [],
+      areaTitles: {},
+      areaNotes: {},
       summaryMetric: "auto",
       visibleInsights: [...insightIds],
       included: [...insightIds],
@@ -399,6 +483,42 @@ export function applyChatPatch(current, patch, message) {
   }
   for (const key of ["view", "metric", "summaryMetric", "visibleInsights", "included"])
     if (patch[key] !== null) next[key] = patch[key];
+  for (const key of ["evidenceAreas", "customerBasics"])
+    if (patch[key] !== null) next[key] = patch[key];
+  if (patch.nextSteps !== null) {
+    next.nextSteps = reviewSteps(patch.nextSteps);
+    const previous = customerChanged ? [] : current.nextSteps;
+    for (const step of next.nextSteps) {
+      for (const field of Object.keys(stepLimits)) {
+        const value = normalize(step[field]);
+        if (
+          value &&
+          !previous.some((entry) => entry[field] === step[field]) &&
+          !normalize(message).includes(value)
+        )
+          throw new PresentationError("Next step text must come from your instruction.", 502);
+      }
+    }
+  }
+  if (patch.areaEdit !== null) {
+    const edit = patch.areaEdit;
+    if (!object(edit) || !kpiAreas.includes(edit.id) || Object.keys(edit).length !== 3)
+      throw new PresentationError("Unknown evidence block edit.", 502);
+    requireNoBoasting([edit.title, edit.text]);
+    requireKnownPercentages(current, [edit.title, edit.text]);
+    for (const [field, target, limit] of [
+      ["title", "areaTitles", 150],
+      ["text", "areaNotes", 2000],
+    ]) {
+      if (edit[field] === null) continue;
+      const value = boundedText(edit[field], limit).trim();
+      if (value && !normalize(message).includes(normalize(value)))
+        throw new PresentationError("Evidence block text must come from your instruction.", 502);
+      next[target] = { ...next[target] };
+      if (value) next[target][edit.id] = value;
+      else delete next[target][edit.id];
+    }
+  }
   if (
     patch.included !== null ||
     (patch.scope.priority !== null && patch.scope.priority !== current.scope.priority)
@@ -464,6 +584,11 @@ export function applyChatPatch(current, patch, message) {
     "savings",
     "managerTexts",
     "dashboardLayout",
+    "evidenceAreas",
+    "customerBasics",
+    "nextSteps",
+    "areaTitles",
+    "areaNotes",
   ])
     if (JSON.stringify(next[key]) !== JSON.stringify(current[key])) changed.push(key);
   return {
@@ -577,7 +702,7 @@ export async function runReviewChat(
     {
       instructions:
         instructions +
-        " When the manager explicitly asks to open or filter the detailed analysis view with evidence, choose one to three analysisTools from the supplied catalog, set supported=true and view=analysis, and set dataQuery=null. Use the scope fields to specify the requested scope. For direct data questions and ordinary workspace edits, set analysisTools=null. A comparison with the same months last year overrides the direct-question route: select only yoy in analysisTools, set view=analysis and dataQuery=null. Keep the current selection unless the user requests a different 2025 period. Use only one route per request.",
+        " When the manager explicitly asks to open or filter the detailed analysis view with evidence, choose one to three analysisTools from the supplied catalog, set supported=true and view=analysis, and set dataQuery=null. Use the scope fields to specify the requested scope. For direct data questions and ordinary workspace edits, set analysisTools=null. A comparison with the same months last year overrides the direct-question route: select only yoy in analysisTools, set view=analysis and dataQuery=null. Keep the current selection unless the user requests a different 2025 period. Use only one route per request. For customer review customization, evidenceAreas selects visible blocks in the results module using the schema IDs, customerBasics selects the detail shown above the blocks (Brief: empty list; Standard: scope and year; Full: all IDs), areaEdit changes the title or commentary of one block, and nextSteps replaces the list of up to five customer-facing steps. Keep existing steps and fields unless asked to change them. New titles, notes, step text, owners and timelines must come verbatim from the current instruction. Use empty strings for omitted owners and timelines. Keep these fields null for data queries and internal analysis.",
       input: JSON.stringify({ ...inputContext, analysisCatalog: analysis.catalog }),
       schema: analysisChatSchema,
       name: "review_workspace_analysis_request",

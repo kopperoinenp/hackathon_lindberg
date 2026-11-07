@@ -107,6 +107,70 @@
       <section id="query-result" aria-live="polite" hidden></section>
       <section id="customer-overview" aria-label="Customer overview" aria-live="polite"></section>
       <section id="summary-panel" role="tabpanel" aria-labelledby="summary-tab">
+        <div id="story" aria-live="polite"></div>
+      </section>
+      <section id="analysis-panel" role="tabpanel" aria-labelledby="analysis-tab" hidden>
+        <div class="analysis-heading">
+          <span class="section-kicker">DETAILED ANALYSIS</span>
+          <h1>Explore customer data</h1>
+          <p>Filter the data to see what drives the findings.</p>
+        </div>
+        <form id="filters" class="filter-grid">
+          <label for="from">From<select id="from"></select></label
+          ><label for="to">To<select id="to"></select></label
+          ><label for="continent"
+            >Continent<select id="continent">
+              <option value="all">All continents</option>
+              <option value="Europe">Europe</option>
+            </select></label
+          ><label for="country">Country<select id="country"></select></label
+          ><label for="site">Site<select id="site"></select></label
+          ><label for="baseline"
+            >Baseline<select id="baseline">
+              <option value="B_LOCAL">Local outsourced laundry</option>
+              <option value="B_HOME">Home laundering</option>
+              <option value="B_INHOUSE">In-house laundry</option>
+            </select></label
+          ><label for="priority"
+            >Review focus<select id="priority">
+              <option value="neutral">No specific focus</option>
+              <option value="water">Water</option>
+              <option value="emissions">Emissions</option>
+              <option value="efficiency">Textile use</option>
+              <option value="circularity">Repairs</option>
+            </select></label
+          ><button type="button" id="reset" class="secondary">Reset filters</button>
+        </form>
+        <p class="quiet">
+          Filters also apply to the customer review and presentation. The dataset contains 2025
+          monthly data from Finland, Sweden and Poland. All sites are in Europe.
+        </p>
+        <section class="review-priorities review-content" aria-labelledby="review-content-title">
+          <span class="section-kicker">CUSTOMER REVIEW CONTENT</span>
+          <h2 id="review-content-title">What the customer sees</h2>
+          <p class="quiet">
+            These choices update the Customer review, the view shown to the customer.
+          </p>
+          <div id="review-basics-picker"></div>
+          <div id="review-area-picker"></div>
+          <div id="review-area-gaps"></div>
+          <div id="review-next-steps"></div>
+          <p class="quiet">
+            Status colours are shown once thresholds have been agreed with the customer.
+          </p>
+          <label for="meeting-note" class="review-note-label"
+            >Note for the review and presentation</label
+          >
+          <textarea
+            id="meeting-note"
+            maxlength="2000"
+            placeholder="E.g. a customer goal or an agreed next step…"
+          ></textarea>
+          <p class="quiet">
+            Shown in the review opening until the customer, site or baseline changes.
+          </p>
+          <button type="button" class="secondary" data-view="summary">Show customer review</button>
+        </section>
         <section
           id="customer-profile-kpis"
           class="review-priorities"
@@ -157,7 +221,6 @@
             ></label
           >
         </section>
-        <div id="story" aria-live="polite"></div>
         <section class="review-priorities" aria-labelledby="review-evidence-title">
           <span class="section-kicker">SHARED REVIEW</span>
           <h2 id="review-evidence-title">Evidence and industry context</h2>
@@ -173,43 +236,6 @@
             <div id="industry-benchmark" class="table-wrap"></div>
           </details>
         </section>
-      </section>
-      <section id="analysis-panel" role="tabpanel" aria-labelledby="analysis-tab" hidden>
-        <div class="analysis-heading">
-          <span class="section-kicker">DETAILED ANALYSIS</span>
-          <h1>Explore customer data</h1>
-          <p>Filter the data to see what drives the findings.</p>
-        </div>
-        <form id="filters" class="filter-grid">
-          <label for="from">From<select id="from"></select></label
-          ><label for="to">To<select id="to"></select></label
-          ><label for="continent"
-            >Continent<select id="continent">
-              <option value="all">All continents</option>
-              <option value="Europe">Europe</option>
-            </select></label
-          ><label for="country">Country<select id="country"></select></label
-          ><label for="site">Site<select id="site"></select></label
-          ><label for="baseline"
-            >Baseline<select id="baseline">
-              <option value="B_LOCAL">Local outsourced laundry</option>
-              <option value="B_HOME">Home laundering</option>
-              <option value="B_INHOUSE">In-house laundry</option>
-            </select></label
-          ><label for="priority"
-            >Review focus<select id="priority">
-              <option value="neutral">No specific focus</option>
-              <option value="water">Water</option>
-              <option value="emissions">Emissions</option>
-              <option value="efficiency">Textile use</option>
-              <option value="circularity">Repairs</option>
-            </select></label
-          ><button type="button" id="reset" class="secondary">Reset filters</button>
-        </form>
-        <p class="quiet">
-          Filters also apply to the customer review and presentation. The dataset contains 2025
-          monthly data from Finland, Sweden and Poland. All sites are in Europe.
-        </p>
         <div id="analysis-content" aria-live="polite"></div>
       </section>
       <footer>

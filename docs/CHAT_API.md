@@ -152,3 +152,23 @@ PPTX slide1.xml and slide2.xml contents. kopperoinenp Codex owns integration and
 merge after successful review/CI under the updated AGENTS.md authorization.
 
 Validated workspace snapshots also include contractKpis (up to 12, at most three prioritized) and includeContractAgenda. Chat cannot author these fields; it preserves the current customer’s validated selections. See REVIEW_STORAGE.md.
+
+## Customer review content
+
+The optional workspace fields below are shared by chat and saved reviews.
+Older reviews use customer defaults and an empty next-step list.
+
+- `evidenceAreas` selects the visible blocks: scorecard, experience, performance,
+  adoption, operations, financial, sustainability, improvement and future.
+- `customerBasics` selects scope, year, siteTypes, countries, products and locations.
+  An empty list keeps the brief view. Null uses the default.
+- `nextSteps` stores up to five entries with title, owner and due (160, 80 and
+  40 characters). The selected steps are also included in the presentation note.
+- `areaTitles` and `areaNotes` hold customer-owned block text keyed by area ID.
+
+Chat can set the selected lists or edit one block through `areaEdit`.
+New text must come from the current user instruction. An existing next step can
+be retained as part of a list edit. Data queries cannot change these fields.
+Filter changes preserve the customer's material. Changing customer loads that
+customer's settings or the defaults. Evidence calculations and the PowerPoint
+request schema are unchanged.

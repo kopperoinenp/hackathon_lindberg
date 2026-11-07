@@ -73,6 +73,14 @@
     savings: null,
     managerTexts: {},
     dashboardLayout: globalThis.WorkspaceModel.defaultDashboardLayout(),
+    // Evidence blocks: null means the customer's default areas.
+    evidenceAreas: null,
+    // Customer basics shown before the figures; null means the full set.
+    customerBasics: null,
+    // Next steps written by the KAM for section 03: {title, owner, due}.
+    nextSteps: [],
+    areaTitles: {},
+    areaNotes: {},
     chat: [],
     contractKpis: [],
     includeContractAgenda: false,
@@ -165,6 +173,7 @@
       const record = await response.json();
       if (!response.ok) throw new Error(record.error || "Load failed");
       const revision = state.chatRevision;
+      openAreas.clear();
       Object.assign(state, structuredClone(defaultReviewState), {
         customer,
         chatRevision: revision,
@@ -189,6 +198,8 @@
           "includeContractAgenda",
         ])
           state[key] = record.workspace[key];
+        // Evidence blocks, customer basics and next steps, when the backend stores them.
+        applyChatAreas(record.workspace);
       }
       profileMode = record.workspace ? "saved" : "original";
       customerDraft = null;
@@ -311,6 +322,95 @@
   ];
   const analysisTools = globalThis.ReviewAnalysisTools;
   const { companies: peers, lindstromIntensity, peerAverage, lowerPct } = analysisTools.benchmark;
+  // Evidence blocks: the KAM chooses which areas matter to this customer.
+  const areaQuestions = {
+    scorecard: "Are we delivering successfully overall?",
+    experience: "Are our users and stakeholders satisfied?",
+    performance: "Is the service reliable?",
+    adoption: "Are we actually using the service effectively?",
+    operations: "Is the service making operations better?",
+    financial: "Are we getting value for what we spend?",
+    sustainability: "What environmental value are we creating together?",
+    improvement: "Are the issues we raise actually being solved?",
+    future: "What should we work on next?",
+  };
+  const topicAreas = {
+    "Water efficiency": "sustainability",
+    "Scope 3 evidence": "sustainability",
+    Hygiene: "performance",
+    "Service continuity": "performance",
+    "Service reliability": "performance",
+    Compliance: "performance",
+    Safety: "performance",
+    "Cost optimization": "financial",
+    "Garment utilization": "adoption",
+    Traceability: "adoption",
+    Repair: "operations",
+  };
+  // Customer basics the KAM can show or hide, e.g. less for a customer who knows the service.
+  const basicsSections = [
+    ["scope", "What the service covers"],
+    ["year", "The service in numbers"],
+    ["siteTypes", "Sites by type"],
+    ["countries", "Countries"],
+    ["products", "Textiles in the service"],
+    ["locations", "List of all locations"],
+  ];
+  const basicsPresets = [
+    ["brief", "Brief", "Customer knows the service", []],
+    ["standard", "Standard", "Regular review", ["scope", "year"]],
+    ["full", "Full", "First review or new contacts", basicsSections.map(([id]) => id)],
+  ];
+  const customerBasics = () => state.customerBasics ?? basicsPresets[2][3];
+  function applyBasicsSelection() {
+    const chosen = customerBasics();
+    const overview = $("#customer-overview");
+    for (const [id] of basicsSections) {
+      const element =
+        id === "locations"
+          ? overview.querySelector(".customer-locations")
+          : overview.querySelector(`[data-basics="${id}"]`);
+      if (element) element.hidden = !chosen.includes(id);
+    }
+    const cards = overview.querySelector(".customer-basics");
+    if (cards)
+      cards.hidden = !["siteTypes", "countries", "products"].some((id) => chosen.includes(id));
+  }
+  function basicsPickerHtml() {
+    const chosen = customerBasics();
+    const same = (ids) => ids.length === chosen.length && ids.every((id) => chosen.includes(id));
+    return `<fieldset class="area-picker basics-picker"><legend>${t("Customer basics before the figures")}</legend><div class="basics-presets">${basicsPresets
+      .map(
+        ([id, label, hint, ids]) =>
+          `<button type="button" class="basics-preset" data-basics-preset="${id}" aria-pressed="${same(ids)}"><strong>${t(label)}</strong><span>${t(hint)}</span></button>`,
+      )
+      .join("")}</div>${basicsSections
+      .map(
+        ([id, label]) =>
+          `<label class="family-summary"><input type="checkbox" data-basics-toggle="${id}" ${chosen.includes(id) ? "checked" : ""} />${t(label)}</label>`,
+      )
+      .join(
+        "",
+      )}<p class="quiet">${t("Name, industry, textiles, sites and countries are always shown.")}</p></fieldset>`;
+  }
+  // Which block actually evidences a customer priority. Unlike topicAreas (default
+  // block selection), topics without a direct measure in the data map to nothing.
+  const topicEvidence = {
+    "Water efficiency": "sustainability",
+    "Scope 3 evidence": "sustainability",
+    "Service continuity": "performance",
+    "Service reliability": "performance",
+    "Garment utilization": "adoption",
+    Traceability: "adoption",
+    Repair: "operations",
+    "Cost optimization": "financial",
+  };
+  const insightAreas = [
+    ["water", "sustainability"],
+    ["emissions", "sustainability"],
+    ["repairs", "operations"],
+  ];
+  const openAreas = new Set();
   let editedKpi = -1;
   let formCustomer;
   let statusTimer;
@@ -648,6 +748,7 @@
     $("#customer-overview").hidden = false;
     renderCustomerOverview();
     renderReviewEvidence();
+    renderReviewContent();
     renderStory();
     renderDashboardEdits();
     renderDashboardLayout();
@@ -676,6 +777,7 @@
         " " + t("KAM estimates are customer-specific and do not change with filters.");
     $("#reset-dashboard").disabled = original;
     $("#customer-profile-kpis").hidden = original;
+    $(".review-content").hidden = original;
     $("#composer").inert = original || switchingReview || storageLoading;
     $("#open-review").disabled ||= original;
     const meetingNote = $("#meeting-note");
@@ -767,9 +869,7 @@
     kpis[editedKpi < 0 ? kpis.length : editedKpi] = kpi;
     state.contractKpis = kpis;
     resetKpiForm();
-    renderReviewEvidence();
-    invalidatePowerPoint();
-    scheduleReviewSave();
+    render();
     status(t("Contract KPI saved."));
   });
   $("#cancel-contract-kpi").addEventListener("click", () => {
@@ -790,9 +890,7 @@
     } else {
       kpis.splice(Number(button.dataset.removeKpi), 1);
       resetKpiForm();
-      renderReviewEvidence();
-      invalidatePowerPoint();
-      scheduleReviewSave();
+      render();
       status(t("Contract KPI removed."));
     }
     kpiForm.elements.label.focus();
@@ -802,6 +900,133 @@
     scheduleReviewSave();
     invalidatePowerPoint();
   });
+  // Whole-customer basics for the full data year. Independent of review filters, like the overview.
+  function customerBasicsHtml(overview) {
+    // Latest data year only, compared with the year before when that year has data.
+    const mine = (rows) => (rows ?? []).filter((row) => row.customer === state.customer);
+    const inYear = (rows, wanted) => rows.filter((row) => row.month.startsWith(wanted));
+    const allRecords = mine(data.records);
+    const year =
+      allRecords
+        .map((row) => row.month.slice(0, 4))
+        .sort()
+        .at(-1) ?? "";
+    const before = String(Number(year) - 1);
+    const records = inYear(allRecords, year);
+    const detail = inYear(mine(data.detail), year);
+    const cycles = inYear(mine(data.cycleGroups), year);
+    const sumOf = (rows, key) => rows.reduce((total, row) => total + (row[key] || 0), 0);
+    const cycleCount = (rows) => rows.reduce((total, row) => total + row.hours.length, 0);
+    const previous = {
+      records: inYear(allRecords, before),
+      detail: inYear(mine(data.detail), before),
+      cycles: inYear(mine(data.cycleGroups), before),
+    };
+    // A previous value is shown only when that table has rows for the previous year.
+    const earlier = (table, value) => (previous[table].length ? value(previous[table]) : null);
+    const volumes = [
+      [
+        sumOf(records, "washed_pieces"),
+        "washes",
+        0,
+        earlier("records", (rows) => sumOf(rows, "washed_pieces")),
+      ],
+      [
+        sumOf(records, "customer_washed_kg") / 1000,
+        "tonnes of textiles washed",
+        0,
+        earlier("records", (rows) => sumOf(rows, "customer_washed_kg") / 1000),
+      ],
+      [cycleCount(cycles), "pickup and return cycles", 0, earlier("cycles", cycleCount)],
+      [
+        sumOf(records, "repair_count"),
+        "repairs",
+        0,
+        earlier("records", (rows) => sumOf(rows, "repair_count")),
+      ],
+      [
+        sumOf(detail, "service_requests"),
+        "service requests",
+        0,
+        earlier("detail", (rows) => sumOf(rows, "service_requests")),
+      ],
+    ];
+    const counts = (values) =>
+      [...values.reduce((map, value) => map.set(value, (map.get(value) ?? 0) + 1), new Map())].sort(
+        (a, b) => b[1] - a[1],
+      );
+    const siteTypes = counts(overview.sites.map((site) => site.site_type));
+    const countries = overview.countries.map((country) => {
+      const sites = overview.sites.filter((site) => site.country === country);
+      return {
+        country,
+        sites: sites.length,
+        allocated: sites.every((site) => site.allocated != null)
+          ? sites.reduce((total, site) => total + site.allocated, 0)
+          : null,
+      };
+    });
+    const snapshot = detail.filter((row) => row.month === overview.snapshotMonth);
+    const products = data.products
+      .map((product) => ({
+        ...product,
+        allocated: sumOf(
+          snapshot.filter((row) => row.product === product.product_id),
+          "allocated_pieces",
+        ),
+      }))
+      .filter((product) => product.allocated > 0)
+      .sort((a, b) => b.allocated - a.allocated);
+    const perSite =
+      overview.allocated != null && overview.sites.length
+        ? overview.allocated / overview.sites.length
+        : null;
+    const row = (label, value) => `<li><span>${label}</span><strong>${value}</strong></li>`;
+    return `<section class="customer-year" data-basics="year" aria-labelledby="customer-year-title"><h3 id="customer-year-title">${t("The service in")} ${esc(year)}</h3><div class="customer-year-stats">${volumes
+      .map(
+        ([number, label, digits, prior]) =>
+          `<div><strong>${f(number, digits ?? 0)}</strong><span>${t(label)}</span>${yoyHtml(number, prior, before)}</div>`,
+      )
+      .join(
+        "",
+      )}</div></section><div class="customer-basics"><section data-basics="siteTypes"><h3>${t("Sites by type")}</h3><ul class="evidence-list">${siteTypes
+      .map(([type, count]) => row(esc(t(type)), f(count)))
+      .join(
+        "",
+      )}</ul><p class="quiet">${perSite == null ? "" : `${t("On average")} ${f(perSite)} ${t("textiles per site")}`}</p></section><section data-basics="countries"><h3>${t("Countries")}</h3><ul class="evidence-list">${countries
+      .map((item) =>
+        row(
+          esc(countryName(item.country)),
+          `${f(item.sites)} ${t(item.sites === 1 ? "site" : "sites")} · ${item.allocated == null ? t("Unavailable") : f(item.allocated) + " " + t("textiles")}`,
+        ),
+      )
+      .join(
+        "",
+      )}</ul></section><section data-basics="products"><h3>${t("Textiles in the service")}</h3><ul class="evidence-list">${products
+      .map((product) =>
+        row(
+          `${esc(t(product.product_name))}<small>${esc(t(product.product_group))}</small>`,
+          f(product.allocated),
+        ),
+      )
+      .join(
+        "",
+      )}</ul><p class="quiet">${t("Allocated textiles in")} ${esc(overview.snapshotMonth ?? "")}</p></section></div>`;
+  }
+  // Broad customer basics shown before any figures, so the customer knows what the service covers.
+  function serviceScopeHtml(overview) {
+    const customerRows = (data.detail ?? []).filter((row) => row.customer === state.customer);
+    const laundries = new Set(overview.sites.map((site) => site.primary_laundry_id));
+    const months = [...new Set(customerRows.map((row) => row.month))].sort();
+    const item = (label, value) => `<div><dt>${t(label)}</dt><dd>${value}</dd></div>`;
+    return `<section class="service-scope" data-basics="scope" aria-labelledby="service-scope-title"><h3 id="service-scope-title">${t("What the service covers")}</h3><p>${t("Lindström provides workwear as a service: textiles are supplied, picked up, washed, repaired and returned to each site.")}</p><dl>${[
+      item("Serving laundries", f(laundries.size)),
+      item(
+        "Data period",
+        months.length ? `${esc(months[0])} – ${esc(months.at(-1))}` : t("Unavailable"),
+      ),
+    ].join("")}</dl></section>`;
+  }
   function renderCustomerOverview() {
     const overview = globalThis.WorkspaceModel.customerOverview(data, state.customer);
     const industry =
@@ -822,6 +1047,15 @@
       <details class="customer-locations"><summary>Kaikki sijainnit ja tekstiilimäärät (${overview.sites.length})</summary>
       <ul>${overview.sites.map((site) => `<li><div><strong>${esc(site.site_name)}</strong><span>${esc(site.city)} · ${esc(countryName(site.country))}</span></div><span>${site.allocated === null ? t("Ei tietoa") : f(site.allocated) + t(" kpl")}</span></li>`).join("")}</ul></details>
       <p class="quiet">Koko asiakkuus, riippumatta katsauksen rajauksesta. Tekstiilimäärä kuvaa viimeisimmän aineistokuukauden kohdistettua kantaa, ei pesumääriä tai reaaliaikaista varastoa. Synteettinen aineisto.</p>`;
+    $("#customer-overview .customer-overview-kpis").insertAdjacentHTML(
+      "afterend",
+      serviceScopeHtml(overview) + customerBasicsHtml(overview),
+    );
+    applyBasicsSelection();
+    // Customer-facing: no internal customer ID or KAM notes in the overview.
+    const heading = $("#customer-overview .customer-overview-heading p");
+    if (heading) heading.textContent = heading.textContent.replace(` · ${state.customer}`, "");
+    $("#customer-overview > p.quiet")?.remove();
     if (state.savings !== null)
       $("#customer-overview").insertAdjacentHTML(
         "beforeend",
@@ -1009,6 +1243,573 @@
       shown = ctx.sites.filter((site) => site.utilization !== null).slice(0, 5);
     return t`<div class="site-benchmark"><div><h3>${shown.length === 1 ? t("Scan coverage at the selected site") : shown.length + t(" sites with the lowest scan coverage")}</h3><p class="quiet">${snapshotName()} · Starting point for a joint review.</p></div><div class="site-ranking">${shown.map((site) => `<div><span>${esc(site.site_name)}</span><div><i style="width:${Math.min(site.utilization, 100)}%"></i></div><strong>${f(site.utilization, 1)} %</strong></div>`).join("")}</div></div>`;
   }
+  function defaultAreas() {
+    const topics = (context().customer.priority_topics || "").split("|");
+    const wanted = new Set(["scorecard", "future", ...topics.map((topic) => topicAreas[topic])]);
+    return evidenceAreas.map(([id]) => id).filter((id) => wanted.has(id));
+  }
+  function customerAreas() {
+    return state.evidenceAreas ?? defaultAreas();
+  }
+  function areaOrder(ids) {
+    return evidenceAreas.map(([id]) => id).filter((id) => ids.has(id));
+  }
+  const areaFamilies = {
+    scorecard: "summary",
+    experience: "relationship",
+    performance: "service",
+    adoption: "service",
+    operations: "value",
+    financial: "value",
+    sustainability: "sustainability",
+    improvement: "relationship",
+    future: "relationship",
+  };
+  function sparkline(points, options) {
+    const values = points
+      .flatMap((point) => [point.value, point.reference])
+      .filter((value) => value != null && Number.isFinite(value));
+    if (points.length < 2 || !values.length)
+      return `<p class="quiet">${t("A trend needs at least two months of data.")}</p>`;
+    // Percent charts use a fixed 0–100 style ceiling with a minimum span, so small
+    // month-to-month changes are not visually exaggerated. Other charts start at zero.
+    const width = 300,
+      height = 100;
+    let min = Math.min(...values),
+      max = Math.max(...values);
+    if (options.ceiling != null) {
+      max = options.ceiling;
+      min = Math.min(min, options.ceiling - options.span);
+    } else {
+      min = Math.min(0, min);
+      max = max || 1;
+    }
+    const x = (index) => (index * width) / (points.length - 1);
+    const y = (value) => 4 + (1 - (value - min) / (max - min)) * (height - 8);
+    const line = (key) =>
+      points
+        .map((point, index) =>
+          point[key] == null ? null : `${x(index).toFixed(1)},${y(point[key]).toFixed(1)}`,
+        )
+        .filter(Boolean)
+        .join(" ");
+    const last = points.at(-1);
+    const hasReference = points.some((point) => point.reference != null);
+    const label = `${options.label}: ${points.map((point) => `${point.month} ${options.format(point.value)}`).join(", ")}`;
+    return `<figure class="evidence-chart"><div class="spark-plot"><span class="spark-axis spark-max">${esc(options.format(max))}</span><span class="spark-axis spark-min">${esc(options.format(min))}</span><svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="${esc(label)}">${hasReference ? `<polyline class="spark-reference" points="${line("reference")}" />` : ""}<polyline class="spark-line" points="${line("value")}" /></svg></div><div class="spark-months"><span>${esc(points[0].month)}</span><span>${esc(last.month)}</span></div><figcaption><span><i class="legend-line"></i>${esc(options.label)}</span>${hasReference ? `<span><i class="legend-reference"></i>${esc(options.referenceLabel)}</span>` : ""}</figcaption></figure>`;
+  }
+  // Same months one year earlier, only when the owner's comparison finds matching
+  // site-months. Values are computed with the same model as the current period.
+  function previousYear() {
+    const comparison = analysisTools.periodComparison(data, state, "yoy");
+    if (!comparison) return null;
+    const scope = { ...state, ...comparison.previousPeriod };
+    const { from, to } = comparison.previousPeriod;
+    const fullYear =
+      from.endsWith("-01") && to.endsWith("-12") && from.slice(0, 4) === to.slice(0, 4);
+    return {
+      scope,
+      ctx: storyContext(data, scope),
+      detail: globalThis.WorkspaceModel.analyzeDetails(data, scope),
+      monthly: monthlyEvidence(scope),
+      label: fullYear ? from.slice(0, 4) : `${from}–${to}`,
+    };
+  }
+  // Change versus the previous year. "better" says which direction is an improvement;
+  // null keeps the wording neutral (e.g. volumes that follow the customer's activity).
+  function yoyHtml(current, previous, label, { points = false, better = null, digits = 1 } = {}) {
+    if (current == null || previous == null || !label) return "";
+    const change = points
+      ? current - previous
+      : previous
+        ? ((current - previous) / previous) * 100
+        : null;
+    if (change == null) return "";
+    const rounded = Number(change.toFixed(digits));
+    const tone =
+      rounded === 0 || !better
+        ? "neutral"
+        : rounded > 0 === (better === "higher")
+          ? "better"
+          : "worse";
+    const arrow = rounded > 0 ? "↑" : rounded < 0 ? "↓" : "→";
+    const amount = new Intl.NumberFormat(t("en-GB"), {
+      maximumFractionDigits: digits,
+      signDisplay: "exceptZero",
+    }).format(rounded);
+    const word = { better: t("improved"), worse: t("weakened"), neutral: "" }[tone];
+    return `<small class="yoy yoy-${tone}">${arrow} ${amount} ${points ? t("pp") : "%"} ${t("vs")} ${esc(label)}${word ? ` · ${word}` : ""}</small>`;
+  }
+  // Financial data is expected as data.financials rows (see docs/FINANCIAL_DATA.md).
+  // Field names live here so they can follow the final workbook columns.
+  const financialFields = {
+    table: "financials",
+    invoiced: "invoiced_eur",
+    savings: "verified_savings_eur",
+  };
+  function financialRows(selection) {
+    const from = selection.from,
+      to = selection.to;
+    return (data[financialFields.table] ?? []).filter(
+      (row) =>
+        row.customer === selection.customer &&
+        row.month >= from &&
+        row.month <= to &&
+        (selection.site === "all" || !row.site || row.site === selection.site) &&
+        (selection.country === "all" ||
+          !row.site ||
+          data.sites.find((site) => site.site_id === row.site)?.country === selection.country),
+    );
+  }
+  function financialEvidence(prev, metrics) {
+    const rows = financialRows(state);
+    if (!rows.length) return null;
+    const sumOf = (list, key) => list.reduce((total, row) => total + (Number(row[key]) || 0), 0);
+    const hasSavings = rows.some((row) => row[financialFields.savings] != null);
+    const invoiced = sumOf(rows, financialFields.invoiced);
+    const savings = hasSavings ? sumOf(rows, financialFields.savings) : null;
+    const perKg = metrics.kg ? invoiced / metrics.kg : null;
+    const prevRows = prev ? financialRows(prev.scope) : [];
+    const prevInvoiced = prevRows.length ? sumOf(prevRows, financialFields.invoiced) : null;
+    const prevPerKg =
+      prevInvoiced != null && prev.ctx.metrics.kg ? prevInvoiced / prev.ctx.metrics.kg : null;
+    // Cost per textile and month: invoiced / sum of monthly allocated textiles.
+    const textileMonths = (ctx) => ctx.rows.reduce((total, row) => total + row.allocated_pieces, 0);
+    const perTextile = invoiced / (textileMonths(context()) || NaN);
+    const prevPerTextile =
+      prevInvoiced != null ? prevInvoiced / (textileMonths(prev.ctx) || NaN) : null;
+    const months = [...new Set(rows.map((row) => row.month))].sort();
+    const series = months.map((month) => ({
+      month,
+      value: sumOf(
+        rows.filter((row) => row.month === month),
+        financialFields.invoiced,
+      ),
+      reference: prevRows.length
+        ? sumOf(
+            prevRows.filter(
+              (row) => row.month === `${Number(month.slice(0, 4)) - 1}${month.slice(4)}`,
+            ),
+            financialFields.invoiced,
+          )
+        : null,
+    }));
+    const euros = (number, digits = 0) => `${f(number, digits)} €`;
+    return {
+      headline: `${euros(invoiced)} ${t("service cost in the period")}`,
+      stats: [
+        [
+          perKg == null ? t("Unavailable") : euros(perKg, 2),
+          t("per washed kg"),
+          yoyHtml(perKg, prevPerKg, prev?.label, { better: "lower" }),
+        ],
+        savings == null
+          ? [
+              Number.isFinite(perTextile) ? euros(perTextile, 2) : t("Unavailable"),
+              t("per textile per month"),
+              yoyHtml(
+                Number.isFinite(perTextile) ? perTextile : null,
+                Number.isFinite(prevPerTextile) ? prevPerTextile : null,
+                prev?.label,
+                { better: "lower" },
+              ),
+            ]
+          : [euros(savings), t("verified savings")],
+      ],
+      chart: sparkline(series, {
+        label: t("Invoiced, € per month"),
+        referenceLabel: prev?.label,
+        format: (number) => euros(number),
+      }),
+      text: t("Synthetic invoicing data. Cost per washed kilogram makes years comparable."),
+    };
+  }
+  function monthlyEvidence(selection = state) {
+    const ctx = storyContext(data, selection);
+    const months = [...new Set(ctx.rows.map((row) => row.month))].sort();
+    const sumOf = (rows, key) => rows.reduce((total, row) => total + (row[key] || 0), 0);
+    const inMonth = (rows, month) => rows.filter((row) => row.month === month);
+    const cycles = globalThis.WorkspaceModel.select(data, selection, data.cycleGroups ?? []);
+    const emissions = globalThis.SummaryCharts.comparisonPoints(ctx, "emissions");
+    return {
+      performance: months.map((month) => {
+        const rows = inMonth(cycles, month);
+        const count = rows.reduce((total, row) => total + row.hours.length, 0);
+        return { month, value: count ? (1 - sumOf(rows, "late") / count) * 100 : null };
+      }),
+      adoption: months.map((month) => {
+        const rows = inMonth(ctx.rows, month);
+        const allocated = sumOf(rows, "allocated_pieces");
+        return {
+          month,
+          value: allocated ? (sumOf(rows, "active_assets_scanned") / allocated) * 100 : null,
+        };
+      }),
+      operations: months.map((month) => ({
+        month,
+        value: sumOf(inMonth(ctx.rows, month), "repair_count"),
+      })),
+      sustainability: emissions.map((point) => ({
+        month: point.month,
+        value: point.actual / 1000,
+        reference: point.baseline == null ? null : point.baseline / 1000,
+      })),
+    };
+  }
+  function areaEvidence() {
+    const { metrics: m, compare: c, sites } = context();
+    const detail = globalThis.WorkspaceModel.analyzeDetails(data, state);
+    const monthly = monthlyEvidence();
+    const { service } = detail;
+    const prev = previousYear();
+    const pm = prev?.ctx.metrics;
+    const pc = prev?.ctx.compare;
+    const ps = prev?.detail.service;
+    const year = prev?.label;
+    const prevOnTime = ps?.latePct == null ? null : 100 - ps.latePct;
+    // Previous year's months as a dashed reference line, aligned month by month.
+    const withPrevious = (key) =>
+      monthly[key].map((point, index) => ({
+        ...point,
+        reference: prev?.monthly[key][index]?.value ?? null,
+      }));
+    const perHundred = (metrics) =>
+      metrics?.washed ? (metrics.repairs / metrics.washed) * 100 : null;
+    const value = (number, unit = "", digits = 1) =>
+      number == null ? t("Unavailable") : [f(number, digits), unit].filter(Boolean).join(" ");
+    const signed = (difference, percent) =>
+      `${difference >= 0 ? "−" : "+"}${f(Math.abs(percent), 0)} %`;
+    const list = (rows) =>
+      `<ul class="evidence-list">${rows.map(([label, text]) => `<li><span>${esc(label)}</span><strong>${esc(text)}</strong></li>`).join("")}</ul>`;
+    const onTime = service.latePct == null ? null : 100 - service.latePct;
+    const lateSites = [...detail.serviceBySite]
+      .filter((site) => site.latePct != null)
+      .sort((a, b) => b.latePct - a.latePct)
+      .slice(0, 3);
+    const lowSites = sites.filter((site) => site.utilization != null).slice(0, 3);
+    const routeNames = {
+      reuse_kg: t("Reuse"),
+      recycling_kg: t("Recycling"),
+      energy_recovery_kg: t("Energy recovery"),
+      incineration_kg: t("Incineration"),
+    };
+    const recovered = detail.wasteRoutes.some((route) => route.share != null)
+      ? detail.wasteRoutes
+          .filter((route) => ["reuse_kg", "recycling_kg"].includes(route.key))
+          .reduce((total, route) => total + (route.share ?? 0), 0) * 100
+      : null;
+    const lower = c.emissionsDifference >= 0;
+    // Customer-facing text stays neutral; the KAM hint is shown only in Explore data.
+    const noData = (hint) => ({
+      headline: t("To be agreed together"),
+      text: t("Measures for this area will be agreed with you and followed in future reviews."),
+      hint: t(hint),
+      missing: true,
+    });
+    return {
+      experience: noData(
+        "No customer experience data yet. Add CSAT, NPS or customer feedback as a contract KPI.",
+      ),
+      financial:
+        financialEvidence(prev, m) ??
+        noData(
+          "No cost or invoice data yet. Add agreed savings or cost development as a contract KPI.",
+        ),
+      improvement: noData(
+        "No action tracking yet. Add open actions or recurring issues as a contract KPI.",
+      ),
+      performance: {
+        headline:
+          onTime == null
+            ? t("No recorded service cycles in the selection")
+            : `${f(onTime, 1)} % ${t("of service cycles were completed on time")}`,
+        stats: [
+          [
+            value(onTime, "%"),
+            t("on time"),
+            yoyHtml(onTime, prevOnTime, year, { points: true, better: "higher" }),
+          ],
+          [
+            value(service.medianHours, "h", 0),
+            t("typical turnaround"),
+            yoyHtml(service.medianHours, ps?.medianHours, year, { better: "lower" }),
+          ],
+        ],
+        chart: sparkline(withPrevious("performance"), {
+          referenceLabel: year,
+          label: t("On time, % per month"),
+          format: (number) => value(number, "%"),
+          ceiling: 100,
+          span: 10,
+        }),
+        more:
+          list([
+            [t("Recorded cycles"), value(service.count, "", 0)],
+            [t("90% of cycles within"), value(service.p90Hours, "h", 0)],
+            [t("Service requests"), value(service.requests, "", 0)],
+            ...lateSites.map((site) => [site.name, value(site.latePct, "% " + t("late"))]),
+          ]) +
+          `<p class="quiet">${t("Late flags come from the source data. Contract SLA targets are not in the dataset.")}</p>`,
+      },
+      adoption: {
+        headline: `${value(m.utilization, "%")} ${t("of textiles in service were scanned in")} ${snapshotName()}`,
+        stats: [
+          [
+            value(m.utilization, "%"),
+            t("scanned"),
+            yoyHtml(m.utilization, pm?.utilization, year, { points: true, better: "higher" }),
+          ],
+          [f(m.allocated), t("textiles in service"), yoyHtml(m.allocated, pm?.allocated, year)],
+        ],
+        chart: sparkline(withPrevious("adoption"), {
+          referenceLabel: year,
+          label: t("Scanned, % per month"),
+          format: (number) => value(number, "%"),
+          ceiling: 100,
+          span: 30,
+        }),
+        more:
+          list([
+            [t("Textiles without a scan"), f(m.unscanned)],
+            ...lowSites.map((site) => [site.site_name, value(site.utilization, "%")]),
+          ]) +
+          `<p class="quiet">${t("Scan coverage shows where to investigate. It is not proof of unused textiles.")}</p>`,
+      },
+      operations: {
+        headline: `${f(m.repairs)} ${t("repairs kept textiles in use")}`,
+        stats: [
+          [f(m.repairs), t("repairs"), yoyHtml(m.repairs, pm?.repairs, year)],
+          [
+            value(perHundred(m), "", 1),
+            t("repairs / 100 washes"),
+            yoyHtml(perHundred(m), perHundred(pm), year),
+          ],
+        ],
+        chart: sparkline(withPrevious("operations"), {
+          referenceLabel: year,
+          label: t("Repairs per month"),
+          format: (number) => f(number),
+        }),
+        more:
+          list(
+            detail.products.map((product) => [
+              product.name,
+              `${value(product.washesPerPieceMonth)} ${t("washes / item / month")} · ${value(product.repairsPerHundredWashes)} ${t("repairs / 100 washes")}`,
+            ]),
+          ) +
+          `<p class="quiet">${t("Repairs keep textiles in use. Avoided purchases need separate evidence.")} ${t("Energy")}: ${value(detail.energyPerKg, t("kWh / kg washed"), 2)}</p>`,
+      },
+      sustainability: {
+        headline: `${f(Math.abs(c.emissionsPercent), 0)} % ${t(lower ? "lower laundry and delivery emissions than" : "higher laundry and delivery emissions than")} ${baselineName()}`,
+        // Absolute amounts first: these are what a sustainability report uses.
+        stats: [
+          [
+            `${f(Math.abs(c.emissionsDifference) / 1000, 0)} t`,
+            t(lower ? "less CO₂e" : "more CO₂e"),
+            yoyHtml(c.emissionsDifference, pc?.emissionsDifference, year, { better: "higher" }),
+          ],
+          [
+            `${f(Math.abs(c.waterDifference) / 1000, 0)} m³`,
+            t(c.waterDifference >= 0 ? "less water" : "more water"),
+            yoyHtml(c.waterDifference, pc?.waterDifference, year, { better: "higher" }),
+          ],
+        ],
+        // Own footprint per washed kilogram: comparable across years regardless of volume.
+        yoyNote:
+          pm?.kg && m.kg
+            ? `<p class="quiet">${t("Laundry and delivery CO₂e per washed kg")}: ${f((m.emissions / m.kg) * 1000, 0)} g ${yoyHtml(m.emissions / m.kg, pm.emissions / pm.kg, year, { better: "lower" })}</p>`
+            : "",
+        text: `${t("Comparison: the same wash volume washed at")} ${baselineName()} (${signed(c.emissionsDifference, c.emissionsPercent)} CO₂e, ${signed(c.waterDifference, c.waterPercent)} ${t("water")}).`,
+        extra: `<p class="evidence-benchmark"><strong>${f((1 - lindstromIntensity / peerAverage) * 100)} %</strong> ${t("lower emissions intensity for Lindström Group than the average of four industry peers. Company-level figure, indicative and unverified.")}</p>`,
+        chart: sparkline(monthly.sustainability, {
+          label: t("Lindström, t CO₂e per month"),
+          referenceLabel: baselineName(),
+          format: (number) => value(number, "t", 1),
+        }),
+        more: list([
+          [t("Textile waste reused or recycled"), value(recovered, "%", 0)],
+          ...detail.wasteRoutes.map((route) => [
+            routeNames[route.key],
+            value(route.share == null ? null : route.share * 100, "%"),
+          ]),
+        ]),
+      },
+      future: {
+        headline: t("Your priorities and where they are covered"),
+        priorities: (context().customer.priority_topics || "").split("|").filter(Boolean),
+        text: t("Agree next steps in section 03 below."),
+      },
+    };
+  }
+  function evidenceBlocks() {
+    const chosen = customerAreas();
+    const evidence = areaEvidence();
+    const kpis = customerKpis();
+    const name = (id) => t(evidenceAreas.find(([area]) => area === id)[1]);
+    const kpiList = (id) => {
+      const rows = kpis.filter((kpi) => kpi.area === id);
+      return rows.length
+        ? `<ul class="evidence-kpis">${rows.map((kpi) => `<li><strong>${esc(kpi.label)}</strong><span>${esc(kpiDescription(kpi))}</span></li>`).join("")}</ul>`
+        : "";
+    };
+    const headlineOf = (id) => {
+      const kpi = kpis.find((item) => item.area === id && item.actual);
+      if (evidence[id].missing && kpi) return `${kpi.label}: ${kpi.actual}`;
+      return evidence[id].headline;
+    };
+    const summary = () =>
+      `<ul class="evidence-messages">${chosen
+        .filter((id) => !["scorecard", "future"].includes(id))
+        .map(
+          (id) =>
+            `<li class="family-${areaFamilies[id]}"><span>${name(id)}</span><strong>${esc(headlineOf(id))}</strong>${evidence[id].stats?.[0]?.[2] ?? ""}</li>`,
+        )
+        .join(
+          "",
+        )}</ul><p class="evidence-decision"><strong>${t("For discussion today")}</strong> ${t("Agree one improvement, an owner and a follow-up date (section 03).")}</p>`;
+    // Each customer priority points to the block that shows evidence for it, or says
+    // honestly that a measure still has to be agreed.
+    const covered = (area) =>
+      area &&
+      chosen.includes(area) &&
+      (!evidence[area]?.missing || kpis.some((kpi) => kpi.area === area && kpi.actual));
+    const priorityMap = (topics) =>
+      `<ul class="priority-map">${topics
+        .map((topic) => {
+          const area = topicEvidence[topic];
+          return `<li class="${covered(area) ? "is-covered" : "is-open"}"><span>${esc(t(topic))}</span>${covered(area) ? `<a href="#evidence-${area}">${t("See")}: ${name(area)}</a>` : `<strong>${t("Measure to be agreed together")}</strong>`}</li>`;
+        })
+        .join("")}</ul>`;
+    const blocks = chosen
+      .map((id) => {
+        const block = evidence[id] ?? {};
+        const missing = block.missing && !kpis.some((kpi) => kpi.area === id && kpi.actual);
+        const body =
+          id === "scorecard"
+            ? summary()
+            : `<p class="evidence-headline">${esc(headlineOf(id))}</p>${block.stats ? `<div class="evidence-stats">${block.stats.map(([number, label, yoy]) => `<div><strong>${esc(number)}</strong><span>${esc(label)}</span>${yoy ?? ""}</div>`).join("")}</div>` : ""}${block.chart ?? ""}${block.priorities ? priorityMap(block.priorities) : ""}${block.text && (missing || !block.missing) ? `<p class="${block.missing ? "evidence-missing" : "quiet"}">${esc(block.text)}</p>` : ""}${block.yoyNote ?? ""}${block.extra ?? ""}${kpiList(id)}`;
+        const more = block.more
+          ? `<details class="evidence-more" data-area-more="${id}" ${openAreas.has(id) ? "open" : ""}><summary>${t("Show more")}</summary>${block.more}<div class="evidence-detail-slot" data-detail-slot="${id}"></div></details>`
+          : "";
+        return `<article class="evidence-block family-${areaFamilies[id]}${missing ? " is-missing" : ""}${id === "scorecard" ? " is-wide" : ""}" data-area="${id}" id="evidence-${id}"><span class="evidence-area">${name(id)}</span><h3>${state.areaTitles[id] ? esc(state.areaTitles[id]) : t(areaQuestions[id])}</h3>${body}${state.areaNotes[id] ? t`<div class="kam-dashboard-note"><strong>KAM:in näkökulma</strong><p>${esc(state.areaNotes[id])}</p></div>` : ""}${more}</article>`;
+      })
+      .join("");
+    return `<div class="evidence-blocks-wrap"><div class="evidence-blocks">${blocks}</div><p class="quiet">${t("All figures are based on synthetic demo data.")}</p></div>`;
+  }
+  // Section 03 shows only next steps the KAM has written; suggestions stay in Explore data.
+  const stepLimits = { title: 160, owner: 80, due: 40 };
+  const agreedSteps = () => state.nextSteps.filter((step) => step.title.trim());
+  function stepText(step) {
+    return [
+      step.title.trim(),
+      step.owner.trim() && `${t("Owner")}: ${step.owner.trim()}`,
+      step.due.trim() && `${t("Timeline")}: ${step.due.trim()}`,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  // The review opening is shown to the customer: no "preparation" label or KAM agenda,
+  // and the comparison point is explained in plain words.
+  function renderIntroForCustomer() {
+    const intro = $("#story .intro");
+    if (!intro) return;
+    const kicker = intro.querySelector(".section-kicker");
+    if (kicker) kicker.textContent = `${t("ANNUAL REVIEW")} ${periodName()}`;
+    const opening = intro.querySelector(":scope > p");
+    if (opening)
+      opening.textContent = t(
+        "How the service performed, the value we created together, and what we propose to work on next.",
+      );
+    const scope = intro.querySelector(".scope");
+    const { metrics: m } = context();
+    if (scope)
+      scope.innerHTML = `<strong>${esc(scopeName())}</strong> · ${f(m.sites)} ${t(m.sites === 1 ? "site" : "sites")} · ${t("Compared with")} ${esc(baselineName())} ${t("at the same wash volume")}`;
+  }
+  // Section 02 is shown to the customer: neutral wording, no KAM instructions or
+  // filter links (site filtering lives in Explore data).
+  function renderOpportunityForCustomer() {
+    const section = $("#opportunity-title")?.closest("section");
+    const { focus } = context();
+    if (!section || !focus) return;
+    const finding = section.querySelector(".opportunity > div:first-child > p");
+    if (finding)
+      finding.textContent = `${f(focus.unscanned)} ${t("textiles allocated to this site had no active scan in")} ${snapshotName()}.`;
+    const relevance = section.querySelector(":scope > p.relevance");
+    if (relevance)
+      relevance.textContent = t(
+        "This site has the lowest scan coverage in the selection, so it is a natural place to start a joint review.",
+      );
+    for (const link of section.querySelectorAll(".site-details .site-link"))
+      link.replaceWith(document.createTextNode(link.textContent));
+    section.querySelector(".site-details > p.quiet")?.remove();
+  }
+  function renderNextSteps() {
+    const section = $("#next-title")?.closest("section");
+    if (!section) return;
+    const steps = agreedSteps();
+    const list = section.querySelector(".next-steps");
+    list.innerHTML = steps
+      .map((step) => {
+        const meta = [
+          step.owner.trim() && `${t("Owner")}: ${step.owner.trim()}`,
+          step.due.trim() && `${t("Timeline")}: ${step.due.trim()}`,
+        ]
+          .filter(Boolean)
+          .join(" · ");
+        return `<li>${esc(step.title.trim())}${meta ? `<small>${esc(meta)}</small>` : ""}</li>`;
+      })
+      .join("");
+    list.hidden = !steps.length;
+    const intro = section.querySelector(".next-chapter > div > p");
+    if (intro)
+      intro.textContent = steps.length
+        ? t("Next steps agreed for the coming period, each with an owner and a timeline.")
+        : t("Next steps will be agreed together in this meeting.");
+  }
+  function nextStepsEditorHtml() {
+    const rows = state.nextSteps
+      .map(
+        (step, index) =>
+          `<li><label>${t("Action")}<input data-step="${index}" data-step-field="title" maxlength="${stepLimits.title}" value="${esc(step.title)}" /></label><label>${t("Owner")}<input data-step="${index}" data-step-field="owner" maxlength="${stepLimits.owner}" value="${esc(step.owner)}" /></label><label>${t("Timeline")}<input data-step="${index}" data-step-field="due" maxlength="${stepLimits.due}" value="${esc(step.due)}" placeholder="${t("E.g. Q2 2026")}" /></label><button type="button" class="text-button" data-step-remove="${index}">${t("Remove")}</button></li>`,
+      )
+      .join("");
+    return `<fieldset class="area-picker next-steps-editor"><legend>${t("Next steps shown in section 03")}</legend><p class="quiet">${t("Only the steps written here are shown to the customer. Keep to one to three.")}</p><ol>${rows}</ol><div class="kpi-actions">${state.nextSteps.length < 5 ? `<button type="button" class="secondary" data-step-add>${t("Add step")}</button>` : ""}${state.nextSteps.length ? "" : `<button type="button" class="text-button" data-step-suggest>${t("Start from suggestions")}</button>`}</div></fieldset>`;
+  }
+  // KAM controls for the customer-facing review live in Explore data.
+  function renderReviewContent() {
+    const editor = $("#review-next-steps");
+    if (
+      !editor.contains(document.activeElement) ||
+      editor.querySelectorAll("li").length !== state.nextSteps.length
+    )
+      editor.innerHTML = nextStepsEditorHtml();
+    $("#review-basics-picker").innerHTML = basicsPickerHtml();
+    const chosen = customerAreas();
+    $("#review-area-picker").innerHTML =
+      `<fieldset class="area-picker"><legend>${t("Areas for this customer")}</legend>${evidenceAreas
+        .map(
+          ([id, label]) =>
+            `<label class="family-${areaFamilies[id]}"><input type="checkbox" data-area-toggle="${id}" ${chosen.includes(id) ? "checked" : ""} />${t(label)}</label>`,
+        )
+        .join(
+          "",
+        )}<button type="button" class="text-button" data-area-reset>${t("Use customer priorities")}</button></fieldset>`;
+    const evidence = context().metrics.hasData ? areaEvidence() : {};
+    const kpis = customerKpis();
+    const gaps = chosen.filter(
+      (id) => evidence[id]?.missing && !kpis.some((kpi) => kpi.area === id && kpi.actual),
+    );
+    $("#review-area-gaps").innerHTML = gaps.length
+      ? `<div class="area-gaps"><strong>${t("Shown to the customer as “to be agreed together”:")}</strong><ul>${gaps
+          .map(
+            (id) =>
+              `<li><span>${t(evidenceAreas.find(([area]) => area === id)[1])}</span> ${esc(evidence[id].hint)}</li>`,
+          )
+          .join("")}</ul></div>`
+      : "";
+    const note = $("#meeting-note");
+    if (document.activeElement !== note) note.value = state.note;
+  }
   function renderStory() {
     const { metrics: m, focus, sites, order, customer } = context();
     if (!m.hasData) {
@@ -1048,8 +1849,173 @@
         )
         .join(
           "",
-        )}</ol></div><details class="notes-details" ${state.note ? "open" : ""}><summary>Add a note to the presentation</summary><label for="meeting-note" class="sr-only">Meeting note</label><textarea id="meeting-note" maxlength="2000" placeholder="E.g. a customer goal or an agreed next step…">${esc(state.note)}</textarea><p class="quiet">The note is saved for this customer and retained when filters change.</p></details></section>`;
+        )}</ol></div><details class="notes-details" ${state.note ? "open" : ""}><summary>Add a note to the presentation</summary><label for="meeting-note" class="sr-only">Meeting note</label><textarea id="meeting-note" maxlength="2000" placeholder="E.g. a customer goal or an agreed next step…">${esc(state.note)}</textarea><p class="quiet">The note stays in this tab until you change the customer, site or baseline.</p></details></section>`;
+    // The note editor moved to Explore data; the review shows the note in its opening.
+    $("#story .notes-details")?.remove();
+    renderNextSteps();
+    renderOpportunityForCustomer();
+    renderIntroForCustomer();
+    const resultsSection = $("#results-title").closest("section");
+    resultsSection.hidden = false;
+    resultsSection
+      .querySelector(".section-heading")
+      .insertAdjacentHTML("afterend", evidenceBlocks());
+    // The original result cards and charts move into the matching block's "Show more".
+    // They keep their data-insight ids so chat edits and KAM notes still land on them.
+    const slot = (area) => resultsSection.querySelector(`[data-detail-slot="${area}"]`);
+    for (const [insight, area] of insightAreas) {
+      const card = resultsSection.querySelector(`.results [data-insight="${insight}"]`);
+      if (!card) continue;
+      if (slot(area)) slot(area).append(card);
+      else card.hidden = true;
+    }
+    const graphics = resultsSection.querySelector(".summary-graphics");
+    if (graphics) {
+      const target = slot("sustainability") || slot("operations");
+      graphics.dataset.inBlock = "true";
+      graphics.hidden = !target || !state.dashboardLayout.sections.includes("charts");
+      if (target) target.append(graphics);
+    }
+    const note = resultsSection.querySelector(".results + p.quiet");
+    if (note && slot("sustainability")) slot("sustainability").append(note);
+    else note?.remove();
+    resultsSection.querySelector(".results")?.remove();
   }
+  // Open the block a chat edit applies to, so the change is visible straight away.
+  function revealChatEdits(before) {
+    const edited = new Set();
+    for (const key of ["areaTitles", "areaNotes"])
+      for (const [id, text] of Object.entries(state[key]))
+        if (before[key][id] !== text) edited.add(id);
+    for (const [insight, area] of insightAreas) {
+      if (
+        (state.titleEdits[insight] && state.titleEdits[insight] !== before.titleEdits[insight]) ||
+        (state.managerTexts[insight] &&
+          state.managerTexts[insight] !== before.managerTexts[insight])
+      )
+        edited.add(area);
+    }
+    for (const area of edited) openAreas.add(area);
+    const chosen = customerAreas();
+    if ([...edited].some((area) => !chosen.includes(area)))
+      state.evidenceAreas = areaOrder(new Set([...chosen, ...edited]));
+  }
+  // Accept the optional chat fields only when they are valid; otherwise keep the current state.
+  function applyChatAreas(next) {
+    const known = evidenceAreas.map(([id]) => id);
+    if (
+      Array.isArray(next.nextSteps) &&
+      next.nextSteps.length <= 5 &&
+      next.nextSteps.every(
+        (step) =>
+          step &&
+          Object.entries(stepLimits).every(
+            ([field, limit]) => typeof step[field] === "string" && step[field].length <= limit,
+          ),
+      )
+    )
+      state.nextSteps = next.nextSteps.map(({ title, owner, due }) => ({ title, owner, due }));
+    const basics = basicsSections.map(([id]) => id);
+    if (
+      Array.isArray(next.customerBasics) &&
+      new Set(next.customerBasics).size === next.customerBasics.length &&
+      next.customerBasics.every((id) => basics.includes(id))
+    )
+      state.customerBasics = basics.filter((id) => next.customerBasics.includes(id));
+    if (
+      Array.isArray(next.evidenceAreas) &&
+      next.evidenceAreas.length &&
+      next.evidenceAreas.every((id) => known.includes(id))
+    )
+      state.evidenceAreas = areaOrder(new Set(next.evidenceAreas));
+    for (const key of ["areaTitles", "areaNotes"]) {
+      const value = next[key];
+      if (
+        value &&
+        typeof value === "object" &&
+        Object.entries(value).every(
+          ([id, text]) => known.includes(id) && typeof text === "string" && text.length <= 2000,
+        )
+      )
+        state[key] = { ...value };
+    }
+  }
+  document.addEventListener("change", (event) => {
+    const id = event.target.dataset?.basicsToggle;
+    if (!id) return;
+    const chosen = new Set(customerBasics());
+    if (event.target.checked) chosen.add(id);
+    else chosen.delete(id);
+    state.customerBasics = basicsSections.map(([key]) => key).filter((key) => chosen.has(key));
+    state.chatRevision += 1;
+    render();
+    $(`[data-basics-toggle="${id}"]`)?.focus();
+  });
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-basics-preset]");
+    if (!button) return;
+    state.customerBasics = [...basicsPresets.find(([id]) => id === button.dataset.basicsPreset)[3]];
+    state.chatRevision += 1;
+    render();
+    $(`[data-basics-preset="${button.dataset.basicsPreset}"]`)?.focus();
+  });
+  document.addEventListener("input", (event) => {
+    const field = event.target.dataset?.stepField;
+    if (!field) return;
+    state.nextSteps[Number(event.target.dataset.step)][field] = event.target.value.slice(
+      0,
+      stepLimits[field],
+    );
+    invalidatePowerPoint();
+    scheduleReviewSave();
+  });
+  document.addEventListener("change", (event) => {
+    if (event.target.dataset?.stepField) render();
+  });
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-step-add], [data-step-remove], [data-step-suggest]");
+    if (!button) return;
+    if (button.dataset.stepRemove !== undefined)
+      state.nextSteps.splice(Number(button.dataset.stepRemove), 1);
+    else if (button.dataset.stepSuggest !== undefined)
+      state.nextSteps = plan().map(([title]) => ({ title, owner: "", due: "" }));
+    else state.nextSteps.push({ title: "", owner: "", due: "" });
+    state.chatRevision += 1;
+    render();
+    const inputs = $("#review-next-steps").querySelectorAll('[data-step-field="title"]');
+    (button.dataset.stepAdd !== undefined ? inputs[inputs.length - 1] : inputs[0])?.focus();
+  });
+  // Show the finished note in the review once the KAM leaves the field.
+  document.addEventListener("change", (event) => {
+    if (event.target.id === "meeting-note") render();
+  });
+  document.addEventListener("change", (event) => {
+    const area = event.target.dataset?.areaToggle;
+    if (!area) return;
+    const chosen = new Set(customerAreas());
+    if (event.target.checked) chosen.add(area);
+    else chosen.delete(area);
+    state.evidenceAreas = areaOrder(chosen);
+    state.chatRevision += 1;
+    render();
+    $(`[data-area-toggle="${area}"]`)?.focus();
+  });
+  document.addEventListener(
+    "toggle",
+    (event) => {
+      const area = event.target.dataset?.areaMore;
+      if (!area) return;
+      if (event.target.open) openAreas.add(area);
+      else openAreas.delete(area);
+    },
+    true,
+  );
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest("[data-area-reset]")) return;
+    state.evidenceAreas = null;
+    state.chatRevision += 1;
+    render();
+  });
   function renderDashboardEdits() {
     const targets = {
       cover: $("#story .intro"),
@@ -1150,7 +2116,7 @@
       savings,
       metrics,
       results: $("#results-title")?.closest("section"),
-      charts: $("#story .summary-graphics"),
+      charts: $("#story .summary-graphics:not([data-in-block])"),
       opportunity: $("#opportunity-title")?.closest("section"),
       plan: $("#next-title")?.closest("section"),
     };
@@ -1231,6 +2197,11 @@
       dashboardLayout: state.dashboardLayout,
       contractKpis: state.contractKpis,
       includeContractAgenda: state.includeContractAgenda,
+      evidenceAreas: customerAreas(),
+      customerBasics: customerBasics(),
+      nextSteps: state.nextSteps,
+      areaTitles: state.areaTitles,
+      areaNotes: state.areaNotes,
     };
   }
   function renderChat() {
@@ -1335,6 +2306,9 @@
         : result.changed.length
           ? null
           : state.queryResult;
+      applyChatAreas(next);
+      if (result.changed.some((key) => /^(titleEdits|managerTexts|areaTitles|areaNotes)/.test(key)))
+        revealChatEdits(workspace);
       render();
       if (result.changed.length) await flushReviewSave();
       state.chat.push({
@@ -1563,6 +2537,8 @@
     )
       return;
     state.dashboardLayout = globalThis.WorkspaceModel.defaultDashboardLayout();
+    state.evidenceAreas = null;
+    state.customerBasics = null;
     state.chatRevision += 1;
     render();
     status("Dashboardin oletusrakenne palautettu.");
@@ -1597,6 +2573,10 @@
       includeAgenda && state.includeContractAgenda
         ? customerKpis().filter((kpi) => kpi.priority)
         : [];
+    const steps = includeAgenda ? agreedSteps() : [];
+    const stepsNote = steps.length
+      ? [t("Agreed next steps"), ...steps.map((step) => `• ${stepText(step)}`)].join("\n")
+      : "";
     const agendaNote = agenda.length
       ? [
           t("Contract KPIs for discussion"),
@@ -1607,7 +2587,7 @@
       scope,
       included: state.included,
       titleEdits: state.titleEdits,
-      note: [state.note, agendaNote].filter(Boolean).join("\n\n"),
+      note: [state.note, stepsNote, agendaNote].filter(Boolean).join("\n\n"),
       cooperation: state.cooperation,
       savings: state.savings,
       managerTexts: state.managerTexts,
