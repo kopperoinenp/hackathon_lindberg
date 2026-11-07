@@ -3149,9 +3149,9 @@ a#download-powerpoint[hidden] {
 }
 
 /* Clear, roomy sections; the editing tools appear only when a section is in use. */
-body[data-mode="prepare"] #customer-overview,
-body[data-mode="prepare"] #summary-panel,
-body[data-mode="home"] #deck {
+body[data-mode="prepare"] #story,
+#deck[hidden],
+#customer-load-status:empty {
   display: none;
 }
 #deck {

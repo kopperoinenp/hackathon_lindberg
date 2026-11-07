@@ -17,11 +17,11 @@ test("review settings open beside the customer review, not in Explore data", asy
   assert.doesNotMatch(page, /Show customer review/);
 });
 
-test("the workspace has one view and folds rarely used settings away", async () => {
+test("the workspace retains both views and folds rarely used settings away", async () => {
   const root = new URL("../frontend/mockups/kopperoinenp/", import.meta.url);
   const page = await readFile(new URL("index.html", root), "utf8");
   const app = await readFile(new URL("app.js", root), "utf8");
-  assert.doesNotMatch(app, /\.view-tabs"\)\.hidden = false/);
+  assert.match(app, /\.view-tabs"\)\.hidden = !preparing/);
   assert.match(page, /<nav class="view-tabs"[^>]*hidden/);
   const more = page.indexOf('id="more-settings"');
   for (const id of ["filters", "customer-profile-kpis", "reset-dashboard", "meeting-note"])

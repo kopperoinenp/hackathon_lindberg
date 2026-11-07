@@ -174,6 +174,7 @@
   }
   async function loadCustomerReview(customer) {
     storageLoading = true;
+    $("#customer-load-status").textContent = "";
     state.chatRevision += 1;
     toggleChatMenu(false);
     $("#workspace").inert = true;
@@ -186,6 +187,8 @@
       });
       const record = await response.json();
       if (!response.ok) throw new Error(record.error || "Load failed");
+      if (record.workspace && record.workspace.scope.customer !== customer)
+        throw new Error("Review belongs to another customer.");
       const revision = state.chatRevision;
       openAreas.clear();
       $("#data-import-form").reset();
@@ -239,6 +242,7 @@
         "Valitun asiakkaan katsausta ei voitu ladata. Kokeile toista asiakasta.",
         "Could not load the selected review. Try another customer.",
       );
+      $("#customer-load-status").textContent = $("#review-storage-status").textContent;
       return false;
     } finally {
       storageLoading = false;
@@ -661,13 +665,6 @@
         )}</select></div><div class="trend-chart" style="grid-template-columns:repeat(${points.length}, minmax(0,1fr))" role="img" aria-label="${t(def.label)}: ${points.map((point) => `${point.month} ${f(point.value / def.divisor, 1)} ${def.unit}`).join(", ")}">${points.map((point) => `<div class="trend-column"><span>${f(point.value / def.divisor)}</span><div class="trend-track"><i style="height:${(point.value / max) * 100}%"></i></div><small>${point.month.slice(5)}</small></div>`).join("")}</div><p class="quiet">${t(def.label)} (${def.unit}) · Synthetic ${state.metric === "repairs" ? t("event count") : t("allocated estimate")}. Monthly totals reflect service volume.</p></section><section class="analysis-card"><h2>Breakdown by country</h2>${countries.map((point) => `<div class="country-row"><div><span>${countryName(point.country)}</span><strong>${f(point.value / def.divisor, 1)} ${def.unit}</strong></div><div class="bar-track"><div class="bar-fill" style="width:${(point.value / countryMax) * 100}%"></div></div></div>`).join("")}<p class="quiet">${t(def.label)} for the selected period. Country totals reflect service volume.</p></section></div><section class="analysis-card"><h2>Sites and textile use</h2><p class="quiet">Snapshot for ${snapshotName()}. Scan coverage flags where to investigate. Water and repairs cover the full period.</p><div class="table-wrap"><table><thead><tr><th>Site</th><th>Country</th><th>Scanned</th><th>Allocated</th><th>Water, m³</th><th>Repairs</th></tr></thead><tbody>${ctx.sites.map((site) => t`<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${countryName(site.country)}</td><td>${site.utilization == null ? t("Unavailable") : f(site.utilization, 1) + " %"}</td><td>${f(site.allocated)}</td><td>${f(site.water / 1000)}</td><td>${f(site.repairs)}</td></tr>`).join("")}</tbody></table></div></section>${detailedAnalysis()}`;
   }
   function render() {
-    // Everything happens in the customer review; older saved reviews may still name the old view.
-    state.view = "summary";
-    const customerOverview = $("#customer-overview");
-    if (customerOverview) {
-      customerOverview.hidden = mode === "home";
-      $("#summary-panel").before(customerOverview);
-    }
     $("#customer").value = state.customer;
     invalidatePowerPoint();
     const ctx = context();
@@ -694,9 +691,12 @@
         .join("");
     for (const id of ["site", "baseline", "priority", "country", "continent"])
       $("#" + id).value = state[id];
-    $("#summary-panel").hidden = mode === "home";
-    $("#analysis-panel").hidden = true;
     const preparing = mode === "prepare";
+    const analyzing = preparing && state.view === "analysis";
+    $(".view-tabs").hidden = !preparing;
+    $("#summary-panel").hidden = !preparing || analyzing;
+    $("#analysis-panel").hidden = !analyzing;
+    $("#deck").hidden = !preparing || analyzing;
     document.body.dataset.mode = mode;
     $("#today").hidden = mode !== "home";
     $(".toolbar").hidden = !preparing;
@@ -713,7 +713,7 @@
     }
     $("#open-review").disabled = !ctx.metrics.hasData || state.generating || !state.included.length;
     $("#summary-panel").before($("#customer-overview"));
-    $("#customer-overview").hidden = mode === "home";
+    $("#customer-overview").hidden = !analyzing;
     renderCustomerOverview();
     renderReviewEvidence();
     renderRelationship();
@@ -2177,21 +2177,6 @@
     Manufacturing: "Teollisuus",
     Healthcare: "Terveydenhuolto",
   };
-  function recentCustomers() {
-    try {
-      return JSON.parse(localStorage.getItem("lindstrom-recent-customers")) ?? [];
-    } catch {
-      return [];
-    }
-  }
-  function rememberCustomer(id) {
-    try {
-      const recent = [id, ...recentCustomers().filter((row) => row !== id)].slice(0, 3);
-      localStorage.setItem("lindstrom-recent-customers", JSON.stringify(recent));
-    } catch {
-      /* The search still works without remembered customers. */
-    }
-  }
   function renderToday() {
     const query = $("#customer-search").value;
     const rows = data.customers.map((customer) => ({
@@ -2200,20 +2185,13 @@
       industry: industryName(customer.industry),
       keywords: `${customer.industry} ${industryKeywords[customer.industry] ?? ""}`,
     }));
-    const recent = recentCustomers()
-      .map((id) => rows.find((row) => row.id === id))
-      .filter(Boolean);
-    const found = query.trim()
-      ? globalThis.SalesModel.matchCustomers(rows, query)
-      : recent.length
-        ? recent
-        : globalThis.SalesModel.matchCustomers(rows, "", 5);
+    const found = globalThis.SalesModel.matchCustomers(rows, query, rows.length);
     searchIndex = Math.min(searchIndex, Math.max(found.length - 1, 0));
     $("#today-label").textContent = query.trim()
       ? found.length
         ? ""
         : t("No customers found")
-      : t(recent.length ? "Recent" : "Customers");
+      : t("Customers");
     $("#today-list").innerHTML = found
       .map(
         ({ id, name, industry }, index) =>
@@ -2252,16 +2230,7 @@
     const card = event.target.closest("[data-open-customer]");
     if (!card) return;
     const customer = card.dataset.openCustomer;
-    rememberCustomer(customer);
-    mode = "prepare";
-    if (customer === state.customer) {
-      setMode("prepare");
-      return;
-    }
-    const select = $("#customer");
-    select.value = customer;
-    select.dispatchEvent(new Event("change"));
-    window.scrollTo(0, 0);
+    void openCustomer(customer);
   });
   function renderMeetingAdvice() {
     const sales = globalThis.SalesModel;
@@ -3062,8 +3031,7 @@
   $("#customer").innerHTML = data.customers
     .map((r) => `<option value="${r.customer_id}">${esc(r.customer_name)}</option>`)
     .join("");
-  $("#customer").addEventListener("change", async (event) => {
-    const customer = event.target.value;
+  async function openCustomer(customer) {
     $("#customer").value = state.customer;
     if (switchingReview) return;
     switchingReview = true;
@@ -3071,7 +3039,7 @@
     $("#composer").inert = true;
     try {
       await flushReviewSave();
-      await loadCustomerReview(customer);
+      if (await loadCustomerReview(customer)) setMode("prepare");
     } catch {
       /* The persistent save status explains the error. */
     } finally {
@@ -3080,7 +3048,8 @@
       $("#composer").inert = !storageReady;
       render();
     }
-  });
+  }
+  $("#customer").addEventListener("change", (event) => void openCustomer(event.target.value));
   for (const id of ["site", "baseline", "priority", "from", "to", "country", "continent"])
     $("#" + id).addEventListener("change", (event) => {
       state[id] = event.target.value;
