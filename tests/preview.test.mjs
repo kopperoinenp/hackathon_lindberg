@@ -47,6 +47,43 @@ async function startPreview(t, dataset = "") {
   });
 }
 
+test("a local customer can upload a file and get a separate quality report", async (t) => {
+  const origin = await startPreview(t);
+  const url = `${origin}/api/imports/CUST001?format=json`;
+  const options = {
+    method: "POST",
+    headers: { "Content-Type": "application/octet-stream" },
+    body: JSON.stringify({ Deliveries: [{ delivered: 10 }, { delivered: 12 }, { delivered: 15 }] }),
+  };
+  const response = await fetch(url, options);
+  assert.equal(response.status, 200);
+  const report = await response.json();
+  assert.equal(report.customer, "CUST001");
+  assert.equal(report.status, "profile_only");
+  assert.equal(report.customerMatch, "unverified");
+  assert.deepEqual(report.quality[0].columns[0].range, { min: 10, max: 15 });
+  assert.equal((await fetch(url, { ...options, body: "invalid" })).status, 400);
+  assert.equal((await fetch(url.replace("CUST001", "missing"), options)).status, 404);
+  const identified = (id) => JSON.stringify({ Deliveries: [{ customer_id: id, delivered: 10 }] });
+  const match = await fetch(url, { ...options, body: identified("CUST001") });
+  assert.equal((await match.json()).customerMatch, "matched");
+  const unknown = await fetch(url, { ...options, body: identified("External-123") });
+  assert.equal(unknown.status, 200);
+  assert.equal((await unknown.json()).customerMatch, "unverified");
+  const mismatch = await fetch(url, { ...options, body: identified("CUST002") });
+  assert.equal(mismatch.status, 400);
+  assert.match((await mismatch.json()).error, /different customer/);
+  assert.equal(
+    (
+      await fetch(url, {
+        ...options,
+        headers: { ...options.headers, Origin: "https://other.example" },
+      })
+    ).status,
+    403,
+  );
+});
+
 test("invalid active data leaves the preview available and blocks analysis", async (t) => {
   const folder = await mkdtemp(join(tmpdir(), "lindberg-invalid-dataset-"));
   const candidate = join(folder, "candidate.json");

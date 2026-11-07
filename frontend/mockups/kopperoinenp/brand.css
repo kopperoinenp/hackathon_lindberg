@@ -1328,6 +1328,54 @@ main {
   color: #fff;
   font-size: 16px;
 }
+#chat-data-import {
+  overflow-y: auto;
+}
+#data-import-title {
+  margin: 0;
+  padding: 12px 14px;
+  color: var(--brand-blue);
+  font-size: 16px;
+}
+#composer #data-import-form {
+  flex-direction: column;
+  padding-bottom: 12px;
+  font-size: 13px;
+}
+#composer:has(#chat-data-import:not([hidden])) {
+  height: auto;
+}
+#composer:has(#chat-data-import:not([hidden]))
+  :is(#chat, #chat-prompts, #chat-prompts-toggle, #ask-form) {
+  display: none;
+}
+#composer:has(#chat-data-import:not([hidden])) > small {
+  display: none;
+}
+#data-import-form label:first-child {
+  display: grid;
+  gap: 4px;
+}
+#composer #data-import-file,
+#composer #data-import-share {
+  flex: none;
+  height: auto;
+  padding: 0;
+}
+#composer #data-import-submit {
+  width: auto;
+  align-self: flex-start;
+  padding: 0 12px;
+  font-size: 13px;
+}
+#data-import-status {
+  margin: 0;
+  padding: 4px 14px;
+  font-size: 12px;
+}
+#data-import-result > details {
+  margin-top: 8px;
+}
 #composer > small {
   flex: none;
   margin: 0;

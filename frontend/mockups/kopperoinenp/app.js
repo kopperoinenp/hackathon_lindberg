@@ -175,6 +175,7 @@
       if (!response.ok) throw new Error(record.error || "Load failed");
       const revision = state.chatRevision;
       openAreas.clear();
+      $("#data-import-form").reset();
       Object.assign(state, structuredClone(defaultReviewState), {
         customer,
         chatRevision: revision,
@@ -679,6 +680,7 @@
     $("#analysis-panel").hidden = state.view !== "analysis";
     $("#composer").hidden = false;
     renderQueryResult();
+    renderDataImport();
     for (const view of ["summary", "analysis"]) {
       const tab = $("#" + view + "-tab");
       tab.setAttribute("aria-selected", String(state.view === view));
@@ -784,6 +786,127 @@
   });
   function customerKpis() {
     return state.contractKpis;
+  }
+  const imports = new Map();
+  let activeImport = null;
+  function renderDataImport() {
+    const entries = imports.get(state.customer) ?? [];
+    $("#data-import-submit").disabled = activeImport !== null;
+    const status = $("#data-import-status");
+    status.textContent =
+      activeImport?.customer === state.customer
+        ? t("Analyzing files…") + " " + f(activeImport.completed) + " / " + f(activeImport.total)
+        : entries.length
+          ? f(entries.length) +
+            " " +
+            t("files processed. See Imported files in the customer review.")
+          : "";
+    status.hidden = !status.textContent;
+    $("#data-import-reports").hidden = !entries.length;
+    $("#data-import-result").innerHTML = entries
+      .map(
+        (entry) =>
+          "<details " +
+          (entries.length === 1 ? "open" : "") +
+          "><summary>" +
+          esc(entry.name) +
+          (entry.error ? " · " + t("Import failed") : "") +
+          "</summary>" +
+          importReportHtml(entry) +
+          "</details>",
+      )
+      .join("");
+  }
+  function importReportHtml(entry) {
+    if (entry.error) return "<p>" + esc(t(entry.error)) + "</p>";
+    const { report } = entry;
+    const descriptions = {
+      profile_only: "Local quality report ready.",
+      no_eligible_data: "The file contains no eligible data for new tools.",
+      no_valid_tools: "The proposed tools did not pass validation.",
+      provider_unavailable: "AI is unavailable. The local quality report is ready.",
+      invalid_tool_list: "AI returned an invalid tool list. The local quality report is ready.",
+      validated: "Analysis ready.",
+    };
+    const quality = report.quality
+      .map((table) => {
+        const issues = table.columns.filter((column) => column.missing || column.kind === "mixed");
+        return `<li><strong>${esc(table.name)}</strong> · ${f(table.rows)} ${t("rows")} · ${f(table.duplicates)} ${t("duplicate rows")} · ${f(issues.length)} ${t("columns with missing or mixed data")}${issues.length ? `<br /><small>${esc(issues.map(({ column }) => column).join(", "))}</small>` : ""}</li>`;
+      })
+      .join("");
+    const suggestions = report.suggestions
+      .map(
+        ({ metric, unit, comparison, source, action }) =>
+          `<li><strong>${esc(metric)}</strong> · ${f(comparison.before, 2)} → ${f(comparison.after, 2)} ${esc(unit)}<br /><small>${esc(source.table)} · ${esc(comparison.previousPeriods.join(", "))} → ${esc(comparison.periods.join(", "))}</small><br />${esc(t(action))}</li>`,
+      )
+      .join("");
+    const tools = report.tools
+      .map(
+        ({ definition, result, comparisonStatus }) =>
+          `<li>${esc(definition.name)} · ${f(result, 2)} ${esc(definition.unit)}${comparisonStatus === "incomplete_or_sparse_prior_year" ? ` · ${t("Prior-year coverage is incomplete.")}` : ""}</li>`,
+      )
+      .join("");
+    const customerCheck =
+      report.customerMatch === "matched"
+        ? t("The customer identifier matches the selected customer.")
+        : t(
+            "The file could not be matched to a customer. Check that it belongs to the selected customer.",
+          );
+    return `<p>${esc(t(descriptions[report.status]))} ${esc(customerCheck)}</p><h4>${t("Data quality")}</h4><ul>${quality}</ul>${tools ? `<h4>${t("Validated tools")}</h4><ul>${tools}</ul>` : ""}${report.rejected.length ? `<p>${f(report.rejected.length)} ${t("tools rejected by quality checks")}</p>` : ""}${suggestions ? `<h4>${t("Suggested follow-ups")}</h4><ul>${suggestions}</ul>` : ""}`;
+  }
+
+  $("#data-import-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (activeImport !== null) return;
+    const files = [...$("#data-import-file").files];
+    if (!files.length) return;
+    if (files.length > 50) {
+      status(t("Choose up to 50 files at a time."));
+      return;
+    }
+    const customer = state.customer;
+    const shareSchema = $("#data-import-share").checked ? "1" : "0";
+    const entries = [];
+    imports.set(customer, entries);
+    activeImport = { customer, completed: 0, total: files.length };
+    event.currentTarget.reset();
+
+    $("#data-import-reports").open = true;
+    renderDataImport();
+    try {
+      for (const file of files) {
+        entries.push(await uploadImport(file, customer, shareSchema));
+        activeImport.completed += 1;
+        renderDataImport();
+      }
+    } finally {
+      activeImport = null;
+      renderDataImport();
+    }
+  });
+  async function uploadImport(file, customer, shareSchema) {
+    const format = file.name.split(".").at(-1).toLowerCase();
+    if (
+      !["csv", "xlsx", "json"].includes(format) ||
+      file.size === 0 ||
+      file.size > 8 * 1024 * 1024
+    ) {
+      return { name: file.name, error: "Choose a nonempty CSV, XLSX or JSON file up to 8 MiB." };
+    }
+    const query = new URLSearchParams({ format, shareSchema });
+    try {
+      const response = await fetch("/api/imports/" + encodeURIComponent(customer) + "?" + query, {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body: file,
+        signal: AbortSignal.timeout(125000),
+      });
+      const report = await response.json();
+      if (!response.ok) throw new Error(report.error);
+      return { name: file.name, report };
+    } catch (error) {
+      return { name: file.name, error: error.message || "The file could not be analyzed." };
+    }
   }
   function kpiDescription(kpi) {
     return [
@@ -2220,7 +2343,10 @@
           (msg) =>
             `<div class="message ${msg.user ? "user" : ""}"><p>${esc(msg.text)}</p>${msg.view ? chatResult(msg.view) : ""}${msg.followUps?.length && msg === state.chat.at(-1) ? `<div class="chat-followups">${msg.followUps.map((text) => `<button type="button" data-chat-prompt>${esc(text)}</button>`).join("")}</div>` : ""}</div>`,
         )
-        .join("") + (state.asking ? t('<p class="message pending">Applying changes…</p>') : "");
+        .join("") +
+      (state.asking
+        ? `<p class="message pending">${t(state.chatTool === "data" ? "Analyzing data…" : "Applying changes…")}</p>`
+        : "");
     $("#chat").scrollTop = $("#chat").scrollHeight;
     const hasPrompts = $("#chat-prompts").children.length > 0;
     const started = state.chat.length > 0;
@@ -2263,6 +2389,18 @@
             "The review changed while the request was running. Send a new request for the current review.",
           ),
         );
+        return;
+      }
+      if (chatTool === "data") {
+        if (result.query !== undefined) state.lastQuery = result.query;
+        state.chat.push({
+          user: false,
+          text: result.changed.length
+            ? t("Find data is read-only. Use Change the dashboard to make edits.")
+            : (result.answer ?? result.message ?? t("No changes.")),
+          view: result.view,
+          followUps: result.followUps ?? [],
+        });
         return;
       }
       const next = result.workspace;
@@ -2386,6 +2524,10 @@
         "Restore the default dashboard",
       ],
     },
+    upload: {
+      title: "Upload files",
+      hint: "Analyze CSV, XLSX or JSON files",
+    },
   };
   function toggleChatMenu(open) {
     $("#chat-menu").hidden = !open;
@@ -2401,16 +2543,19 @@
   }
   function openChatTool(id) {
     if (storageLoading || switchingReview) return;
-    state.chatTool = id;
+    const uploading = id === "upload";
+    if (!uploading) state.chatTool = id;
     state.promptsOpen = true;
-    $("#chat-prompts").innerHTML = chatTools[id].prompts
+    $("#chat-data-import").hidden = !uploading;
+    $("#toggle-chat").setAttribute("aria-controls", uploading ? "chat-data-import" : "chat");
+    $("#chat-prompts").innerHTML = (chatTools[id].prompts ?? [])
       .map((text) => `<button type="button" data-chat-prompt>${esc(t(text))}</button>`)
       .join("");
     toggleChatMenu(false);
     $("#chat").hidden = false;
     updateChatToggle();
     renderChat();
-    $("#question").focus();
+    $(uploading ? "#data-import-file" : "#question").focus();
   }
   $("#toggle-chat").addEventListener("click", () => {
     if ($("#chat").hidden) {
@@ -2418,7 +2563,9 @@
       toggleChatMenu($("#chat-menu").hidden);
       return;
     }
+    $("#chat-data-import").hidden = true;
     $("#chat").hidden = true;
+    $("#toggle-chat").setAttribute("aria-controls", "chat");
     updateChatToggle();
   });
   $("#query-result").addEventListener("click", (event) => {

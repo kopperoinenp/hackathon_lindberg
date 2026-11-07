@@ -60,6 +60,51 @@
     "There is insufficient data for a proposal in this selection.":
       "Valitulla rajauksella ei ole riittävää näyttöä kehitysehdotukselle.",
     "Same period last year": "Sama jakso vuotta aiemmin",
+    "Imported files": "Tuodut tiedostot",
+    "Upload files": "Lisää tiedostoja",
+    "Analyze CSV, XLSX or JSON files": "Analysoi CSV-, XLSX- tai JSON-tiedostoja",
+    "Analyzing data…": "Analysoidaan dataa…",
+    "Applying changes…": "Tehdään muutoksia…",
+    "Find data is read-only. Use Change the dashboard to make edits.":
+      "Tietohaku ei muokkaa katsausta. Tee muutokset kohdasta Muuta dashboardia.",
+    "Data files (CSV, XLSX or JSON, up to 8 MiB each)":
+      "Tiedostot (CSV, XLSX tai JSON, enintään 8 MiB per tiedosto)",
+    "Allow AI to use column headings and types to propose tools":
+      "Salli sarakeotsikoiden ja -tyyppien käyttö AI-työkalujen ehdottamiseen",
+    "Analyze files": "Analysoi tiedostot",
+    "Analyzing files…": "Analysoidaan tiedostoja…",
+    "files processed. See Imported files in the customer review.":
+      "tiedostoa käsitelty. Katso Tuodut tiedostot asiakaskatsauksessa.",
+    "Choose up to 50 files at a time.": "Valitse enintään 50 tiedostoa kerralla.",
+    "Import failed": "Tuonti epäonnistui",
+    "Choose a nonempty CSV, XLSX or JSON file up to 8 MiB.":
+      "Valitse CSV-, XLSX- tai JSON-tiedosto, jonka koko on enintään 8 MiB ja jossa on sisältöä.",
+    "Local quality report ready.": "Paikallinen laaturaportti on valmis.",
+    "The file contains no eligible data for new tools.":
+      "Tiedostossa ei ole riittävän laadukasta dataa uusille työkaluille.",
+    "The proposed tools did not pass validation.":
+      "Ehdotetut työkalut eivät läpäisseet tarkistusta.",
+    "AI is unavailable. The local quality report is ready.":
+      "AI-palvelua ei saatu käyttöön. Paikallinen laaturaportti on valmis.",
+    "AI returned an invalid tool list. The local quality report is ready.":
+      "AI:n työkalulista oli virheellinen. Paikallinen laaturaportti on valmis.",
+    "Analysis ready.": "Analyysi on valmis.",
+    "Data quality": "Aineiston laatu",
+    "The customer identifier matches the selected customer.":
+      "Tiedoston asiakastunniste vastaa valittua asiakasta.",
+    "The file could not be matched to a customer. Check that it belongs to the selected customer.":
+      "Tiedostoa ei voitu yhdistää asiakkaaseen. Tarkista, että aineisto kuuluu valitulle asiakkaalle.",
+    "The file identifies a different customer. Select the matching customer.":
+      "Tiedosto kuuluu eri asiakkaalle. Valitse tiedostoa vastaava asiakas.",
+    rows: "riviä",
+    "duplicate rows": "toistuvaa riviä",
+    "columns with missing or mixed data": "saraketta, joissa on puuttuvia tai sekoittuneita arvoja",
+    "Validated tools": "Tarkistetut työkalut",
+    "tools rejected by quality checks": "työkalua hylättiin laatutarkistuksessa",
+    "Suggested follow-ups": "Ehdotetut jatkotoimet",
+    "Prior-year coverage is incomplete.": "Edellisen vuoden vertailuaineisto on vajaa.",
+    "Review the process behind the change and track this metric in the next comparable period.":
+      "Selvitä muutoksen taustalla oleva prosessi ja seuraa mittaria seuraavalla vertailukelpoisella jaksolla.",
     "Data-based suggestions": "Dataan perustuvat ehdotukset",
     "Historical change": "Jaksovertailu",
     "Previous value: 0": "Vertailujakson arvo: 0",
