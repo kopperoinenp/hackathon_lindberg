@@ -163,7 +163,9 @@ export const kamCases = [
     check(r, w) {
       assert.deepEqual(r.workspace.slideOrder.slice(0, 2), ["overview", "cover"]);
       assert.deepEqual(r.workspace.approvedUpsells, w.approvedUpsells);
-      assert.ok(buildPresentation(r.workspace).slides.at(-1).id.startsWith("upsell-"));
+      const { slides } = buildPresentation(r.workspace);
+      const plan = slides.findIndex((slide) => slide.id === "plan");
+      assert.ok(slides[plan - 1].id.startsWith("upsell-"));
     },
   },
   {

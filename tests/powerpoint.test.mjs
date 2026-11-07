@@ -122,7 +122,7 @@ test("Copilot adapter returns the same plan shape and disables web grounding", a
 test("PowerPoint export contains editable chart data, sources, notes and scope", async () => {
   const base = buildPresentation(request),
     deck = applyPlan(base, defaultPlan(base));
-  const bytes = await renderPowerPoint(deck, { provider: "deterministic", model: null });
+  const bytes = await renderPowerPoint(deck);
   const zip = await JSZip.loadAsync(bytes);
   const slides = Object.keys(zip.files).filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name));
   const charts = Object.keys(zip.files).filter((name) => /^ppt\/charts\/chart\d+\.xml$/.test(name));
@@ -191,7 +191,7 @@ test("internal relationship assessments stay out of preview and PowerPoint slide
     deck.slides.forEach((slide) => {
       slide.cooperation = { status, color: "E52330", label: "INTERNAL_RELATIONSHIP" };
     });
-    const zip = await JSZip.loadAsync(await renderPowerPoint(deck, { provider: "deterministic" }));
+    const zip = await JSZip.loadAsync(await renderPowerPoint(deck));
     for (const file of Object.keys(zip.files).filter((name) =>
       /^ppt\/slides\/slide\d+\.xml$/.test(name),
     )) {
@@ -205,9 +205,7 @@ test("internal relationship assessments stay out of preview and PowerPoint slide
 test("Finnish charts use localized editable category labels without crowded numeric point labels", async () => {
   const base = buildPresentation({ scope: {}, language: "fi" });
   const deck = applyPlan(base, defaultPlan(base));
-  const zip = await JSZip.loadAsync(
-    await renderPowerPoint(deck, { provider: "deterministic", model: null }),
-  );
+  const zip = await JSZip.loadAsync(await renderPowerPoint(deck));
   const entries = Object.keys(zip.files).filter((name) =>
     /^ppt\/charts\/chart\d+\.xml$/.test(name),
   );

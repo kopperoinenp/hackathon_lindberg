@@ -310,7 +310,10 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
   const download = await fetch(`${origin}${presentation.downloadUrl}`);
   assert.equal(download.status, 200);
   assert.match(download.headers.get("content-type"), /presentationml/);
-  assert.match(download.headers.get("content-disposition"), /CUST003/);
+  assert.match(
+    download.headers.get("content-disposition"),
+    /Mediora-Health-Network-customer-review/,
+  );
   assert.ok((await download.arrayBuffer()).byteLength > 10000);
   const stream = await fetch(`${origin}/__preview_events`);
   assert.match(stream.headers.get("content-type"), /text\/event-stream/);
