@@ -41,6 +41,39 @@
     "Customer-allocated figures for up to six laundries, sorted by washed weight. Source: Customer_Impacts.":
       "Asiakkaalle kohdistetut luvut enintään kuudelta pesulalta pestyn kilomäärän mukaan. Lähde: Customer_Impacts.",
     "Questions for the customer review": "Kysymykset asiakaskatsaukseen",
+    "There is insufficient data for a proposal in this selection.":
+      "Valitulla rajauksella ei ole riittävää näyttöä kehitysehdotukselle.",
+    "Investigate lower wash frequency": "Selvittäkää vähäisemmän pesutiheyden syy",
+    "washes per allocated item per month": "pesua allokoitua kappaletta kohti kuukaudessa",
+    "Difference repeated in ": "Ero toistui ",
+    " of ": " / ",
+    " matched months.": " vertailukuukaudessa.",
+    " matched months": " vertailukuukautta",
+    "Compare shift patterns, change routines and reserve stock before piloting a change to allocations. Track garment availability during the pilot.":
+      "Vertailkaa työvuoroja, vaihtokäytäntöjä ja varavarastoa ennen jakelumäärien kokeilua. Seuratkaa tekstiilien saatavuutta kokeilun aikana.",
+    "Check stock against lower wash volumes": "Tarkistakaa varastotaso pesumäärän laskettua",
+    "Average washes per month": "Pesuja keskimäärin kuukaudessa",
+    "Average allocated items": "Allokoituja kappaleita keskimäärin",
+    "Check whether lower demand is seasonal. Agree on stock levels for quiet and peak months, then track garment availability.":
+      "Selvittäkää, onko kysynnän lasku kausiluonteista. Sopikaa hiljaisen kauden ja sesongin varastotasot ja seuratkaa tekstiilien saatavuutta.",
+    "Investigate higher repair frequency": "Selvittäkää suuremman korjaustiheyden syy",
+    "Repairs per 100 washes (total washes)": "Korjauksia / 100 pesua (pesuja yhteensä)",
+    "Check whether tasks, garment suitability or repair practices explain the gap. Test one change and compare repairs per 100 washes at the next review.":
+      "Selvittäkää, selittävätkö työtehtävät, tekstiilin soveltuvuus tai korjauskäytännöt eron. Kokeilkaa yhtä muutosta ja verratkaa korjauksia sataa pesua kohti seuraavassa katsauksessa.",
+    "Review textile stock and scanning together":
+      "Tarkistakaa tekstiilivarasto ja skannaus yhdessä",
+    "Scan coverage was ": "Skannauskattavuus oli ",
+    "% in ": " % kuussa ",
+    "Compare local stock and scanning records together before changing allocations. Repeat the coverage check after the next inventory count.":
+      "Verratkaa yhdessä paikallista varastoa ja skannaustietoja ennen jakelumäärien muuttamista. Tarkistakaa skannauskattavuus uudelleen seuraavan inventoinnin jälkeen.",
+    "Investigate the longest service cycles together":
+      "Selvittäkää yhdessä pisimpien palvelukiertojen syyt",
+    "At least 90% of recorded cycles finished within ":
+      "Vähintään 90 % kirjatuista palvelukierroista valmistui ",
+    " hours (": " tunnissa (",
+    " records, ": " kirjattua kiertoa, ",
+    "Review handoffs and delays together, agree on one change, and compare cycle times at the next review.":
+      "Käykää yhdessä läpi työvaiheet ja viiveet, sopikaa yhdestä muutoksesta ja verratkaa kiertoaikoja seuraavassa katsauksessa.",
     "Can we reconcile the scan gap with local stock and scanning practices?":
       "Voidaanko skannausvaje täsmäyttää paikalliseen tekstiilikantaan ja skannauskäytäntöihin?",
     "Which steps explain the longer recorded cycles, and what target has been agreed?":
@@ -428,6 +461,34 @@
     "The review changed while the request was running. Send a new request for the current review.":
       "Katsaus vaihtui viestin käsittelyn aikana. Vanhaa vastausta ei käytetty.",
     Done: "Valmis",
+    "This wording is a claim the data cannot support.":
+      "Tämä muotoilu on väite, jota data ei tue, joten sitä ei lisätty.",
+    "What should we raise in the meeting?": "Mistä palaverissa kannattaa puhua?",
+    "Show suggestions": "Näytä ehdotukset",
+    "Hide suggestions": "Piilota ehdotukset",
+    "The comparison is on the dashboard.": "Näytin vertailun dashboardilla.",
+    "Outsourced local laundry": "Paikallinen ulkoistettu pesula",
+    "Home washing": "Kotipesu",
+    "In-house customer laundry": "Asiakkaan oma pesula",
+    "Assistant search": "Apurin haku",
+    "Close result": "Sulje tulos",
+    Source: "Lähde",
+    "This percentage is not in the data, so it was not added.":
+      "Tätä prosenttilukua ei ole aineistossa, joten sitä ei lisätty.",
+    "Find and compare data": "Etsi ja vertaile tietoa",
+    "Figures, quarters, sites and products": "Luvut, kvartaalit, toimipaikat ja tuotteet",
+    "Change the dashboard": "Muuta dashboardia",
+    "Period, focus and visible content": "Jakso, painotus ja näkyvä sisältö",
+    "Compare water by quarter": "Vertaa vettä kvartaaleittain",
+    "Which products need the most repairs?": "Mitkä tuotteet tarvitsevat eniten korjauksia?",
+    "Compare emissions by country": "Vertaa päästöjä maittain",
+    "Which sites have the most late cycles?": "Millä toimipaikoilla on eniten myöhästymisiä?",
+    "Show Q2": "Näytä Q2",
+    "Focus on emissions": "Keskity päästöihin",
+    "Show only water and repairs": "Näytä vain vesi ja korjaukset",
+    "Restore the default dashboard": "Palauta oletusdashboard",
+    "Assistant tools": "Apurin työkalut",
+    "Suggested requests": "Ehdotetut pyynnöt",
     "No changes.": "Ei muutoksia.",
     "The review changed. Send a new request for the current filters.":
       "Katsaus vaihtui. Voit lähettää uuden viestin nykyisestä rajauksesta.",

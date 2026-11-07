@@ -12,6 +12,23 @@ assessment controls. The relationship rating can be set through review chat and
 is passed to the presentation request.
 Same-origin checks, request limits and the shared chat concurrency lock apply.
 
+## Assistant tools
+
+The assistant routes requests to a workspace edit, a scoped analysis view, or
+a read-only data query. For `dataQuery`, the model returns structured filters, and
+`backend/data-query.mjs` calculates and writes the answer with the same dashboard
+functions. The model never writes figures. A successful question adds `answer` and
+`source` and a chart-ready `view` to the response and leaves the workspace unchanged.
+The search tool shows `view` as a chart in the chat, and the dashboard tool shows it as a
+result card above the dashboard. Topics: water, emissions,
+repairs, washed, scan, late, requests, energy, waste, overview, meeting, explain.
+Comparisons: none, month, quarter, country, site, product, baseline. A query can also
+choose totals or rates, a period, a rank and a row limit. The browser returns the last
+query as `lastQuery`, so follow-up questions keep their context; the server validates it.
+
+Free text from the user is still applied only verbatim, and a percentage in a note,
+heading, title or slide text must already exist in the current evidence.
+
 ## KAM editing tools
 
 `dashboardLayout` changes actual dashboard structure, not meeting notes. Null
@@ -50,7 +67,7 @@ This adds one local interface; existing presentation requests remain compatible.
 
 ## POST /api/chat
 
-JSON input: `{message, history, workspace}`.
+JSON input: `{message, history, workspace, lastQuery?}`.
 
 - `message`: nonempty instruction, at most 1,000 characters.
 - `history`: at most six `{role: "user" | "assistant", content}` entries,
@@ -66,12 +83,13 @@ visible insight IDs, PowerPoint insight IDs, the summary heading, cover title an
 manager note. Text must be supplied verbatim in the current user instruction.
 No executable HTML/CSS/JS, arbitrary components, figures or source-data edits are
 accepted. At least one insight must remain selected. Mandatory deck chapters stay.
-Unsupported, ambiguous or question-only requests return an empty patch.
+Unsupported edits return an error. Data questions leave all edit fields null.
 
 JSON success: `{workspace, changed, reply}`. `changed` is the list of modified
-field paths. `reply` is exactly `Done` or `No changes.`. The browser displays
-only that status. It renders all user text as escaped text and recalculates the
-charts through deterministic models. Customer changes clear customer-specific
+field paths. `reply` is exactly `Done` or `No changes.`. Edits may also return a
+short `message` describing the changes. Queries add `answer`, `source`, `view`,
+`followUps` and `query` while keeping `changed` empty. The browser escapes
+user text and renders charts from computed results. Customer changes clear customer-specific
 notes/titles/selections; other data-scope changes clear notes and edited titles.
 A country follow-up preserves the period and priority. Site/customer membership
 and nonempty data are checked before the entire patch is applied.
@@ -85,11 +103,11 @@ errors retain the shared adapter's status mapping.
 
 ## Boundaries
 
-For evidence requests, the provider can select up to three internal analysis
+For requests to open the detailed analysis, the provider can select up to three internal analysis
 tools before returning its final workspace patch. The server evaluates the
 tools on the validated proposed scope and checks that the final patch keeps
-that scope. Both calls share the existing deadline. The public request,
-response and action-only acknowledgement keep the same shape.
+that scope. Both calls share the existing deadline. A direct data query uses
+one provider call and cannot be combined with a workspace edit or scoped analysis.
 See [Analysis tools](ANALYSIS_TOOLS.md).
 
 Loopback only, same-origin POST checks, 32 KiB request limit, one chat request at a
