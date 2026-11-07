@@ -14,8 +14,8 @@ Same-origin checks, request limits and the shared chat concurrency lock apply.
 
 ## Assistant tools
 
-The assistant routes requests to a workspace edit, a scoped analysis view, or
-a read-only data query. For `dataQuery`, the model returns structured filters, and
+The assistant has exactly two tools. The workspace patch changes the dashboard.
+`dataQuery` is read-only: the model returns only `{topic, compareBy}`, and
 `backend/data-query.mjs` calculates and writes the answer with the same dashboard
 functions. The model never writes figures. A successful question adds `answer` and
 `source` and a chart-ready `view` to the response and leaves the workspace unchanged.

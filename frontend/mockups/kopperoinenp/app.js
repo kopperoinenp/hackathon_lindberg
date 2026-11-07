@@ -98,31 +98,29 @@
     saveTimer;
   let saveQueue = Promise.resolve();
   let switchingReview = false;
-  let profileMode = "original";
-  let customerDraft = null;
   let storageMessage;
+  const reviewSignature = (workspace) => JSON.stringify({ ...workspace, view: undefined });
   function storageStatus(fi, en) {
     storageMessage = { fi, en };
     $("#review-storage-status").textContent = language === "fi" ? fi : en;
   }
   function scheduleReviewSave() {
-    if (profileMode !== "saved" || storageLoading || !storageReady || storageBlocked) return;
+    if (storageLoading || !storageReady || storageBlocked) return;
     clearTimeout(saveTimer);
-    if (JSON.stringify(chatWorkspace()) === savedSignature) return;
+    if (reviewSignature(chatWorkspace()) === savedSignature) return;
     storageStatus("Tallennetaan…", "Saving…");
     saveTimer = setTimeout(() => {
       flushReviewSave().catch(() => {});
     }, 250);
   }
-  function flushReviewSave(force = false) {
+  function flushReviewSave() {
     clearTimeout(saveTimer);
-    if (profileMode !== "saved") return saveQueue;
     if (storageBlocked) return Promise.reject(new Error("Reload the page before saving."));
     if (storageLoading || !storageReady) return saveQueue;
     const workspace = structuredClone(chatWorkspace());
     const operation = saveQueue.then(async () => {
-      const signature = JSON.stringify(workspace);
-      if (!force && signature === savedSignature) return;
+      const signature = reviewSignature(workspace);
+      if (signature === savedSignature) return;
       if (storageBlocked) throw new Error("Reload the page before saving.");
       try {
         const response = await fetch(
@@ -201,18 +199,16 @@
         // Evidence blocks, customer basics and next steps, when the backend stores them.
         applyChatAreas(record.workspace);
       }
-      profileMode = record.workspace ? "saved" : "original";
-      customerDraft = null;
       savedRevision = record.revision;
-      savedSignature = JSON.stringify(chatWorkspace());
+      savedSignature = reviewSignature(chatWorkspace());
       storageReady = true;
       storageBlocked = false;
       sessionStorage.setItem("lindstrom-review-customer", customer);
       storageStatus(
         record.workspace
           ? "Tallennettu katsaus ladattu"
-          : "Tälle asiakkaalle ei ole vielä tallennettua katsausta.",
-        record.workspace ? "Saved review loaded" : "This customer has no saved review yet.",
+          : "Muutokset tallennetaan automaattisesti.",
+        record.workspace ? "Saved review loaded" : "Edits are saved automatically.",
       );
       return true;
     } catch {
@@ -224,71 +220,11 @@
     } finally {
       storageLoading = false;
       $("#workspace").inert = false;
-      $("#composer").inert = profileMode === "original";
+      $("#composer").inert = false;
       render();
       renderChat();
     }
   }
-  async function switchProfileMode(nextMode) {
-    $("#review-profile-mode").value = profileMode;
-    if (nextMode === profileMode || switchingReview || storageLoading) return;
-    if (nextMode === "saved" && savedRevision === 0) return;
-    if (!storageReady || state.asking || state.generating) {
-      status(t("Wait until loading or editing has finished before switching views."));
-      return;
-    }
-    switchingReview = true;
-    $("#workspace").inert = true;
-    $("#composer").inert = true;
-    try {
-      await flushReviewSave();
-      const revision = state.chatRevision + 1;
-      if (nextMode === "original") {
-        customerDraft = structuredClone(state);
-        Object.assign(state, structuredClone(defaultReviewState), {
-          customer: state.customer,
-          chatRevision: revision,
-        });
-        profileMode = "original";
-      } else {
-        Object.assign(state, customerDraft, { chatRevision: revision });
-        customerDraft = null;
-        profileMode = "saved";
-      }
-      render();
-      renderChat();
-    } catch {
-      // Keep the current view and its edits when saving fails.
-    } finally {
-      switchingReview = false;
-      $("#workspace").inert = false;
-      $("#composer").inert = profileMode === "original";
-      $("#review-profile-mode").value = profileMode;
-    }
-  }
-  $("#review-profile-mode").addEventListener("change", (event) => {
-    switchProfileMode(event.target.value);
-  });
-  $("#create-customer-review").addEventListener("click", async () => {
-    if (savedRevision > 0 || !storageReady || storageBlocked || switchingReview || storageLoading)
-      return;
-    switchingReview = true;
-    $("#workspace").inert = true;
-    const original = structuredClone(state);
-    try {
-      profileMode = "saved";
-      state.chatRevision += 1;
-      await flushReviewSave(true);
-    } catch {
-      profileMode = "original";
-      Object.assign(state, original);
-    } finally {
-      switchingReview = false;
-      $("#workspace").inert = false;
-      render();
-      renderChat();
-    }
-  });
   window.addEventListener("pagehide", () => {
     flushReviewSave().catch(() => {});
   });
@@ -735,8 +671,7 @@
       $("#" + id).value = state[id];
     $("#summary-panel").hidden = state.view !== "summary";
     $("#analysis-panel").hidden = state.view !== "analysis";
-    $("#composer").hidden = profileMode === "original";
-    if ($("#composer").hidden) toggleChatMenu(false);
+    $("#composer").hidden = false;
     renderQueryResult();
     for (const view of ["summary", "analysis"]) {
       const tab = $("#" + view + "-tab");
@@ -753,35 +688,7 @@
     renderDashboardEdits();
     renderDashboardLayout();
     if (state.view === "analysis") renderAnalysis();
-    const original = profileMode === "original";
-    const hasSavedReview = savedRevision > 0;
-    const customerName = data.customers.find(
-      (row) => row.customer_id === state.customer,
-    ).customer_name;
-    const savedOption = $("#review-profile-mode option[value=saved]");
-    savedOption.disabled = !hasSavedReview;
-    savedOption.textContent = `${t(hasSavedReview ? "Saved customer review" : "No saved review")} · ${customerName}`;
-    $("#create-customer-review").hidden = hasSavedReview;
-    $("#create-customer-review").disabled = !storageReady || storageBlocked || switchingReview;
-    $("#create-customer-review").textContent = `${t("Create customer review")} · ${customerName}`;
-    $("#review-profile-mode").value = profileMode;
-    $("#profile-mode-help").textContent = `${customerName}: ${t(
-      !hasSavedReview
-        ? "No review has been created for this customer. Create a customer review to edit and save it."
-        : original
-          ? "Original template preview. Your saved review is unchanged. Select Saved customer review to edit."
-          : "Edits are saved to this customer’s review.",
-    )}`;
-    if (!original && state.savings !== null)
-      $("#profile-mode-help").textContent +=
-        " " + t("KAM estimates are customer-specific and do not change with filters.");
-    $("#reset-dashboard").disabled = original;
-    $("#customer-profile-kpis").hidden = original;
-    $(".review-content").hidden = original;
-    $("#composer").inert = original || switchingReview || storageLoading;
-    $("#open-review").disabled ||= original;
-    const meetingNote = $("#meeting-note");
-    if (meetingNote) meetingNote.disabled = original;
+    $("#composer").inert = switchingReview || storageLoading || !storageReady;
     scheduleReviewSave();
   }
   function customerKpis() {
@@ -1767,13 +1674,20 @@
         : t("Next steps will be agreed together in this meeting.");
   }
   function nextStepsEditorHtml() {
+    const suggestions = plan().filter((item) => item.length > 1);
+    const preview = suggestions
+      .map(
+        ([title, ...details]) =>
+          `<p><strong>${esc(title)}</strong><br />${esc(details.join(" "))}</p>`,
+      )
+      .join("");
     const rows = state.nextSteps
       .map(
         (step, index) =>
           `<li><label>${t("Action")}<input data-step="${index}" data-step-field="title" maxlength="${stepLimits.title}" value="${esc(step.title)}" /></label><label>${t("Owner")}<input data-step="${index}" data-step-field="owner" maxlength="${stepLimits.owner}" value="${esc(step.owner)}" /></label><label>${t("Timeline")}<input data-step="${index}" data-step-field="due" maxlength="${stepLimits.due}" value="${esc(step.due)}" placeholder="${t("E.g. Q2 2026")}" /></label><button type="button" class="text-button" data-step-remove="${index}">${t("Remove")}</button></li>`,
       )
       .join("");
-    return `<fieldset class="area-picker next-steps-editor"><legend>${t("Next steps shown in section 03")}</legend><p class="quiet">${t("Only the steps written here are shown to the customer. Keep to one to three.")}</p><ol>${rows}</ol><div class="kpi-actions">${state.nextSteps.length < 5 ? `<button type="button" class="secondary" data-step-add>${t("Add step")}</button>` : ""}${state.nextSteps.length ? "" : `<button type="button" class="text-button" data-step-suggest>${t("Start from suggestions")}</button>`}</div></fieldset>`;
+    return `<fieldset class="area-picker next-steps-editor"><legend>${t("Next steps shown in section 03")}</legend><p class="quiet">${t("Only the steps written here are shown to the customer. Keep to one to three.")}</p><ol>${rows}</ol>${preview ? `<details><summary>${t("Data-based suggestions")}</summary>${preview}</details>` : ""}<div class="kpi-actions">${state.nextSteps.length < 5 ? `<button type="button" class="secondary" data-step-add>${t("Add step")}</button>` : ""}${state.nextSteps.length || !suggestions.length ? "" : `<button type="button" class="text-button" data-step-suggest>${t("Start from suggestions")}</button>`}</div></fieldset>`;
   }
   // KAM controls for the customer-facing review live in Explore data.
   function renderReviewContent() {
@@ -1978,7 +1892,9 @@
     if (button.dataset.stepRemove !== undefined)
       state.nextSteps.splice(Number(button.dataset.stepRemove), 1);
     else if (button.dataset.stepSuggest !== undefined)
-      state.nextSteps = plan().map(([title]) => ({ title, owner: "", due: "" }));
+      state.nextSteps = plan()
+        .filter((item) => item.length > 1)
+        .map(([title]) => ({ title: title.slice(0, stepLimits.title), owner: "", due: "" }));
     else state.nextSteps.push({ title: "", owner: "", due: "" });
     state.chatRevision += 1;
     render();
@@ -2225,7 +2141,7 @@
     $("#ask-form").setAttribute("aria-busy", String(state.asking));
   }
   async function ask(question) {
-    if (state.asking || profileMode !== "saved" || storageLoading || switchingReview) return;
+    if (state.asking || storageLoading || switchingReview || !storageReady) return;
     const workspace = chatWorkspace(),
       snapshot = JSON.stringify(workspace),
       revision = state.chatRevision,
@@ -2388,7 +2304,7 @@
       .join("");
   }
   function openChatTool(id) {
-    if (profileMode !== "saved" || storageLoading || switchingReview) return;
+    if (storageLoading || switchingReview) return;
     state.chatTool = id;
     state.promptsOpen = true;
     $("#chat-prompts").innerHTML = chatTools[id].prompts
@@ -2483,7 +2399,7 @@
     } finally {
       switchingReview = false;
       $("#workspace").inert = false;
-      $("#composer").inert = profileMode === "original";
+      $("#composer").inert = !storageReady;
       render();
     }
   });
@@ -2532,7 +2448,6 @@
   });
   $("#reset-dashboard").addEventListener("click", () => {
     if (
-      profileMode !== "saved" ||
       !window.confirm(t("Replace this customer's saved dashboard layout with the original layout?"))
     )
       return;

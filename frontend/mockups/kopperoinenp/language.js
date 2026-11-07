@@ -7,18 +7,6 @@
     "Textile use by product": "Tekstiilien käyttö tuotteittain",
     "Allocation and scan coverage for": "Allokointi ja skannausosuus kuukaudelta",
     "Dashboard view": "Dashboard-näkymä",
-    "Saved customer review": "Asiakkaan tallennettu katsaus",
-    "Original template": "Alkuperäinen pohja",
-    "No saved review": "Ei tallennettua katsausta",
-    "Create customer review": "Luo asiakkaalle oma katsaus",
-    "No review has been created for this customer. Create a customer review to edit and save it.":
-      "Tälle asiakkaalle ei ole vielä luotu katsausta. Luo asiakkaalle oma katsaus, jotta voit muokata ja tallentaa sen.",
-    "Edits are saved to this customer’s review.":
-      "Muutokset tallentuvat tämän asiakkaan katsaukseen.",
-    "Original template preview. Your saved review is unchanged. Select Saved customer review to edit.":
-      "Alkuperäisen pohjan esikatselu. Tallennettu katsaus säilyy ennallaan. Muokkaa valitsemalla asiakkaan tallennettu katsaus.",
-    "Wait until loading or editing has finished before switching views.":
-      "Odota latauksen tai muokkauksen valmistumista ennen näkymän vaihtamista.",
     "Replace this customer's saved dashboard layout with the original layout?":
       "Korvataanko tämän asiakkaan tallennettu dashboard-rakenne alkuperäisellä rakenteella?",
 
@@ -48,6 +36,7 @@
     "There is insufficient data for a proposal in this selection.":
       "Valitulla rajauksella ei ole riittävää näyttöä kehitysehdotukselle.",
     "Same period last year": "Sama jakso vuotta aiemmin",
+    "Data-based suggestions": "Dataan perustuvat ehdotukset",
     "Historical change": "Jaksovertailu",
     "Previous value: 0": "Vertailujakson arvo: 0",
     "Preceding period": "Edeltävä jakso",
