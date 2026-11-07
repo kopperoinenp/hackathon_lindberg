@@ -13,7 +13,7 @@ import {
 } from "../backend/presentation-model.mjs";
 import { renderPowerPoint } from "../backend/powerpoint.mjs";
 import { createReviewStore } from "../backend/review-store.mjs";
-import { normalizeWorkspace } from "../backend/review-chat.mjs";
+import { chatSchema, normalizeWorkspace, runReviewChat } from "../backend/review-chat.mjs";
 const model = globalThis.UpsellModel;
 const scope = {
   customer: "CUST002",
@@ -94,6 +94,41 @@ test("only approved current proposals reach final slides and the actual PowerPoi
   const final = await zip.file(`ppt/slides/slide${deck.slides.length}.xml`).async("string");
   assert.ok(final.includes(p.title));
   assert.ok(final.includes("Benefits have not been verified"));
+});
+
+test("chat can reorder review slides while approved opportunities stay at the end", async () => {
+  const selected = approval(proposals()[0]);
+  const workspace = normalizeWorkspace({
+    scope,
+    approvedUpsells: [selected],
+    cooperationDescription: "Internal relationship description",
+    cooperationReason: "Internal relationship rationale",
+  });
+  const before = buildPresentation(workspace).slides;
+  const result = await runReviewChat(
+    { workspace, message: "Swap slides 1 and 2" },
+    {
+      generate: async ({ input }) => {
+        const context = JSON.parse(input);
+        assert.equal(context.presentationSlides.length, before.length - 1);
+        assert.equal(context.workspace.cooperationDescription, undefined);
+        assert.equal(context.workspace.cooperationReason, undefined);
+        return {
+          ...Object.fromEntries(chatSchema.required.map((key) => [key, null])),
+          scope: Object.fromEntries(chatSchema.properties.scope.required.map((key) => [key, null])),
+          supported: true,
+          slideSwap: { first: 1, second: 2 },
+        };
+      },
+    },
+  );
+  const after = buildPresentation(result.workspace).slides;
+  assert.deepEqual(
+    after.map(({ id }) => id),
+    [before[1], before[0], ...before.slice(2)].map(({ id }) => id),
+  );
+  assert.equal(result.workspace.cooperationDescription, workspace.cooperationDescription);
+  assert.equal(result.workspace.cooperationReason, workspace.cooperationReason);
 });
 
 test("approvals persist per customer across restart and legacy reviews default to none", async (t) => {

@@ -151,7 +151,10 @@ test("provider receives strict patch contract and fresh evidence, failures never
       generate: async ({ schema, input }) => {
         assert.ok(schema.required.includes("analysisTools"));
         const parsed = JSON.parse(input);
-        assert.deepEqual(parsed.workspace, current);
+        const expectedWorkspace = { ...current };
+        delete expectedWorkspace.cooperationDescription;
+        delete expectedWorkspace.cooperationReason;
+        assert.deepEqual(parsed.workspace, expectedWorkspace);
         assert.ok(parsed.catalog.customers.length === 3);
         assert.ok(parsed.evidence.some((s) => s.id === "water"));
         assert.ok(parsed.analysisCatalog.some((tool) => tool.id === "service"));
