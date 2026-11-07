@@ -354,7 +354,7 @@ export function buildPresentation(input) {
       kind: "text",
       title: t("Shared priorities for 2026"),
       paragraphs: [
-        t`Review ${focus.site_name} with the customer. Check garment availability and scan coverage.`,
+        t`Review ${focus.site_name} together. Check garment availability and scan coverage.`,
         t("Agree on one improvement and assign an owner."),
         t(
           "Review progress at the next meeting. Estimate potential savings once the inputs have been agreed.",
@@ -419,7 +419,7 @@ export function buildPresentation(input) {
   });
   Object.assign(slides.water, {
     layout: "hero",
-    kicker: t("Environment"),
+    kicker: t("Environmental estimate"),
     hero: slides.water.value,
     lead:
       c.waterDifference >= 0
@@ -428,7 +428,7 @@ export function buildPresentation(input) {
   });
   Object.assign(slides.emissions, {
     layout: "hero",
-    kicker: t("Environment"),
+    kicker: t("Environmental estimate"),
     hero: slides.emissions.value,
     lead:
       c.emissionsDifference >= 0
@@ -513,6 +513,25 @@ export function buildPresentation(input) {
     })
     // An area with nothing to show stays out rather than leaving an empty slide.
     .filter((slide) => slide.hero || slide.chart || slide.added.length);
+  const summaryPoints = [
+    c.waterDifference > 0 && c.emissionsDifference > 0
+      ? t`What worked: ${slides.water.value} water and ${slides.emissions.value} emissions against the comparison.`
+      : t`What worked: ${f(m.repairs)} repairs kept textiles in use.`,
+    request.hideUsage
+      ? t("What to improve: choose one area for the coming period.")
+      : t`What to improve: ${f(focus.unscanned)} textiles without a scan at ${focus.site_name}.`,
+    t("What we agree today: one improvement, an owner and a follow-up date."),
+  ];
+  const summary = {
+    id: "summary",
+    kind: "text",
+    layout: "steps",
+    kicker: t("Summary"),
+    title: t("The review in brief"),
+    steps: summaryPoints,
+    paragraphs: summaryPoints,
+    added: [],
+  };
   const upsellSlides = globalThis.UpsellModel.approved(
     globalThis.UpsellModel.proposals(data, request.scope, request.language),
     request.approvedUpsells,
@@ -533,9 +552,12 @@ export function buildPresentation(input) {
     customer: { name: customer.customer_name, industry: customer.industry },
     period,
     footer,
-    slides: withReviewAreas(
-      order.map((id) => ({ ...slides[id] })),
-      [...areaSlides, ...upsellSlides],
+    slides: withSummary(
+      withReviewAreas(
+        order.map((id) => ({ ...slides[id] })),
+        [...areaSlides, ...upsellSlides],
+      ),
+      summary,
     ),
   };
 }
@@ -545,6 +567,11 @@ function withReviewAreas(slides, areas) {
   const at = plan < 0 ? slides.findIndex((slide) => slide.id === "sources") : plan;
   const place = at < 0 ? slides.length : at;
   return [...slides.slice(0, place), ...areas, ...slides.slice(place)];
+}
+// The summary follows the cover, so the main message is clear before the detail.
+function withSummary(slides, summary) {
+  const place = slides.findIndex((slide) => slide.id === "cover") + 1;
+  return [...slides.slice(0, place), summary, ...slides.slice(place)];
 }
 function orderedSlides(defaultIds, override = []) {
   return [
@@ -596,17 +623,20 @@ export function applyPlan(deck, plan) {
   ];
   return {
     ...deck,
-    slides: withReviewAreas(
-      orderedSlides(ids, deck.request.slideOrder).map((id) => {
-        const slide = byId.get(id);
-        return {
-          ...slide,
-          title:
-            deck.request.titleEdits[id] ||
-            (choices.has(id) ? slide.headlineOptions[choices.get(id)] : slide.title),
-        };
-      }),
-      deck.slides.filter((slide) => /^(area|upsell)-/.test(slide.id)),
+    slides: withSummary(
+      withReviewAreas(
+        orderedSlides(ids, deck.request.slideOrder).map((id) => {
+          const slide = byId.get(id);
+          return {
+            ...slide,
+            title:
+              deck.request.titleEdits[id] ||
+              (choices.has(id) ? slide.headlineOptions[choices.get(id)] : slide.title),
+          };
+        }),
+        deck.slides.filter((slide) => /^(area|upsell)-/.test(slide.id)),
+      ),
+      deck.slides.find((slide) => slide.id === "summary"),
     ),
   };
 }

@@ -29,7 +29,7 @@
             "Repair counts show maintenance activity alongside environmental estimates and help discuss continued use.",
           ),
       opportunity: t(
-        "This site has the lowest scan coverage in the selection. Start here when checking garment availability and data coverage.",
+        "This site has the most textiles without a scan. Start here when checking garment availability and data coverage.",
       ),
     }[id];
   }

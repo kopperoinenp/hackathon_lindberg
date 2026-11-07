@@ -7,8 +7,6 @@
     "Approved service proposals stay at the end of the presentation.":
       "Hyväksytyt palveluehdotukset säilyvät esityksen lopussa.",
     "Customer relationship": "Asiakassuhde",
-    "Internal KAM assessment. Only shown in Explore data, never on presentation slides.":
-      "KAM:in sisäinen arvio. Näkyy vain Tutki dataa -sivulla, ei esityksen dioissa.",
     "Describe the customer relationship": "Kuvaile asiakassuhteen tilannetta",
     "Ask the assistant to assess": "Pyydä apurin arvio",
     "Relationship status": "Asiakassuhteen tila",
@@ -236,8 +234,6 @@
     "Open analysis": "Avaa analyysi",
     "Add to plan": "Lisää suunnitelmaan",
     "Added to plan": "Lisätty suunnitelmaan",
-    "Site service cycle P90": "Toimipaikan palvelukierron P90",
-    "Peer site P90 median": "Vertailutoimipaikkojen P90-mediaani",
     "Agreed next steps": "Sovitut jatkotoimet",
     "Next steps shown in section 03": "Osiossa 03 näytettävät jatkotoimet",
     "Only the steps written here are shown to the customer. Keep to one to three.":
@@ -248,12 +244,15 @@
       "Jatkotoimet sovitaan yhdessä tässä tapaamisessa.",
     "List of all locations": "Kaikkien sijaintien lista",
     Brief: "Lyhyt",
-    "Customer knows the service": "Asiakas tuntee palvelun",
+    "Key results only": "Vain päätulokset",
     Standard: "Perus",
-    "Regular review": "Tavallinen katsaus",
+    "Selected areas": "Valitut osa-alueet",
     Full: "Laaja",
-    "First review or new contacts": "Ensimmäinen katsaus tai uudet yhteyshenkilöt",
-    "Customer basics before the figures": "Asiakkaan perustiedot ennen lukuja",
+    "All available areas": "Kaikki saatavilla olevat osa-alueet",
+    "Presentation length": "Esityksen laajuus",
+    "Customise the review": "Muokkaa katsausta",
+    "Active use": "Aktiivikäyttö",
+    "More figures": "Tarkemmat luvut",
     "Name, industry, textiles, sites and countries are always shown.":
       "Nimi, toimiala, tekstiilit, toimipaikat ja maat näytetään aina.",
     "The service in": "Palvelu vuonna",
@@ -289,11 +288,10 @@
     "CUSTOMER REVIEW CONTENT": "ASIAKASKATSAUKSEN SISÄLTÖ",
     "What the customer sees": "Mitä asiakas näkee",
     "Changes appear in the review right away.": "Muutokset näkyvät katsauksessa heti.",
-    "Approve and create PowerPoint": "Hyväksy ja luo PowerPoint",
     "Creating PowerPoint…": "Luodaan PowerPointia…",
     "Approved. The PowerPoint is ready.": "Hyväksytty. PowerPoint on valmis.",
     Approved: "Hyväksytty",
-    "Open slideshow": "Avaa diaesitys",
+    "Download started": "Lataus alkoi",
     "Needs a figure before it can appear:": "Tarvitsee luvun ennen kuin voi näkyä:",
     "Textiles in service": "Tekstiilit palvelussa",
     "The service in numbers": "Palvelu lukuina",
@@ -319,7 +317,6 @@
     "Search by name or industry": "Hae nimellä tai toimialalla",
     Recent: "Viimeksi avatut",
     "No customers found": "Asiakkaita ei löytynyt",
-    "Change customer": "Vaihda asiakas",
     "For you only": "Vain sinulle",
     "Service opportunities": "Lisämyyntiehdotukset",
     "Internal KAM assessment. Only you see it, never on presentation slides.":
@@ -525,11 +522,10 @@
     "Lindström — customer workspace": "Lindström — asiakkuuden työpöytä",
     "Workspace view": "Työpöydän näkymä",
     "Customer review": "Asiakaskatsaus",
-    "Explore data": "Tutki dataa",
-    "Synthetic demo": "Synteettinen demo",
     Customer: "Asiakas",
     "Open presentation": "Avaa esitys",
     "Download PowerPoint": "Lataa PowerPoint",
+    Customers: "Asiakkaat",
     "Generate the presentation first": "Luo esitys ensin",
     "DETAILED ANALYSIS": "TARKEMPI TARKASTELU",
     "Explore customer data": "Tutki asiakkaan dataa.",
@@ -850,8 +846,8 @@
       " korjaustoiminta tekee tekstiilien huollon näkyväksi. Se tukee keskustelua käyttöiästä ilman oletusta vältetyistä hankinnoista.",
     "Repair counts show maintenance activity alongside environmental estimates and help discuss continued use.":
       "Korjaukset näyttävät konkreettista huoltotoimintaa ympäristöarvioiden rinnalla. Määrä kannattaa yhdistää keskusteluun tekstiilien jatkokäytöstä.",
-    "This site has the lowest scan coverage in the selection. Start here when checking garment availability and data coverage.":
-      "Tällä toimipaikalla on rajauksen pienin skannausosuus. Siksi siitä kannattaa aloittaa saatavuuden ja datan kattavuuden yhteinen tarkistus.",
+    "This site has the most textiles without a scan. Start here when checking garment availability and data coverage.":
+      "Tällä toimipaikalla on eniten tekstiilejä ilman skannausta. Siksi siitä kannattaa aloittaa saatavuuden ja datan kattavuuden yhteinen tarkistus.",
     "Invalid presentation request.": "Virheellinen esityspyyntö.",
     "Invalid filters.": "Virheellinen rajaus.",
     "Unknown customer or baseline.": "Tuntematon asiakas tai vertailumalli.",
@@ -893,8 +889,25 @@
     Unscanned: "Ilman skannausta",
     "Snapshot for investigation": "Tilannekuva yhteistä tarkastelua varten",
     "Shared priorities for 2026": "Yhteinen suunta vuodelle 2026",
-    " with the customer. Check garment availability and scan coverage.":
-      " yhdessä asiakkaan kanssa. Varmistetaan vaatteiden saatavuus ja skannausten kattavuus.",
+    " together. Check garment availability and scan coverage.":
+      " yhdessä. Varmistetaan vaatteiden saatavuus ja skannausten kattavuus.",
+    "Environmental estimate": "Ympäristöarvio",
+    Summary: "Yhteenveto",
+    "The review in brief": "Katsaus lyhyesti",
+    "What worked: ": "Mikä toimi: ",
+    " water and ": " vettä ja ",
+    " emissions against the comparison.": " päästöjä vertailuun nähden.",
+    " repairs kept textiles in use.": " korjausta piti tekstiilit käytössä.",
+    "What to improve: choose one area for the coming period.":
+      "Mitä parannetaan: valitaan yksi kohde tulevalle kaudelle.",
+    "What to improve: ": "Mitä parannetaan: ",
+    " textiles without a scan at ": " tekstiiliä ilman skannausta kohteessa ",
+    "What we agree today: one improvement, an owner and a follow-up date.":
+      "Mitä sovitaan tänään: yksi parannus, vastuuhenkilö ja seurantapäivä.",
+    "90% of cycles finished within": "90 % kierroista valmistui ajassa",
+    "Other sites, median": "Muut toimipaikat, mediaani",
+    "A data query cannot change the workspace.":
+      "Kysymykseen ei saatu vastausta. Kysy uudelleen hieman eri sanoin.",
     "Review progress at the next meeting. Estimate potential savings once the inputs have been agreed.":
       "Palataan tuloksiin seuraavassa seurantapalaverissa. Mahdollinen säästö arvioidaan vasta hyväksytyillä lähtötiedoilla.",
     "Proposals for discussion.": "Keskusteluehdotuksia, eivät vielä sovittuja toimenpiteitä.",

@@ -25,28 +25,7 @@
       <a class="brand" href="#" aria-label="Lindström — customer workspace"
         ><img src="assets/lindstrom-logo.webp" alt="Lindström" width="153" height="33"
       /></a>
-      <nav class="view-tabs" role="tablist" aria-label="Workspace view" hidden>
-        <button
-          id="summary-tab"
-          role="tab"
-          aria-selected="true"
-          aria-controls="summary-panel"
-          data-view="summary"
-        >
-          Customer review</button
-        ><button
-          id="analysis-tab"
-          role="tab"
-          aria-selected="false"
-          aria-controls="analysis-panel"
-          tabindex="-1"
-          data-view="analysis"
-        >
-          Explore data
-        </button>
-      </nav>
       <div class="header-options">
-        <span class="demo-status">Synthetic demo</span>
         <div class="language-switch" role="group" aria-label="Workspace language">
           <button
             type="button"
@@ -96,59 +75,45 @@
       </section>
       <div class="toolbar">
         <span id="review-storage-status" role="status" aria-live="polite"></span>
-        <button id="back-today" class="text-button" type="button">Change customer</button>
-        <label for="customer">Customer<select id="customer"></select></label
-        ><button id="approve-review" class="primary" type="button">
-          Approve and create PowerPoint
-        </button>
-        <span id="approved-status" hidden>Approved</span>
-        <a id="download-powerpoint" class="primary" aria-disabled="true" hidden
-          >Download PowerPoint</a
-        >
-        <button id="open-review" class="secondary" hidden>
-          Open slideshow <span aria-hidden="true">↗</span>
-        </button>
+        <button id="open-review" class="secondary" type="button">Open presentation</button>
+        <button id="download-powerpoint" class="primary" type="button">Download PowerPoint</button>
       </div>
       <section id="query-result" aria-live="polite" hidden></section>
       <section id="deck" aria-label="Slides" aria-live="polite"></section>
-      <section id="customer-overview" aria-label="Customer overview" aria-live="polite"></section>
-      <section id="summary-panel" role="tabpanel" aria-labelledby="summary-tab">
+      <section id="summary-panel">
         <details id="data-import-reports" class="review-priorities" hidden>
           <summary>Imported files</summary>
           <div id="data-import-result"></div>
         </details>
         <div id="story" aria-live="polite"></div>
       </section>
-      <section id="analysis-panel" role="tabpanel" aria-labelledby="analysis-tab" hidden>
-        <div class="analysis-heading">
-          <span class="section-kicker">DETAILED ANALYSIS</span>
-          <h1>Explore customer data</h1>
-          <p>Filter the data to see what drives the findings.</p>
-        </div>
-        <p class="quiet">
-          Filters also apply to the customer review and presentation. The dataset contains 2025
-          monthly data from Finland, Sweden and Poland. All sites are in Europe.
-        </p>
-        <section class="review-priorities" aria-labelledby="review-evidence-title">
-          <span class="section-kicker">SHARED REVIEW</span>
-          <h2 id="review-evidence-title">Evidence and industry context</h2>
-          <details>
-            <summary>Evidence to review with the customer</summary>
-            <ul id="review-evidence-areas" class="contract-kpi-list"></ul>
-          </details>
-          <details>
-            <summary id="industry-benchmark-summary"></summary>
-            <p class="quiet">
-              Illustrative peer comparison. Reporting year and emissions scopes are unverified.
-            </p>
-            <div id="industry-benchmark" class="table-wrap"></div>
-          </details>
-        </section>
+      <details id="analysis-panel" hidden>
+        <summary>More figures</summary>
+        <section id="customer-overview" aria-label="Customer overview" aria-live="polite"></section>
         <div id="analysis-content" aria-live="polite"></div>
-      </section>
+      </details>
+      <button
+        id="panel-toggle"
+        type="button"
+        aria-label="Customise the review"
+        title="Customise the review"
+        aria-expanded="false"
+        aria-controls="review-editor"
+        hidden
+      >
+        <span aria-hidden="true">⚙</span>
+      </button>
       <aside id="review-editor" aria-label="Review settings" hidden>
+        <button id="panel-close" type="button" aria-label="Close" title="Close">
+          <span aria-hidden="true">×</span>
+        </button>
         <section class="review-priorities review-content" aria-label="Customise the review">
+          <fieldset class="area-picker meeting-advice">
+            <legend>Customer</legend>
+            <select id="customer" aria-label="Customer"></select>
+          </fieldset>
           <div id="meeting-advice"></div>
+          <div id="review-basics-picker"></div>
           <details id="for-you" class="sales-signals" hidden>
             <summary><span>For you only</span><em id="for-you-read"></em></summary>
             <div id="sales-signals"></div>
@@ -157,7 +122,6 @@
           <div id="review-area-picker"></div>
           <details id="more-settings">
             <summary>More settings</summary>
-            <div id="review-basics-picker"></div>
             <form id="filters" class="filter-grid">
               <label for="from">From<select id="from"></select></label
               ><label for="to">To<select id="to"></select></label
@@ -184,68 +148,6 @@
                 </select></label
               ><button type="button" id="reset" class="secondary">Reset filters</button>
             </form>
-            <section
-              id="customer-profile-kpis"
-              class="review-priorities"
-              aria-labelledby="review-priorities-title"
-            >
-              <h2 id="review-priorities-title">Contract KPIs</h2>
-              <div id="contract-agenda" aria-live="polite"></div>
-              <details id="manage-contract-kpis">
-                <summary>Manage contract KPIs</summary>
-                <form id="contract-kpi-form" class="contract-kpi-form">
-                  <label for="contract-kpi-name"
-                    >KPI name<input id="contract-kpi-name" name="label" maxlength="80" required
-                  /></label>
-                  <label for="contract-kpi-area"
-                    >Evidence area<select id="contract-kpi-area" name="area"></select
-                  ></label>
-                  <label for="contract-kpi-actual"
-                    >Actual and unit<input id="contract-kpi-actual" name="actual" maxlength="40"
-                  /></label>
-                  <label for="contract-kpi-target"
-                    >Target and unit<input id="contract-kpi-target" name="target" maxlength="40"
-                  /></label>
-                  <label for="contract-kpi-source"
-                    >Source or reporting period<input
-                      id="contract-kpi-source"
-                      name="source"
-                      maxlength="100"
-                  /></label>
-                  <label class="kpi-checkbox"
-                    ><input type="checkbox" name="priority" /> Highlight on agenda
-                  </label>
-                  <div class="kpi-actions">
-                    <button type="submit" class="secondary">Save KPI</button>
-                    <button type="button" id="cancel-contract-kpi" class="text-button" hidden>
-                      Cancel edit
-                    </button>
-                  </div>
-                </form>
-                <ul id="contract-kpi-list" class="contract-kpi-list"></ul>
-              </details>
-              <label class="kpi-checkbox"
-                ><input id="include-contract-agenda" type="checkbox" /><span
-                  >Include highlighted KPIs in the presentation</span
-                ></label
-              >
-            </section>
-            <section class="review-priorities" aria-labelledby="relationship-title">
-              <h2 id="relationship-title">Customer relationship</h2>
-              <label for="relationship-description">Describe the customer relationship</label>
-              <textarea id="relationship-description" rows="3" maxlength="2000"></textarea>
-              <button id="assess-relationship" type="button" class="text-button">
-                Ask the assistant to assess
-              </button>
-              <label for="relationship-status">Relationship status</label>
-              <select id="relationship-status">
-                <option value="unrated">Not assessed</option>
-                <option value="green">Green – cooperation is going well</option>
-                <option value="yellow">Yellow – needs attention</option>
-                <option value="red">Red – action required</option>
-              </select>
-              <p id="relationship-result" role="status"></p>
-            </section>
             <button id="reset-dashboard" class="text-button" type="button">Reset dashboard</button>
           </details>
         </section>

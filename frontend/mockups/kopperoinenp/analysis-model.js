@@ -60,7 +60,12 @@
     const sites = data.sites
       .filter((site) => rows.some((row) => row.site === site.site_id))
       .map((site) => ({ ...site, ...summarize(rows.filter((row) => row.site === site.site_id)) }))
-      .sort((a, b) => (a.utilization ?? Infinity) - (b.utilization ?? Infinity));
+      // The site with the most textiles without a scan is where a review changes the most.
+      .sort(
+        (a, b) =>
+          (b.unscanned ?? -Infinity) - (a.unscanned ?? -Infinity) ||
+          (a.utilization ?? Infinity) - (b.utilization ?? Infinity),
+      );
     const priority = selection.priority || root.StoryModel.defaultPriority(customer);
     const order =
       priority === "neutral"
@@ -160,7 +165,11 @@
     });
     return (
       candidates
-        .filter(({ gap, monthsAbove }) => gap > 0 && monthsAbove >= 2)
+        // A small or occasional gap is ordinary variation, not a finding to raise with a customer.
+        .filter(
+          ({ gap, monthsAbove }) =>
+            gap >= 5 && monthsAbove >= 2 && monthsAbove * 2 >= months.length,
+        )
         .sort((a, b) => b.gap - a.gap || b.monthsAbove - a.monthsAbove || b.count - a.count)[0] ??
       null
     );

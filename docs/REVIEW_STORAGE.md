@@ -59,7 +59,6 @@ The workspace follows a meeting. It opens on one customer search, with recently 
 The service performance section compares a site's service cycle P90 with the median
 P90 of other sites in the selected customer and filters. Sites must cover the same
 observed months and have at least 30 cycles overall and five per month. A finding
-requires a positive gap overall and in at least two months. These demo thresholds
+requires a gap of at least five hours overall and in at least half of the months. These demo thresholds
 screen for usable comparisons. They do not represent a contractual target.
-The section shows the comparison and monthly series. The service cycle table in
-detailed data uses the same filters.
+The section shows the comparison and monthly series.

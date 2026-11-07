@@ -2998,42 +2998,6 @@ body[data-mode="home"] footer {
   display: none;
 }
 
-/* Approval is the one main action; the file appears only for an approved review. */
-#approved-status {
-  color: #17602f;
-  font-weight: 700;
-}
-#approved-status[hidden],
-#download-powerpoint[hidden],
-#approve-review[hidden] {
-  display: none;
-}
-a#download-powerpoint {
-  display: inline-flex;
-  align-items: center;
-  width: auto;
-  height: auto;
-  padding: 10px 18px;
-  border-radius: 999px;
-  background: var(--brand-red, #e4002b);
-  color: #fff;
-  font-weight: 700;
-  text-decoration: none;
-}
-a#download-powerpoint[hidden] {
-  display: none;
-}
-#more-settings [aria-labelledby="relationship-title"] label,
-#more-settings [aria-labelledby="relationship-title"] select,
-#more-settings [aria-labelledby="relationship-title"] textarea {
-  display: block;
-  width: 100%;
-}
-
-/* The chosen customer is the page heading, so the selector stays out of the way. */
-.toolbar > label[for="customer"] {
-  display: none;
-}
 #review-editor .sales-signals {
   padding: 10px 12px;
   border: 1px dashed #8796a3;
@@ -3201,4 +3165,279 @@ body[data-mode="prepare"] #story,
   color: #4f5d68;
   font-size: 12px;
   line-height: 1.3;
+}
+.usage-line small {
+  display: block;
+  color: #4f5d68;
+  font-size: 12px;
+}
+
+/* The two presentation actions sit together at the top of the review. */
+#workspace .toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-block: 10px;
+  background: var(--page-background, #fff);
+}
+#workspace .toolbar[hidden] {
+  display: none;
+}
+#workspace .toolbar button {
+  width: auto;
+  min-height: 42px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+#review-storage-status {
+  flex: 1 1 auto;
+  color: #9c1c1c;
+}
+#review-storage-status:not(.is-problem) {
+  visibility: hidden;
+}
+#review-editor .meeting-advice select {
+  width: 100%;
+}
+
+/* Supporting figures stay on the review page, closed until they are needed. */
+#analysis-panel {
+  margin-block: 24px;
+}
+#analysis-panel[hidden] {
+  display: none;
+}
+#analysis-panel > summary {
+  padding: 14px 18px;
+  border: 1px solid #cbd3da;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--brand-blue);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+#analysis-panel[open] > summary {
+  margin-bottom: 16px;
+}
+
+/* Chosen areas are filled pills; the ones below add to the review with one click. */
+.area-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.area-pills.is-available {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e1e8ee;
+}
+.area-picker .area-pill {
+  position: relative;
+  display: inline-flex;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.area-pill input {
+  position: absolute;
+  opacity: 0;
+}
+.area-pill span {
+  padding: 6px 12px;
+  border: 1px solid var(--brand-blue);
+  border-radius: 999px;
+  background: var(--brand-blue);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.area-pill span::after {
+  content: " ×";
+}
+.is-available .area-pill span {
+  border-color: #cbd3da;
+  background: #fff;
+  color: var(--brand-blue);
+}
+.is-available .area-pill span::after {
+  content: none;
+}
+.is-available .area-pill span::before {
+  content: "+ ";
+}
+.area-pill input:focus-visible + span {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+
+/* For you only: small two-line facts and one-click offers, nothing to read through. */
+#for-you[open] > summary {
+  margin-bottom: 8px;
+}
+#for-you .for-you-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 8px;
+}
+#for-you .for-you-facts > div {
+  display: block;
+  min-width: 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #f2f6f9;
+}
+#for-you .for-you-facts > div:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+#for-you .for-you-facts dd,
+#for-you .for-you-facts dt {
+  overflow: hidden;
+  margin: 0;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#for-you .for-you-facts dd {
+  color: var(--brand-blue);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+#for-you .for-you-facts dt {
+  color: #4f5d68;
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.3;
+}
+#for-you .kpi-checkbox {
+  margin: 0;
+  font-size: 13px;
+}
+#upsell-proposals h3 {
+  margin: 10px 0 4px;
+  font-size: 13px;
+}
+#upsell-proposals .kpi-checkbox {
+  align-items: flex-start;
+  margin: 0 0 4px;
+}
+#upsell-proposals .kpi-checkbox > span {
+  min-width: 0;
+}
+#upsell-proposals .kpi-checkbox strong {
+  display: block;
+  color: var(--brand-blue);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+#upsell-proposals .kpi-checkbox small {
+  overflow: hidden;
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#for-you,
+#sales-signals,
+#upsell-proposals,
+#upsell-proposals .kpi-checkbox {
+  min-width: 0;
+  max-width: 100%;
+}
+#for-you {
+  overflow: hidden;
+}
+#upsell-proposals .kpi-checkbox > span {
+  flex: 1 1 0;
+  overflow: hidden;
+}
+
+/* The panel opens from the left edge and the review uses the full page when it is closed. */
+#review-editor {
+  transform: translateX(-100%);
+  transition: transform 0.2s ease;
+}
+body.panel-open #review-editor {
+  transform: none;
+}
+#workspace.editing {
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-inline: 32px;
+}
+body.panel-open #workspace.editing {
+  max-width: none;
+  margin-right: 0;
+  margin-left: 400px;
+}
+#panel-toggle {
+  position: fixed;
+  top: 112px;
+  left: 0;
+  z-index: 29;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid #cbd3da;
+  border-left: 0;
+  border-radius: 0 12px 12px 0;
+  background: #fff;
+  box-shadow: 2px 2px 10px #10243a1f;
+  color: var(--brand-blue);
+  font-size: 22px;
+  cursor: pointer;
+}
+#panel-toggle:hover {
+  background: #f2f6f9;
+}
+#panel-toggle[hidden],
+body.panel-open #panel-toggle {
+  display: none;
+}
+#panel-close {
+  position: sticky;
+  top: 8px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: 8px 8px -40px auto;
+  padding: 0;
+  border: 1px solid #cbd3da;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--brand-blue);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+@media (max-width: 760px) {
+  #review-editor {
+    top: 0;
+    right: auto;
+    bottom: 0;
+    width: min(400px, 100vw);
+    max-height: none;
+    border-top: 0;
+    border-right: 1px solid #cbd3da;
+  }
+  #workspace.editing,
+  body.panel-open #workspace.editing {
+    margin-inline: auto;
+    padding-inline: 16px;
+    padding-bottom: 24px;
+  }
 }
