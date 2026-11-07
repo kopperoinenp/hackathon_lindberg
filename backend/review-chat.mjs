@@ -648,6 +648,16 @@ function describeChange(before, { workspace: after, changed }) {
     parts.push(say("Vaihdoin otsikon.", "Changed the title."));
   return parts.join(" ") || null;
 }
+const quickQueries = new Map([
+  ["What should we raise in the meeting?", { topic: "meeting", compareBy: "none" }],
+  ["Compare water by quarter", { topic: "water", compareBy: "quarter" }],
+  ["Which products need the most repairs?", { topic: "repairs", compareBy: "product" }],
+  ["Compare emissions by country", { topic: "emissions", compareBy: "country" }],
+  ["Which sites have the most late cycles?", { topic: "late", compareBy: "site" }],
+]);
+for (const [question, query] of [...quickQueries])
+  quickQueries.set(globalThis.ReviewLanguage.translate("fi", question), query);
+
 async function answerQuery(request, dataQuery, proposed, generate, options) {
   const query = refineQuery(dataQuery, request.message, request.lastQuery);
   if (query.clarify)
@@ -668,25 +678,27 @@ async function answerQuery(request, dataQuery, proposed, generate, options) {
   const fallback = summary ?? text;
   const buttons = (followUps ?? []).slice(0, 3);
   const offers = buttons.filter((item) => !/tarkoit|mean/iu.test(item)).slice(0, 1);
-  const answer = await writeReply(
-    {
-      message: request.message,
-      history: request.history,
-      fallback,
-      language: language === "fi" ? "Finnish" : "English",
-      options: offers,
-      facts: {
-        result: fallback,
-        rows: view?.rows.map(({ label, display, note }) => ({ label, display, note })) ?? [],
-        title: view?.title ?? null,
-        period: view?.subtitle ?? null,
-        more: view?.more ?? null,
-        explanation: view ? null : text,
-      },
-    },
-    generate,
-    options,
-  );
+  const answer = generate
+    ? await writeReply(
+        {
+          message: request.message,
+          history: request.history,
+          fallback,
+          language: language === "fi" ? "Finnish" : "English",
+          options: offers,
+          facts: {
+            result: fallback,
+            rows: view?.rows.map(({ label, display, note }) => ({ label, display, note })) ?? [],
+            title: view?.title ?? null,
+            period: view?.subtitle ?? null,
+            more: view?.more ?? null,
+            explanation: view ? null : text,
+          },
+        },
+        generate,
+        options,
+      )
+    : fallback;
   return {
     ...proposed,
     answer,
@@ -712,6 +724,13 @@ export async function runReviewChat(
       followUps: [],
       query: request.lastQuery,
     };
+  const quickQuery = quickQueries.get(request.message);
+  if (quickQuery)
+    return answerQuery(request, quickQuery, {
+      workspace: request.workspace,
+      changed: [],
+      reply: "No changes.",
+    });
   if (generate === generateStructured && providerConfig(env).provider === "deterministic")
     throw new PresentationError("The AI assistant is unavailable in this mode.", 503);
   let evidence,

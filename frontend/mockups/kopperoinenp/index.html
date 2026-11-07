@@ -95,6 +95,10 @@
       <section id="query-result" aria-live="polite" hidden></section>
       <section id="customer-overview" aria-label="Customer overview" aria-live="polite"></section>
       <section id="summary-panel" role="tabpanel" aria-labelledby="summary-tab">
+        <details id="data-import-reports" class="review-priorities" hidden>
+          <summary>Imported files</summary>
+          <div id="data-import-result"></div>
+        </details>
         <div id="story" aria-live="polite"></div>
       </section>
       <section id="analysis-panel" role="tabpanel" aria-labelledby="analysis-tab" hidden>
@@ -239,6 +243,21 @@
           Show conversation
         </button>
       </div>
+      <section id="chat-data-import" aria-labelledby="data-import-title" hidden>
+        <h2 id="data-import-title">Upload files</h2>
+        <form id="data-import-form">
+          <label>
+            Data files (CSV, XLSX or JSON, up to 8 MiB each)
+            <input id="data-import-file" type="file" accept=".csv,.xlsx,.json" multiple required />
+          </label>
+          <label class="kpi-checkbox">
+            <input id="data-import-share" type="checkbox" />
+            Allow AI to use column headings and types to propose tools
+          </label>
+          <button id="data-import-submit" type="submit" class="secondary">Analyze files</button>
+        </form>
+        <p id="data-import-status" role="status" hidden></p>
+      </section>
       <div id="chat" aria-live="polite" hidden></div>
       <div id="chat-prompts" aria-label="Suggested requests"></div>
       <button id="chat-prompts-toggle" class="text-button" type="button" hidden></button>

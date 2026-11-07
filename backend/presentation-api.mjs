@@ -12,12 +12,16 @@ import { runReviewChat } from "./review-chat.mjs";
 import { assessCooperation } from "./cooperation.mjs";
 import { templateStandard } from "./lindstrom-template.mjs";
 import { createReviewStore } from "./review-store.mjs";
+import { dataset } from "./dataset.mjs";
+import { analyzeImport } from "./import-analysis.mjs";
+import { importFormats, importLimit, readImportFile } from "./import-file.mjs";
 import { fileURLToPath } from "node:url";
 let reviewStore;
 const files = new Map();
 const ttl = 10 * 60 * 1000;
 let busy = false;
 let chatBusy = false;
+let importBusy = false;
 function json(response, status, value) {
   response.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
@@ -36,21 +40,29 @@ function receipt(id, file) {
     expiresInSeconds: Math.max(1, Math.floor((file.expires - Date.now()) / 1000)),
   };
 }
-async function readJson(request) {
-  if (!/^application\/json(?:;|$)/i.test(request.headers["content-type"] || ""))
-    throw new PresentationError("Send a JSON request.", 415);
+async function readBytes(request, limit) {
   const chunks = [];
   let size = 0;
+  if (Number(request.headers["content-length"]) > limit) {
+    request.resume();
+    throw new PresentationError("The request is too large.", 413);
+  }
   for await (const chunk of request.iterator({ destroyOnReturn: false })) {
     size += chunk.length;
-    if (size > 32768) {
+    if (size > limit) {
       request.resume();
       throw new PresentationError("The request is too large.", 413);
     }
     chunks.push(chunk);
   }
+  return Buffer.concat(chunks);
+}
+async function readJson(request) {
+  if (!/^application\/json(?:;|$)/i.test(request.headers["content-type"] || ""))
+    throw new PresentationError("Send a JSON request.", 415);
+  const bytes = await readBytes(request, 32768);
   try {
-    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+    return JSON.parse(bytes.toString("utf8"));
   } catch {
     throw new PresentationError("Invalid JSON.");
   }
@@ -69,6 +81,41 @@ export async function handlePresentationApi(request, response, url) {
         403,
       );
     for (const [id, file] of files) if (Date.now() > file.expires) files.delete(id);
+    const importMatch = url.pathname.match(/^\/api\/imports\/([A-Za-z0-9_-]+)$/);
+    if (importMatch) {
+      if (request.method !== "POST") throw new PresentationError("Method not allowed.", 405);
+      const [, customer] = importMatch;
+      const selected = dataset?.customers.find((row) => row.customer_id === customer);
+      if (!selected) throw new PresentationError("Unknown customer.", 404);
+      const format = url.searchParams.get("format");
+      if (
+        !importFormats.includes(format) ||
+        request.headers["content-type"] !== "application/octet-stream"
+      )
+        throw new PresentationError("Send a CSV, XLSX or JSON file.", 415);
+      if (importBusy) throw new PresentationError("Another file is being analyzed.", 429);
+      importBusy = true;
+      try {
+        const bytes = await readBytes(request, importLimit);
+        try {
+          json(
+            response,
+            200,
+            await analyzeImport(await readImportFile(bytes, format), {
+              customer,
+              customerName: selected.customer_name,
+              otherCustomers: dataset.customers.filter((row) => row !== selected),
+              allowSchemaSharing: url.searchParams.get("shareSchema") === "1",
+            }),
+          );
+        } catch (error) {
+          throw new PresentationError(error.message || "The file could not be analyzed.");
+        }
+      } finally {
+        importBusy = false;
+      }
+      return true;
+    }
     const reviewMatch = url.pathname.match(/^\/api\/reviews\/([A-Za-z0-9_-]+)$/);
     if (reviewMatch) {
       reviewStore ??= createReviewStore(
