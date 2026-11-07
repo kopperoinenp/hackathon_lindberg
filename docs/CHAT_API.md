@@ -64,3 +64,21 @@ real OpenAI calls verified Finland January–March, emissions emphasis, two sele
 insights, then Sweden with period/priority preserved and an explicit new heading.
 Both edits displayed only `Valmis`. Native PowerPoint application compatibility,
 live Copilot and production multi-user operation were not tested in this change.
+
+## Slide edits and truthful acknowledgement
+
+Task-owner-approved extension, 2026-11-07: workspace carries optional `slideOrder`.
+The model patch now requires `supported:boolean` and nullable `slideSwap` with
+`first`/`second` integer 1-based positions. The server swaps existing slide IDs,
+validates the resulting deck, and stores its order for both native and browser
+export. Invalid, equal or out-of-range positions fail without changes. Model
+output cannot silently substitute priority or insight selection for a requested
+slide swap. Unsupported requests return 422 with a short message, never `Valmis`.
+The rest of the strict nullable patch contract remains unchanged.
+
+The extension passed all 34 tests plus Ruff/ESLint/Prettier. A real OpenAI browser
+request using the original Finnish typo ("ekan ja tiosen dian") applied the swap.
+The regenerated browser deck showed the common overview as slide 1/9 and the
+customer cover as slide 2/9. The HTTP test separately checked the actual generated
+PPTX slide1.xml and slide2.xml contents. kopperoinenp Codex owns integration and
+merge after successful review/CI under the updated AGENTS.md authorization.

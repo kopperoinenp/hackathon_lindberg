@@ -12,6 +12,7 @@ const workspace = () => normalizeWorkspace({ scope: {} });
 const patch = (changes = {}) => ({
   ...Object.fromEntries(chatSchema.required.map((k) => [k, null])),
   scope: Object.fromEntries(chatSchema.properties.scope.required.map((k) => [k, null])),
+  supported: true,
   ...changes,
 });
 const scoped = (changes) => patch({ scope: { ...patch().scope, ...changes } });
@@ -149,5 +150,49 @@ test("provider receives strict patch contract and fresh evidence, failures never
       { env: { PRESENTATION_PROVIDER: "deterministic" } },
     ),
     (e) => e.status === 503,
+  );
+});
+
+test("explicit slide swap survives AI planning, repeated swaps and unsupported requests cannot report success", async () => {
+  const current = workspace();
+  const swapped = applyChatPatch(
+    current,
+    patch({ slideSwap: { first: 1, second: 2 } }),
+    "vaihda powerpointin ekan ja toisen dian paikkoja",
+  );
+  assert.equal(swapped.reply, "Valmis");
+  assert.deepEqual(swapped.workspace.slideOrder.slice(0, 2), ["overview", "cover"]);
+  const { applyPlan, defaultPlan } = await import("../backend/presentation-model.mjs");
+  const base = buildPresentation(swapped.workspace);
+  assert.deepEqual(
+    applyPlan(base, defaultPlan(base))
+      .slides.slice(0, 2)
+      .map((s) => s.id),
+    ["overview", "cover"],
+  );
+  const again = applyChatPatch(
+    swapped.workspace,
+    patch({ slideSwap: { first: 1, second: 2 } }),
+    "vaihda diat 1 ja 2",
+  );
+  assert.deepEqual(again.workspace.slideOrder.slice(0, 2), ["cover", "overview"]);
+  for (const p of [
+    patch({ slideSwap: { first: 0, second: 2 } }),
+    patch({ slideSwap: { first: 1, second: 10 } }),
+    patch({ slideSwap: { first: 1, second: 1 } }),
+  ])
+    assert.throws(() => applyChatPatch(current, p, "vaihda diat"));
+  assert.throws(
+    () =>
+      applyChatPatch(
+        current,
+        scoped({ priority: "water" }),
+        "vaihda powerpointin ekan ja toisen dian paikkoja",
+      ),
+    /järjestystä ei muutettu/,
+  );
+  assert.throws(
+    () => applyChatPatch(current, patch({ supported: false, heading: "English" }), "English"),
+    (e) => e.status === 422,
   );
 });

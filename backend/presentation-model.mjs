@@ -15,7 +15,8 @@ const f = (value, digits = 0) =>
   new Intl.NumberFormat("fi-FI", { maximumFractionDigits: digits }).format(value);
 export const evidenceIds = ["water", "emissions", "repairs"];
 export const insightIds = [...evidenceIds, "opportunity"];
-export const storyVersion = "customer-value-story-v1";
+export const slideIds = ["cover", "overview", ...insightIds, "plan", "sources", "limits"];
+export const storyVersion = "customer-value-story-v2";
 const defaults = {
   customer: "CUST001",
   from: "2025-01",
@@ -83,7 +84,15 @@ export function validateRequest(input) {
       throw new PresentationError("Virheellinen diaotsikko.");
     if (title.trim()) titleEdits[id] = title.trim();
   }
-  return { scope, included, note, titleEdits };
+  const slideOrder = input.slideOrder ?? [];
+  if (
+    !Array.isArray(slideOrder) ||
+    slideOrder.length > slideIds.length ||
+    new Set(slideOrder).size !== slideOrder.length ||
+    slideOrder.some((id) => !slideIds.includes(id))
+  )
+    throw new PresentationError("Virheellinen managerin diajärjestys.");
+  return { scope, included, note, titleEdits, slideOrder: [...slideOrder] };
 }
 export function buildPresentation(input) {
   const request = validateRequest(input);
@@ -262,7 +271,10 @@ export function buildPresentation(input) {
   if (request.note) slides.plan.paragraphs.push(`Account managerin muistiinpano: ${request.note}`);
   for (const id of insightIds)
     slides[id].relevance = globalThis.MeetingModel.relevance(id, request.scope.priority, false);
-  const order = globalThis.MeetingModel.slideIds(ctx.order, request.included);
+  const order = orderedSlides(
+    globalThis.MeetingModel.slideIds(ctx.order, request.included),
+    request.slideOrder,
+  );
   return {
     request,
     customer: { name: customer.customer_name, industry: customer.industry },
@@ -270,6 +282,12 @@ export function buildPresentation(input) {
     footer,
     slides: order.map((id) => slides[id]),
   };
+}
+function orderedSlides(defaultIds, override = []) {
+  return [
+    ...override.filter((id) => defaultIds.includes(id)),
+    ...defaultIds.filter((id) => !override.includes(id)),
+  ];
 }
 export function applyPlan(deck, plan) {
   const allowed = deck.slides.filter((s) => insightIds.includes(s.id)).map((s) => s.id);
@@ -316,7 +334,7 @@ export function applyPlan(deck, plan) {
   ];
   return {
     ...deck,
-    slides: ids.map((id) => {
+    slides: orderedSlides(ids, deck.request.slideOrder).map((id) => {
       const slide = byId.get(id);
       return {
         ...slide,

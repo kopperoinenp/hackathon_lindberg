@@ -14,7 +14,7 @@ ei väite automaattisesti mitatusta puheajasta tai tarkka diakiintiö.
 
 | Vaihe             | Esityksen sisältö                                         | Koodissa lukittu sääntö                                  |
 | ----------------- | --------------------------------------------------------- | -------------------------------------------------------- |
-| Asiakasyhteys     | Asiakas, ajanjakso, rajaus                                | Kansidia aina ensimmäisenä                               |
+| Asiakasyhteys     | Asiakas, ajanjakso, rajaus                                | Kansidia oletuksena ensimmäisenä                               |
 | Katso taakse      | Palvelun käyttö ja huolto: kuusi yhteistä perustietoa     | Perustietodia aina mukana ennen nostoja                  |
 | Osoita arvo       | Vesi, pesun ja toimitusten päästöt, korjaukset            | AI voi järjestää vain valitut tulosnostot                |
 | Rakenna luottamus | Lähde, yksikkö, synteettisyys, vertailu ja tulkinnan raja | Näytetään tuloksen yhteydessä; laskenta ei tule mallilta |
@@ -85,3 +85,12 @@ vastaanottajan fonttiasennukset vaikuttavat native PowerPointin näyttöön.
 Palvelukatko näytetään virheenä. Determinististä tilaa ei nimetä tekoälyn tekemäksi
 esitykseksi. Copilot-sovitin noudattaa samaa standardia, mutta oikean tenantin
 käyttökoe odottaa Microsoft-käyttöoikeuksia.
+
+## Managerin nimenomainen järjestysmuutos
+
+Käyttäjän hyväksymä poikkeus 7.11.2026: manageri voi vaihtaa diojen paikkoja
+chatissa, myös kansi- ja perustietodian. Yllä oleva tarinajärjestys on oletus.
+Hyväksytty järjestysmuutos ohittaa AI:n oletusjärjestyksen; pakolliset diat,
+lähteet, laskenta ja väitteiden rajat säilyvät. Pelkkä AI:n esityssuunnittelu
+noudattaa edelleen yllä olevia oletussääntöjä. Muokkauschat ei saa korvata
+pyydettyä diasiirtoa painotuksen tai nostovalinnan muutoksella.

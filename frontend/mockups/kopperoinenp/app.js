@@ -24,6 +24,7 @@
     priority: "neutral",
     included: [...globalThis.MeetingModel.insightIds],
     titleEdits: {},
+    slideOrder: [],
     generating: false,
     readyPresentation: null,
     note: "",
@@ -305,6 +306,7 @@
   function clearScope() {
     state.note = "";
     state.titleEdits = {};
+    state.slideOrder = [];
     state.chat = [];
     state.heading = "";
     state.chatRevision += 1;
@@ -377,6 +379,7 @@
         "note",
         "heading",
         "titleEdits",
+        "slideOrder",
       ])
         state[key] = next[key];
       if (customerChanged) {
@@ -521,7 +524,13 @@
         (key) => [key, state[key]],
       ),
     );
-    return { scope, included: state.included, titleEdits: state.titleEdits, note: state.note };
+    return {
+      scope,
+      included: state.included,
+      titleEdits: state.titleEdits,
+      note: state.note,
+      slideOrder: state.slideOrder,
+    };
   }
   $("#open-review").addEventListener("click", async () => {
     if (state.generating) return;
@@ -558,11 +567,12 @@
         throw new Error(
           "Katsaus muuttui valmistelun aikana. Avaa esitys uudelleen nykyisillä valinnoilla.",
         );
+      state.slideOrder = result.slides.map((slide) => slide.id);
       const viewUrl = `/kopperoinenp/presentation.html?id=${encodeURIComponent(result.id)}`;
       state.readyPresentation = {
         id: result.id,
         viewUrl,
-        request,
+        request: JSON.stringify(presentationRequest()),
         expires: Date.now() + result.expiresInSeconds * 1000,
       };
       const link = $("#download-powerpoint");
