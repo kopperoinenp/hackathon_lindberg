@@ -47,8 +47,9 @@ test("AI can rank approved insights and choose headlines but cannot change facts
   plan.headlines.forEach((c) => (c.choice = 1));
   const deck = applyPlan(base, plan);
   assert.throws(() => applyPlan(base, { ...plan, unsupportedClaim: "Invented savings" }));
-  assert.equal(deck.slides[1].id, "overview");
-  assert.equal(deck.slides[2].id, "repairs");
+  assert.equal(deck.slides[1].id, "summary");
+  assert.equal(deck.slides[2].id, "overview");
+  assert.equal(deck.slides[3].id, "repairs");
   assert.equal(deck.slides.at(-3).id, "opportunity");
   assert.throws(() => applyPlan(base, { ...plan, order: ["opportunity", ...plan.order] }));
   assert.equal(deck.slides.find((s) => s.id === "water").title, "Oma otsikko");
@@ -122,11 +123,11 @@ test("Copilot adapter returns the same plan shape and disables web grounding", a
 test("PowerPoint export contains editable chart data, sources, notes and scope", async () => {
   const base = buildPresentation(request),
     deck = applyPlan(base, defaultPlan(base));
-  const bytes = await renderPowerPoint(deck, { provider: "deterministic", model: null });
+  const bytes = await renderPowerPoint(deck);
   const zip = await JSZip.loadAsync(bytes);
   const slides = Object.keys(zip.files).filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name));
   const charts = Object.keys(zip.files).filter((name) => /^ppt\/charts\/chart\d+\.xml$/.test(name));
-  assert.equal(slides.length, 7);
+  assert.equal(slides.length, 8);
   assert.equal(charts.length, 2);
   const xml = (await Promise.all(slides.map((name) => zip.file(name).async("string")))).join("\n");
   assert.match(xml, /Oma otsikko/);
@@ -191,7 +192,7 @@ test("internal relationship assessments stay out of preview and PowerPoint slide
     deck.slides.forEach((slide) => {
       slide.cooperation = { status, color: "E52330", label: "INTERNAL_RELATIONSHIP" };
     });
-    const zip = await JSZip.loadAsync(await renderPowerPoint(deck, { provider: "deterministic" }));
+    const zip = await JSZip.loadAsync(await renderPowerPoint(deck));
     for (const file of Object.keys(zip.files).filter((name) =>
       /^ppt\/slides\/slide\d+\.xml$/.test(name),
     )) {
@@ -205,15 +206,13 @@ test("internal relationship assessments stay out of preview and PowerPoint slide
 test("Finnish charts use localized editable category labels without crowded numeric point labels", async () => {
   const base = buildPresentation({ scope: {}, language: "fi" });
   const deck = applyPlan(base, defaultPlan(base));
-  const zip = await JSZip.loadAsync(
-    await renderPowerPoint(deck, { provider: "deterministic", model: null }),
-  );
+  const zip = await JSZip.loadAsync(await renderPowerPoint(deck));
   const entries = Object.keys(zip.files).filter((name) =>
     /^ppt\/charts\/chart\d+\.xml$/.test(name),
   );
   const charts = await Promise.all(entries.map((name) => zip.file(name).async("string")));
   assert.ok(charts.length >= 2);
-  const water = await zip.file("ppt/slides/slide3.xml").async("string");
+  const water = await zip.file("ppt/slides/slide4.xml").async("string");
   assert.ok(water.includes("Lindström") && water.includes("m³"));
   assert.ok(charts.every((xml) => !xml.includes('showVal val="1"')));
   assert.ok(charts.every((xml) => !xml.includes("items")));

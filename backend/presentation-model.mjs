@@ -41,7 +41,9 @@ function validAreaStats(stats) {
         typeof stat?.value === "string" &&
         stat.value.length <= 40 &&
         typeof stat.label === "string" &&
-        stat.label.length <= 80,
+        stat.label.length <= 80 &&
+        (stat.delta == null || (typeof stat.delta === "string" && stat.delta.length <= 60)) &&
+        (stat.tone == null || ["better", "worse", "neutral"].includes(stat.tone)),
     )
   );
 }
@@ -183,7 +185,12 @@ export function validateRequest(input) {
         points: [...points],
         note,
         chart,
-        stats: stats.map(({ value, label }) => ({ value, label })),
+        stats: stats.map(({ value, label, delta = null, tone = null }) => ({
+          value,
+          label,
+          delta,
+          tone,
+        })),
       }),
     ),
     approvedUpsells: approvedUpsells.map((approval) => ({ ...approval })),
@@ -212,6 +219,7 @@ export function buildPresentation(input) {
     B_HOME: t("home laundering"),
     B_INHOUSE: t("in-house laundry"),
   }[request.scope.baseline];
+  const baselineLabel = baseline[0].toUpperCase() + baseline.slice(1);
   const scopeName =
     request.scope.site !== "all"
       ? focus.site_name
@@ -252,7 +260,7 @@ export function buildPresentation(input) {
           "For service and product breakdowns, ask your account manager. Unique wearer counts require person identifiers.",
         ),
       ],
-      source: "Sites, Service_Activity, Repairs",
+      source: t("Service and repair records"),
       boundary: t("Shared evidence · inventory snapshots and period totals"),
     },
     water: {
@@ -273,11 +281,11 @@ export function buildPresentation(input) {
         t`Allocated water consumption was ${f(m.water / 1000)} m³. The difference versus the baseline is ${f(Math.abs(c.waterDifference) / 1000)} m³.`,
       ],
       chart: {
-        labels: ["Lindström", t("Baseline")],
+        labels: ["Lindström", baselineLabel],
         values: [m.water / 1000, c.baselineWater / 1000],
         unit: "m³",
       },
-      source: "Customer_Impacts, Baselines",
+      source: t("Customer environmental data and comparison model"),
       boundary: t("Calculated estimate · water used for washing"),
     },
     emissions: {
@@ -298,11 +306,11 @@ export function buildPresentation(input) {
         t`Estimated laundry and delivery emissions were ${f(m.emissions / 1000, 1)} t CO₂e. The difference versus the baseline is ${f(Math.abs(c.emissionsDifference) / 1000, 1)} t CO₂e.`,
       ],
       chart: {
-        labels: ["Lindström", t("Baseline")],
+        labels: ["Lindström", baselineLabel],
         values: [m.emissions / 1000, c.baselineEmissions / 1000],
         unit: "t CO₂e",
       },
-      source: "Customer_Impacts, Baselines",
+      source: t("Customer environmental data and comparison model"),
       boundary: t("Calculated estimate · laundry and delivery"),
     },
     repairs: {
@@ -324,29 +332,31 @@ export function buildPresentation(input) {
         values: globalThis.WorkspaceModel.series(ctx, "repairs").map((p) => p.value),
         unit: "items",
       },
-      source: "Repairs",
+      source: t("Repair records"),
       boundary: t("Synthetic count of repair events"),
     },
     opportunity: {
       id: "opportunity",
       kind: "opportunity",
-      title: t("Check actual textile demand"),
+      title: t("Keep textiles in active use"),
       headlineOptions: [
-        t("Check actual textile demand"),
+        t("Keep textiles in active use"),
         t("Use scan coverage to guide a joint review"),
       ],
       paragraphs: [
         request.language === "fi"
           ? `${focus.site_name}: ${f(focus.utilization, 1)} % allokoiduista tekstiileistä skannattiin kuussa ${m.snapshotMonth}. Skannaamatta jäi ${f(focus.unscanned)} tekstiiliä.`
           : `${focus.site_name}: ${f(focus.utilization, 1)}% of allocated textiles had an active scan in ${m.snapshotMonth}. ${f(focus.unscanned)} textiles had no scan.`,
-        t("Check reserve stock, seasonal demand and scan data coverage to understand actual use."),
+        t(
+          "Review together how textiles circulate, so garments are available where they are needed.",
+        ),
       ],
       chart: {
         labels: [t("Scanned"), t("Unscanned")],
         values: [focus.scanned, focus.unscanned],
         unit: "items",
       },
-      source: `Service_Activity, ${m.snapshotMonth}`,
+      source: `${t("Service records")}, ${m.snapshotMonth}`,
       boundary: t("Snapshot for investigation"),
     },
     plan: {
@@ -354,10 +364,8 @@ export function buildPresentation(input) {
       kind: "text",
       title: t("Shared priorities for 2026"),
       paragraphs: [
-        t`Review ${focus.site_name} with the customer. Check reserve stock needs and scan coverage.`,
-        t(
-          "Agree on one improvement and assign an owner. Confirm demand before changing allocations.",
-        ),
+        t`Review ${focus.site_name} together. Check garment availability and scan coverage.`,
+        t("Agree on one improvement and assign an owner."),
         t(
           "Review progress at the next meeting. Estimate potential savings once the inputs have been agreed.",
         ),
@@ -369,10 +377,7 @@ export function buildPresentation(input) {
       kind: "text",
       title: t("Sources and calculations"),
       paragraphs: [
-        t("Source: ") +
-          data.source +
-          ". " +
-          t("Customers, Sites, Service_Activity, Customer_Impacts, Repairs and Baselines."),
+        t("Source: ") + t("Lindström service and environmental data") + ".",
         t`Period totals sum activity across the selected months. Allocations and scans reflect the end of ${m.snapshotMonth}. Repairs count events.`,
         t`Water difference: ${f(m.kg, 1)} kg washed × ${f(b.water_l_per_kg, 2)} l/kg − ${f(m.water)} l = ${f(c.waterDifference)} l. Emissions difference: the same washed weight × ${f(b.process_kgco2e_per_kg + b.delivery_kgco2e_per_kg, 3)} kg CO₂e/kg − ${f(m.emissions)} kg CO₂e = ${f(c.emissionsDifference)} kg CO₂e.`,
       ],
@@ -401,31 +406,53 @@ export function buildPresentation(input) {
       slide.facts = slide.facts?.filter((fact) => !usage.test(fact.label));
     }
   const delta = (value) => f(Math.abs(value));
-  const kpi = (value, label) => ({ value, label });
+  const kpi = (value, label, change = null) => ({ value, label, ...change });
+  // The same months a year earlier; better says which direction is good, if either is.
+  const earlierYear = Number(request.scope.from.slice(0, 4)) - 1;
+  const earlierScope = {
+    ...request.scope,
+    from: `${earlierYear}${request.scope.from.slice(4)}`,
+    to: `${earlierYear}${request.scope.to.slice(4)}`,
+  };
+  const earlier = globalThis.WorkspaceModel.buildContext(data, earlierScope).metrics;
+  const change = (now, before, better = null) => {
+    if (!earlier.hasData || !before) return null;
+    const percent = Number((((now - before) / before) * 100).toFixed(1));
+    const amount = new Intl.NumberFormat(t("en-GB"), {
+      maximumFractionDigits: 1,
+      signDisplay: "exceptZero",
+    }).format(percent);
+    const arrow = percent > 0 ? "↑" : percent < 0 ? "↓" : "→";
+    const tone =
+      !better || percent === 0
+        ? "neutral"
+        : percent > 0 === (better === "higher")
+          ? "better"
+          : "worse";
+    return { delta: `${arrow} ${amount} % ${t("vs")} ${earlierYear}`, tone };
+  };
+  const yearChange = (key, better = null) => change(m[key], earlier[key], better);
+  const repairRate = (metrics) => (metrics.washed ? (metrics.repairs / metrics.washed) * 100 : 0);
   Object.assign(slides.cover, {
     layout: "cover",
     kicker: t("Customer review"),
     lead: t("Key results and shared priorities for 2026."),
-    kpis: [
-      kpi(f(m.sites), t(m.sites === 1 ? "site" : "sites")),
-      kpi(f(m.allocated), t("textiles in service")),
-      kpi(f(m.repairs), t("repairs")),
-    ],
+    kpis: [],
   });
   Object.assign(slides.overview, {
     layout: "kpis",
     kicker: t("The service in numbers"),
     kpis: [
       kpi(f(m.sites), t("Sites")),
-      kpi(f(m.allocated), t("Textiles in service")),
-      kpi(`${f(m.kg / 1000)} t`, t("Washed")),
-      kpi(f(m.repairs), t("Repairs")),
+      kpi(f(m.allocated), t("Textiles in service"), yearChange("allocated")),
+      kpi(`${f(m.kg / 1000)} t`, t("Washed"), yearChange("kg")),
     ],
   });
   Object.assign(slides.water, {
     layout: "hero",
-    kicker: t("Environment"),
+    kicker: t("Environmental estimate"),
     hero: slides.water.value,
+    trend: yearChange("water", "lower"),
     lead:
       c.waterDifference >= 0
         ? t`${delta(c.waterDifference / 1000)} m³ less water than the comparison`
@@ -433,8 +460,9 @@ export function buildPresentation(input) {
   });
   Object.assign(slides.emissions, {
     layout: "hero",
-    kicker: t("Environment"),
+    kicker: t("Environmental estimate"),
     hero: slides.emissions.value,
+    trend: yearChange("emissions", "lower"),
     lead:
       c.emissionsDifference >= 0
         ? t`${f(Math.abs(c.emissionsDifference) / 1000, 1)} t CO₂e less than the comparison`
@@ -443,8 +471,10 @@ export function buildPresentation(input) {
   Object.assign(slides.repairs, {
     layout: "hero",
     kicker: t("Textile care"),
-    hero: slides.repairs.value,
-    lead: t("repairs kept textiles in use"),
+    hero: f(repairRate(m), 1),
+    lead: t("Repairs per 100 washes"),
+    trend: change(repairRate(m), repairRate(earlier)),
+    kpis: [kpi(f(m.repairs), t("Repairs"), yearChange("repairs"))],
   });
   slides.water.chart.type = "compare";
   slides.emissions.chart.type = "compare";
@@ -464,7 +494,10 @@ export function buildPresentation(input) {
   Object.assign(slides.sources, {
     layout: "notes",
     kicker: t("About the figures"),
-    fine: [t("Source: ") + data.source, slides.limits.paragraphs[0]],
+    fine: [
+      t("Source: ") + t("Lindström service and environmental data"),
+      slides.limits.paragraphs[0],
+    ],
   });
   for (const slide of Object.values(slides)) slide.added = [];
   if (request.note) slides.plan.added.push(request.note);
@@ -496,62 +529,89 @@ export function buildPresentation(input) {
   );
   const usage = /scan|skann/iu;
   const visible = (text) => text && !(request.hideUsage && usage.test(text));
-  const areaSlides = request.reviewAreas.map((area) => {
-    const stats = area.stats.filter((stat) => visible(`${stat.value} ${stat.label}`));
-    return {
-      id: `area-${area.id}`,
-      kind: "area",
-      layout: "hero",
-      kicker: t("Customer priority"),
-      title: area.title,
-      hero: stats[0]?.value ?? "",
-      lead: stats[0]?.label ?? area.headline,
-      kpis: stats.slice(1, 3).map(({ value, label }) => kpi(value, label)),
-      chart: area.chart,
-      added: area.note ? [area.note] : [],
-      paragraphs: [area.headline, ...area.points, area.note].filter(visible),
-      source: t("Customer review"),
-    };
-  });
+  const areaSlides = request.reviewAreas
+    .map((area) => {
+      const stats = area.stats.filter((stat) => visible(`${stat.value} ${stat.label}`));
+      return {
+        id: `area-${area.id}`,
+        kind: "area",
+        layout: "hero",
+        kicker: t("Customer priority"),
+        title: area.title,
+        hero: stats[0]?.value ?? "",
+        lead: stats[0]?.label ?? area.headline,
+        trend: stats[0]?.delta ? { delta: stats[0].delta, tone: stats[0].tone } : null,
+        kpis: stats
+          .slice(1, 3)
+          .map(({ value, label, delta, tone }) =>
+            kpi(value, label, delta ? { delta, tone } : null),
+          ),
+        chart: area.chart,
+        added: area.note ? [area.note] : [],
+        paragraphs: [area.headline, ...area.points, area.note].filter(visible),
+      };
+    })
+    // An area with nothing to show stays out rather than leaving an empty slide.
+    .filter((slide) => slide.hero || slide.chart || slide.added.length);
+  const summaryPoints = [
+    c.waterDifference > 0 && c.emissionsDifference > 0
+      ? t`What worked: ${slides.water.value} water and ${slides.emissions.value} emissions against the comparison.`
+      : t`What worked: ${f(m.repairs)} repairs kept textiles in use.`,
+    request.hideUsage
+      ? t("What to improve: choose one area for the coming period.")
+      : t`What to improve: ${f(focus.unscanned)} textiles without a scan at ${focus.site_name}.`,
+    t("What we agree today: one improvement, an owner and a follow-up date."),
+  ];
+  const summary = {
+    id: "summary",
+    kind: "text",
+    layout: "steps",
+    kicker: t("Summary"),
+    title: t("The review in brief"),
+    steps: summaryPoints,
+    paragraphs: summaryPoints,
+    added: [],
+  };
+  const upsellSlides = globalThis.UpsellModel.approved(
+    globalThis.UpsellModel.proposals(data, request.scope, request.language),
+    request.approvedUpsells,
+  )
+    .filter((proposal) => !request.hideUsage || !/scan|skann/iu.test(JSON.stringify(proposal)))
+    .map((proposal) => ({
+      id: `upsell-${proposal.id}`,
+      kind: "text",
+      layout: "notes",
+      kicker: t("Service opportunity"),
+      fine: [proposal.observation, proposal.benefit, proposal.nextStep],
+      title: proposal.title,
+      paragraphs: [proposal.observation, proposal.siteSummary, proposal.benefit, proposal.nextStep],
+      source: t("Service and repair records"),
+    }));
   return {
     request,
     customer: { name: customer.customer_name, industry: customer.industry },
     period,
     footer,
-    slides: [
-      ...withReviewAreas(
+    slides: withSummary(
+      withReviewAreas(
         order.map((id) => ({ ...slides[id] })),
-        areaSlides,
+        [...areaSlides, ...upsellSlides],
       ),
-      ...globalThis.UpsellModel.approved(
-        globalThis.UpsellModel.proposals(data, request.scope, request.language),
-        request.approvedUpsells,
-      )
-        .filter((proposal) => !request.hideUsage || !/scan|skann/iu.test(JSON.stringify(proposal)))
-        .map((proposal) => ({
-          id: `upsell-${proposal.id}`,
-          kind: "text",
-          layout: "notes",
-          kicker: t("Service opportunity"),
-          fine: [proposal.observation, proposal.benefit, proposal.nextStep, proposal.boundary],
-          title: proposal.title,
-          paragraphs: [
-            proposal.observation,
-            proposal.siteSummary,
-            proposal.benefit,
-            proposal.nextStep,
-            proposal.boundary,
-          ],
-          source: proposal.source,
-        })),
-    ],
+      summary,
+    ),
   };
 }
-// Chosen review areas sit between the evidence and the plan, whatever the slide order.
+// Chosen review areas and approved opportunities sit before the plan, whatever the slide order.
 function withReviewAreas(slides, areas) {
-  const at = slides.findIndex((slide) => slide.id === "plan");
+  const plan = slides.findIndex((slide) => slide.id === "plan");
+  const at = plan < 0 ? slides.findIndex((slide) => slide.id === "sources") : plan;
   const place = at < 0 ? slides.length : at;
   return [...slides.slice(0, place), ...areas, ...slides.slice(place)];
+}
+// The summary follows the cover, so the main message is clear before the detail.
+function withSummary(slides, summary) {
+  const place = slides.findIndex((slide) => slide.id === "cover") + 1;
+  return [...slides.slice(0, place), summary, ...slides.slice(place)];
 }
 function orderedSlides(defaultIds, override = []) {
   return [
@@ -603,8 +663,8 @@ export function applyPlan(deck, plan) {
   ];
   return {
     ...deck,
-    slides: [
-      ...withReviewAreas(
+    slides: withSummary(
+      withReviewAreas(
         orderedSlides(ids, deck.request.slideOrder).map((id) => {
           const slide = byId.get(id);
           return {
@@ -614,10 +674,10 @@ export function applyPlan(deck, plan) {
               (choices.has(id) ? slide.headlineOptions[choices.get(id)] : slide.title),
           };
         }),
-        deck.slides.filter((slide) => slide.id.startsWith("area-")),
+        deck.slides.filter((slide) => /^(area|upsell)-/.test(slide.id)),
       ),
-      ...deck.slides.filter((slide) => slide.id.startsWith("upsell-")),
-    ],
+      deck.slides.find((slide) => slide.id === "summary"),
+    ),
   };
 }
 export function defaultPlan(deck) {

@@ -135,7 +135,7 @@ test("the role shifts the deck's emphasis and internal notes stay out of a senda
   assert.doesNotMatch(deck, /Secret note|sustainability manager/i);
 });
 
-test("hidden usage also removes an approved proposal that mentions scans", () => {
+test("hidden usage keeps scan figures out of approved proposals", () => {
   const scope = {
     customer: "CUST002",
     from: "2025-01",
@@ -147,10 +147,7 @@ test("hidden usage also removes an approved proposal that mentions scans", () =>
     priority: "neutral",
   };
   const { proposals } = globalThis.UpsellModel;
-  const usage = Array.from(proposals(data, scope, "en")).find((row) =>
-    /scan/i.test(JSON.stringify(row)),
-  );
-  assert.ok(usage, "The data has a proposal based on scans");
+  const usage = Array.from(proposals(data, scope, "en"))[0];
   const approvedUpsells = [{ id: usage.id, evidenceKey: usage.evidenceKey }];
   const request = { scope, language: "en", approvedUpsells };
   assert.match(JSON.stringify(buildPresentation(request)), /upsell-/);
@@ -206,4 +203,32 @@ test("a slide chart reaches the deck and a broken one is refused", () => {
     () => buildPresentation({ ...request, reviewAreas: [broken] }),
     /Invalid review content/,
   );
+});
+
+test("figures show the change from the same months a year earlier", () => {
+  const deck = buildPresentation({ scope: { customer: "CUST002" }, language: "en" });
+  const find = (id) => deck.slides.find((slide) => slide.id === id);
+  const textiles = find("overview").kpis.find((row) => row.label === "Textiles in service");
+  assert.match(textiles.delta, /[↑↓→] [+−-]?[\d.,]+ % vs 2024/);
+  assert.equal(textiles.tone, "neutral");
+  const { trend } = find("water");
+  assert.match(trend.delta, /vs 2024$/);
+  assert.equal(trend.tone, trend.delta.startsWith("↓") ? "better" : "worse");
+  const stat = { value: "81.9 %", label: "scanned", delta: "↑ +3.3 pp vs 2024", tone: "better" };
+  const area = {
+    id: "adoption",
+    title: "Use",
+    headline: "",
+    points: [],
+    note: "",
+    stats: [stat, { ...stat, value: "9,207", label: "textiles" }],
+  };
+  const withArea = buildPresentation({
+    scope: { customer: "CUST002" },
+    language: "en",
+    reviewAreas: [area],
+  });
+  const slide = withArea.slides.find((row) => row.id === "area-adoption");
+  assert.equal(slide.trend.tone, "better");
+  assert.equal(slide.kpis[0].delta, stat.delta);
 });

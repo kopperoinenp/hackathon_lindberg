@@ -67,9 +67,13 @@
       f,
     );
   }
+  const change = (value) =>
+    value?.delta
+      ? `<span class="card-delta tone-${esc(value.tone ?? "neutral")}">${esc(value.delta)}</span>`
+      : "";
   const tiles = (kpis = []) =>
     kpis.length
-      ? `<dl class="card-kpis">${kpis.map((kpi) => `<div><dd>${esc(kpi.value)}</dd><dt>${esc(kpi.label)}</dt></div>`).join("")}</dl>`
+      ? `<dl class="card-kpis">${kpis.map((kpi) => `<div><dd>${esc(kpi.value)}</dd><dt>${esc(kpi.label)}${change(kpi)}</dt></div>`).join("")}</dl>`
       : "";
   function html(item, footer, t, { editableTitle = false } = {}) {
     const title = editableTitle
@@ -85,7 +89,7 @@
         `${item.lead ? `<p class="card-lead">${esc(item.lead)}</p>` : ""}${tiles(item.kpis)}`,
       kpis: () => tiles(item.kpis),
       hero: () =>
-        `<div class="card-grid"><div>${item.hero ? `<strong class="card-hero">${esc(item.hero)}</strong>` : ""}${item.lead ? `<p class="card-lead">${esc(item.lead)}</p>` : ""}${tiles(item.kpis)}</div>${item.chart ? `<div class="card-chart">${chart(item, t)}</div>` : ""}</div>`,
+        `<div class="card-grid"><div>${item.hero ? `<strong class="card-hero">${esc(item.hero)}</strong>` : ""}${item.lead ? `<p class="card-lead">${esc(item.lead)}</p>` : ""}${change(item.trend)}${tiles(item.kpis)}</div>${item.chart ? `<div class="card-chart">${chart(item, t)}</div>` : ""}</div>`,
       steps: () =>
         `<ol class="card-steps">${(item.steps ?? []).map((step) => `<li>${esc(step)}</li>`).join("")}</ol>`,
       notes: () =>

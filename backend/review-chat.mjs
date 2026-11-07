@@ -708,10 +708,7 @@ function describeChange(before, { workspace: after, changed }) {
     parts.push(say("Päivitin sovittavat jatkotoimet.", "Updated the next steps."));
   if (changed.includes("cooperation"))
     parts.push(
-      say(
-        "Päivitin sisäisen asiakassuhdearvion Tutki dataa -sivulle.",
-        "Updated the internal relationship assessment in Explore data.",
-      ),
+      say("Päivitin sisäisen asiakassuhdearvion.", "Updated the internal relationship assessment."),
     );
   return parts.join(" ") || null;
 }

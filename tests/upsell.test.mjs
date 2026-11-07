@@ -74,7 +74,13 @@ test("only approved current proposals reach final slides and the actual PowerPoi
   const p = proposals().find((row) => row.id.endsWith(":wipers"));
   const base = buildPresentation({ scope, approvedUpsells: [approval(p)] });
   const deck = applyPlan(base, defaultPlan(base));
-  assert.equal(deck.slides.at(-1).title, p.title);
+  const ids = deck.slides.map((slide) => slide.id);
+  assert.equal(deck.slides[ids.indexOf("plan") - 1].title, p.title);
+  assert.equal(ids.at(-1), "sources");
+  assert.doesNotMatch(
+    JSON.stringify(deck.slides.find((slide) => slide.title === p.title)),
+    /Synthetic data\. Confirm/,
+  );
   assert.equal(deck.slides.filter((slide) => slide.id.startsWith("upsell-")).length, 1);
   const plain = buildPresentation({ scope });
   assert.equal(
@@ -89,14 +95,14 @@ test("only approved current proposals reach final slides and the actual PowerPoi
     stale.slides.some((slide) => slide.id.startsWith("upsell-")),
     false,
   );
-  const bytes = await renderPowerPoint(deck, { provider: "deterministic" });
+  const bytes = await renderPowerPoint(deck);
   const zip = await JSZip.loadAsync(bytes);
-  const final = await zip.file(`ppt/slides/slide${deck.slides.length}.xml`).async("string");
+  const final = await zip.file(`ppt/slides/slide${ids.indexOf("plan")}.xml`).async("string");
   assert.ok(final.includes(p.title));
-  assert.ok(final.includes("Benefits have not been verified"));
+  assert.ok(!final.includes("Benefits have not been verified"));
 });
 
-test("chat can reorder review slides while approved opportunities stay at the end", async () => {
+test("chat can reorder review slides while approved opportunities stay before the plan", async () => {
   const selected = approval(proposals()[0]);
   const workspace = normalizeWorkspace({
     scope,
@@ -110,7 +116,7 @@ test("chat can reorder review slides while approved opportunities stay at the en
     {
       generate: async ({ input }) => {
         const context = JSON.parse(input);
-        assert.equal(context.presentationSlides.length, before.length - 1);
+        assert.equal(context.presentationSlides.length, before.length - 2);
         assert.equal(context.workspace.cooperationDescription, undefined);
         assert.equal(context.workspace.cooperationReason, undefined);
         return {
@@ -125,7 +131,7 @@ test("chat can reorder review slides while approved opportunities stay at the en
   const after = buildPresentation(result.workspace).slides;
   assert.deepEqual(
     after.map(({ id }) => id),
-    [before[1], before[0], ...before.slice(2)].map(({ id }) => id),
+    [before[2], before[0], before[1], ...before.slice(3)].map(({ id }) => id),
   );
   assert.equal(result.workspace.cooperationDescription, workspace.cooperationDescription);
   assert.equal(result.workspace.cooperationReason, workspace.cooperationReason);

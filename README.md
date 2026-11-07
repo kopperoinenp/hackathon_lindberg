@@ -1,9 +1,8 @@
 # Lindström customer review demo
 
 The account manager opens a customer review based on synthetic workwear data.
-The two tabs cover the customer summary and detailed data. The summary supports
-scoped review edits through chat and opens a browser presentation with a download
-option for an editable PowerPoint.
+It is a single page: the review supports scoped edits through chat and opens a
+browser presentation with a download option for an editable PowerPoint.
 
 ## Run locally
 

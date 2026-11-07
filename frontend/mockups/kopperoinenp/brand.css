@@ -2623,37 +2623,6 @@ main {
   width: 100%;
   margin: 0;
 }
-.next-steps-editor ol {
-  display: grid;
-  gap: 10px;
-  width: 100%;
-  margin: 0;
-  padding-left: 20px;
-}
-.next-steps-editor li {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr auto;
-  align-items: end;
-  gap: 8px;
-}
-.area-picker.next-steps-editor label {
-  display: grid;
-  gap: 4px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  font-size: 13px;
-  cursor: default;
-}
-.next-steps-editor input {
-  width: 100%;
-  min-width: 0;
-  padding: 8px;
-  border: 1px solid #b7c6d0;
-  border-radius: 6px;
-  font: inherit;
-}
 .next-steps-editor > .quiet,
 .next-steps-editor .kpi-actions {
   width: 100%;
@@ -2784,16 +2753,6 @@ main {
   border: 0;
   border-radius: 0;
   background: none;
-}
-.review-editor-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-.review-editor-heading h2 {
-  margin: 4px 0 0;
-  font-size: 24px;
 }
 #workspace.editing {
   max-width: none;
@@ -2933,24 +2892,6 @@ main {
   font-weight: 700;
   cursor: pointer;
 }
-.meeting-advice h3 {
-  margin: 12px 0 4px;
-  font-size: 15px;
-}
-.meeting-advice ol {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding-left: 20px;
-  font-size: 14px;
-}
-.meeting-advice ol strong {
-  display: block;
-  font-weight: 600;
-}
-.meeting-advice ol small {
-  color: #4f5d68;
-}
 #more-settings {
   display: grid;
   gap: 12px;
@@ -3035,22 +2976,6 @@ main {
 .customer-option small {
   color: #4f5d68;
 }
-#after-meeting {
-  scroll-margin-top: 12px;
-}
-#after-meeting label {
-  display: block;
-}
-#after-meeting textarea {
-  display: block;
-  width: 100%;
-  min-height: 84px;
-  margin-top: 4px;
-  padding: 8px;
-  border: 1px solid #b7c6d0;
-  border-radius: 6px;
-  font: inherit;
-}
 #copy-status:empty {
   display: none;
 }
@@ -3073,54 +2998,6 @@ body[data-mode="home"] footer {
   display: none;
 }
 
-/* Approval is the one main action; the file appears only for an approved review. */
-#approved-status {
-  color: #17602f;
-  font-weight: 700;
-}
-#approved-status[hidden],
-#download-powerpoint[hidden],
-#approve-review[hidden] {
-  display: none;
-}
-a#download-powerpoint {
-  display: inline-flex;
-  align-items: center;
-  width: auto;
-  height: auto;
-  padding: 10px 18px;
-  border-radius: 999px;
-  background: var(--brand-red, #e4002b);
-  color: #fff;
-  font-weight: 700;
-  text-decoration: none;
-}
-a#download-powerpoint[hidden] {
-  display: none;
-}
-#more-settings [aria-labelledby="relationship-title"] label,
-#more-settings [aria-labelledby="relationship-title"] select,
-#more-settings [aria-labelledby="relationship-title"] textarea {
-  display: block;
-  width: 100%;
-}
-#upsell-details > summary {
-  padding: 10px 12px;
-  border: 1px solid #cbd3da;
-  border-radius: 6px;
-  background: #fff;
-  color: var(--brand-blue);
-  font-weight: 700;
-  cursor: pointer;
-}
-#upsell-details[open] > summary {
-  margin-bottom: 10px;
-}
-
-/* The chosen customer is the page heading, so the selector stays out of the way. */
-.toolbar > label[for="customer"] {
-  display: none;
-}
 #review-editor .sales-signals {
   padding: 10px 12px;
   border: 1px dashed #8796a3;
@@ -3137,14 +3014,6 @@ a#download-powerpoint[hidden] {
   cursor: pointer;
 }
 .sales-signals[open] > summary {
-  margin-bottom: 10px;
-}
-#after-meeting > summary {
-  color: var(--brand-blue);
-  font-weight: 700;
-  cursor: pointer;
-}
-#after-meeting[open] > summary {
   margin-bottom: 10px;
 }
 
@@ -3221,4 +3090,343 @@ body[data-mode="prepare"] #story,
 .prototype-profile select {
   max-width: 100%;
   padding: 5px;
+}
+
+/* The panel's sections open from one clear button style. */
+#review-editor .sales-signals {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+#more-settings > summary,
+.sales-signals > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #cbd3da;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--brand-blue);
+  font-size: 15px;
+  font-weight: 700;
+  list-style: none;
+  cursor: pointer;
+}
+#more-settings > summary:hover,
+.sales-signals > summary:hover {
+  background: #f2f6f9;
+}
+#more-settings > summary::-webkit-details-marker,
+.sales-signals > summary::-webkit-details-marker {
+  display: none;
+}
+#more-settings > summary::after,
+.sales-signals > summary::after {
+  content: "▾";
+  margin-left: auto;
+}
+.sales-signals > summary em {
+  margin-left: auto;
+}
+.sales-signals > summary em + *,
+.sales-signals > summary:has(em)::after {
+  margin-left: 0;
+}
+#more-settings[open] > summary::after,
+.sales-signals[open] > summary::after {
+  transform: rotate(180deg);
+}
+.sales-signals[open] > summary {
+  margin-bottom: 10px;
+}
+
+/* For you only stays short: one usage line, a few signals and the offers to include. */
+.usage-line strong {
+  color: var(--brand-blue);
+  font-size: 18px;
+}
+#upsell-proposals h3 {
+  margin: 12px 0 6px;
+  font-size: 14px;
+}
+#upsell-proposals .kpi-checkbox small {
+  display: block;
+  color: #4f5d68;
+  font-size: 12px;
+  line-height: 1.3;
+}
+.usage-line small {
+  display: block;
+  color: #4f5d68;
+  font-size: 12px;
+}
+
+/* The two presentation actions sit together at the top of the review. */
+#workspace .toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-block: 10px;
+  background: var(--page-background, #fff);
+}
+#workspace .toolbar[hidden] {
+  display: none;
+}
+#workspace .toolbar button {
+  width: auto;
+  min-height: 42px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+#review-storage-status {
+  flex: 1 1 auto;
+  color: #9c1c1c;
+}
+#review-storage-status:not(.is-problem) {
+  visibility: hidden;
+}
+#review-editor .meeting-advice select {
+  width: 100%;
+}
+
+/* Supporting figures stay on the review page, closed until they are needed. */
+#analysis-panel {
+  margin-block: 24px;
+}
+#analysis-panel[hidden] {
+  display: none;
+}
+#analysis-panel > summary {
+  padding: 14px 18px;
+  border: 1px solid #cbd3da;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--brand-blue);
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+}
+#analysis-panel[open] > summary {
+  margin-bottom: 16px;
+}
+
+/* Chosen areas are filled pills; the ones below add to the review with one click. */
+.area-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.area-pills.is-available {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e1e8ee;
+}
+.area-picker .area-pill {
+  position: relative;
+  display: inline-flex;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.area-pill input {
+  position: absolute;
+  opacity: 0;
+}
+.area-pill span {
+  padding: 6px 12px;
+  border: 1px solid var(--brand-blue);
+  border-radius: 999px;
+  background: var(--brand-blue);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.area-pill span::after {
+  content: " ×";
+}
+.is-available .area-pill span {
+  border-color: #cbd3da;
+  background: #fff;
+  color: var(--brand-blue);
+}
+.is-available .area-pill span::after {
+  content: none;
+}
+.is-available .area-pill span::before {
+  content: "+ ";
+}
+.area-pill input:focus-visible + span {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+
+/* For you only: small two-line facts and one-click offers, nothing to read through. */
+#upsell-proposals h3 {
+  margin: 10px 0 4px;
+  font-size: 13px;
+}
+#upsell-proposals .kpi-checkbox {
+  align-items: flex-start;
+  margin: 0 0 4px;
+}
+#upsell-proposals .kpi-checkbox > span {
+  min-width: 0;
+}
+#upsell-proposals .kpi-checkbox strong {
+  display: block;
+  color: var(--brand-blue);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+#upsell-proposals .kpi-checkbox small {
+  overflow: hidden;
+  font-size: 11.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#sales-signals,
+#upsell-proposals,
+#upsell-proposals .kpi-checkbox {
+  min-width: 0;
+  max-width: 100%;
+}
+#upsell-proposals .kpi-checkbox > span {
+  flex: 1 1 0;
+  overflow: hidden;
+}
+
+/* The panel opens from the left edge and the review uses the full page when it is closed. */
+#review-editor {
+  transform: translateX(-100%);
+  transition: transform 0.2s ease;
+}
+body.panel-open #review-editor {
+  transform: none;
+}
+#workspace.editing {
+  max-width: 1120px;
+  margin-inline: auto;
+  padding-inline: 32px;
+}
+body.panel-open #workspace.editing {
+  max-width: none;
+  margin-right: 0;
+  margin-left: 400px;
+}
+#panel-toggle {
+  position: fixed;
+  top: 112px;
+  left: 0;
+  z-index: 29;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid #cbd3da;
+  border-left: 0;
+  border-radius: 0 12px 12px 0;
+  background: #fff;
+  box-shadow: 2px 2px 10px #10243a1f;
+  color: var(--brand-blue);
+  font-size: 22px;
+  cursor: pointer;
+}
+#panel-toggle:hover {
+  background: #f2f6f9;
+}
+#panel-toggle[hidden],
+body.panel-open #panel-toggle {
+  display: none;
+}
+#panel-close {
+  position: sticky;
+  top: 8px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: 8px 8px -40px auto;
+  padding: 0;
+  border: 1px solid #cbd3da;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--brand-blue);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+@media (max-width: 760px) {
+  #review-editor {
+    top: 0;
+    right: auto;
+    bottom: 0;
+    width: min(400px, 100vw);
+    max-height: none;
+    border-top: 0;
+    border-right: 1px solid #cbd3da;
+  }
+  #workspace.editing,
+  body.panel-open #workspace.editing {
+    margin-inline: auto;
+    padding-inline: 16px;
+    padding-bottom: 24px;
+  }
+}
+
+/* The customer switch sits with the presentation actions. */
+#workspace .toolbar #customer {
+  width: auto;
+  max-width: 260px;
+  min-height: 42px;
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid #cbd3da;
+  border-radius: 999px;
+  background-color: #fff;
+  color: var(--brand-blue);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Areas are stacked boxes: chosen ones filled, the ones to add below them. */
+.area-pills {
+  flex-direction: column;
+  gap: 6px;
+}
+.area-picker .area-pill {
+  display: block;
+}
+.area-pill span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--brand-blue);
+  border-radius: 8px;
+  background: #e8f1f7;
+  color: var(--brand-blue);
+  font-size: 14px;
+}
+.area-pill span::after {
+  content: "×";
+}
+.is-available .area-pill span {
+  justify-content: flex-start;
+}
+.is-available .area-pill span::before {
+  content: "+";
 }

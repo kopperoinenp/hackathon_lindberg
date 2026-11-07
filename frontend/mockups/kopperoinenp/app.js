@@ -247,13 +247,15 @@
   let deckRequest = "";
   let deckSlides = [];
   let deckFooter = "";
-  let approvedRequest = null;
   let searchIndex = 0;
   let storageMessage;
   const reviewSignature = (workspace) => JSON.stringify({ ...workspace, view: undefined });
   function storageStatus(fi, en) {
     storageMessage = { fi, en };
-    $("#review-storage-status").textContent = language === "fi" ? fi : en;
+    const line = $("#review-storage-status");
+    line.textContent = language === "fi" ? fi : en;
+    // Saving is silent; only a problem needs the user's attention.
+    line.classList.toggle("is-problem", /could not|failed/i.test(en));
   }
   function scheduleReviewSave() {
     if (sharedSession?.readOnly) return;
@@ -361,6 +363,10 @@
           state[key] = record.workspace[key];
         // Evidence blocks, customer basics and next steps, when the backend stores them.
         applyChatAreas(record.workspace);
+      } else {
+        // A first review follows the panel's advice: falling use stays internal until shown.
+        const signals = globalThis.SalesModel.salesSignals(data, selectionScope(), language);
+        state.hideUsage = signals?.usage.read === "keep";
       }
       savedRevision = record.revision;
       savedSignature = reviewSignature(chatWorkspace());
@@ -392,7 +398,6 @@
   window.addEventListener("pagehide", () => {
     flushReviewSave().catch(() => {});
   });
-  const kpiForm = $("#contract-kpi-form");
   const evidenceAreas = [
     ["scorecard", "Customer success scorecard", "Review the overall picture with the customer."],
     ["experience", "Customer experience", "CSAT, NPS or feedback supplied by the customer."],
@@ -421,7 +426,7 @@
     ],
   ];
   const analysisTools = globalThis.ReviewAnalysisTools;
-  const { companies: peers, lindstromIntensity, peerAverage, lowerPct } = analysisTools.benchmark;
+  const { lindstromIntensity, peerAverage } = analysisTools.benchmark;
   // Evidence blocks: the KAM chooses which areas matter to this customer.
   const areaQuestions = {
     scorecard: "Are we delivering successfully overall?",
@@ -457,11 +462,11 @@
     ["locations", "List of all locations"],
   ];
   const basicsPresets = [
-    ["brief", "Brief", "Customer knows the service", []],
-    ["standard", "Standard", "Regular review", ["scope", "year"]],
-    ["full", "Full", "First review or new contacts", basicsSections.map(([id]) => id)],
+    ["brief", "Brief", "Key results only", []],
+    ["standard", "Standard", "Selected areas", ["scope", "year"]],
+    ["full", "Full", "All available areas", basicsSections.map(([id]) => id)],
   ];
-  const customerBasics = () => state.customerBasics ?? basicsPresets[0][3];
+  const customerBasics = () => state.customerBasics ?? basicsPresets[1][3];
   function applyBasicsSelection() {
     const chosen = customerBasics();
     const overview = $("#customer-overview");
@@ -479,19 +484,13 @@
   function basicsPickerHtml() {
     const chosen = customerBasics();
     const same = (ids) => ids.length === chosen.length && ids.every((id) => chosen.includes(id));
-    return `<fieldset class="area-picker basics-picker"><legend>${t("Customer basics before the figures")}</legend><div class="basics-presets">${basicsPresets
+    const options = basicsPresets
       .map(
         ([id, label, hint, ids]) =>
-          `<button type="button" class="basics-preset" data-basics-preset="${id}" aria-pressed="${same(ids)}"><strong>${t(label)}</strong><span>${t(hint)}</span></button>`,
+          `<option value="${id}" ${same(ids) ? "selected" : ""}>${t(label)} – ${t(hint)}</option>`,
       )
-      .join("")}</div>${basicsSections
-      .map(
-        ([id, label]) =>
-          `<label class="family-summary"><input type="checkbox" data-basics-toggle="${id}" ${chosen.includes(id) ? "checked" : ""} />${t(label)}</label>`,
-      )
-      .join(
-        "",
-      )}<p class="quiet">${t("Name, industry, textiles, sites and countries are always shown.")}</p></fieldset>`;
+      .join("");
+    return `<fieldset class="area-picker meeting-advice"><legend>${t("Presentation length")}</legend><select id="basics-level" aria-label="${t("Presentation length")}">${options}</select></fieldset>`;
   }
   // Which block actually evidences a customer priority. Unlike topicAreas (default
   // block selection), topics without a direct measure in the data map to nothing.
@@ -511,8 +510,6 @@
     ["repairs", "operations"],
   ];
   const openAreas = new Set();
-  let editedKpi = -1;
-  let formCustomer;
   let statusTimer;
   const context = () => storyContext(data, state);
   const baselineName = (id = state.baseline) =>
@@ -760,6 +757,10 @@
         The product footprint estimate is separate from laundry and delivery emissions. Sources: Repairs and Assumptions.</p>
       </section>`;
   }
+  // The figures render when opened, so the review itself stays quick.
+  $("#analysis-panel").addEventListener("toggle", (event) => {
+    if (event.target.open) renderAnalysis();
+  });
   function renderAnalysis() {
     const ctx = context(),
       m = ctx.metrics;
@@ -829,39 +830,31 @@
     for (const id of ["site", "baseline", "priority", "country", "continent"])
       $("#" + id).value = state[id];
     const preparing = mode === "prepare";
-    const analyzing = preparing && state.view === "analysis";
-    $(".view-tabs").hidden = !preparing;
-    $("#summary-panel").hidden = !preparing || analyzing;
-    $("#analysis-panel").hidden = !analyzing;
-    $("#deck").hidden = !preparing || analyzing;
+    // The workspace is one page; saved reviews and the chat may still name the old data view.
+    state.view = "summary";
+    $("#summary-panel").hidden = !preparing;
+    $("#analysis-panel").hidden = !preparing;
+    $("#deck").hidden = !preparing;
     document.body.dataset.mode = mode;
     $("#today").hidden = mode !== "home";
     $(".toolbar").hidden = !preparing;
     $("#review-editor").hidden = !preparing;
     $("#workspace").classList.toggle("editing", preparing);
+    $("#panel-toggle").hidden = !preparing;
     if (!preparing) toggleChatMenu(false);
     $("#composer").hidden = !preparing;
     renderQueryResult();
     renderDataImport();
-    renderSteeringFinding(preparing && !analyzing);
-    for (const view of ["summary", "analysis"]) {
-      const tab = $("#" + view + "-tab");
-      tab.setAttribute("aria-selected", String(state.view === view));
-      tab.tabIndex = state.view === view ? 0 : -1;
-    }
-    $("#open-review").disabled = !ctx.metrics.hasData || state.generating || !state.included.length;
-    $("#summary-panel").before($("#customer-overview"));
-    $("#customer-overview").hidden = !analyzing;
+    for (const id of ["open-review", "download-powerpoint"])
+      $(`#${id}`).disabled = !ctx.metrics.hasData || state.generating || !state.included.length;
     renderCustomerOverview();
-    renderReviewEvidence();
-    renderRelationship();
     renderReviewContent();
     renderStory();
     renderUpsells();
     renderDashboardEdits();
     renderDashboardLayout();
-    renderImportPanel(analyzing);
-    if (state.view === "analysis") renderAnalysis();
+    renderImportPanel(preparing);
+    if ($("#analysis-panel").open) renderAnalysis();
     $("#composer").inert = switchingReview || storageLoading || !storageReady;
     if (mode === "home") renderToday();
     scheduleReviewSave();
@@ -872,12 +865,10 @@
     if (!finding) return null;
     const { site, actual, reference, gap, count, monthsAbove, monthly, peerCount } = finding;
     const fi = language === "fi";
-    const title = fi
-      ? "Missä tarvitaan ohjausryhmän apua"
-      : "Where steering committee input is needed";
+    const title = fi ? "Missä palvelukierto on hitain" : "Where service cycles run slowest";
     const headline = fi
-      ? `${site}: palvelukierron P90 on ${f(gap, 1)} h pidempi kuin vertailutoimipaikoissa.`
-      : `${site}: service cycle P90 is ${f(gap, 1)} h longer than at peer sites.`;
+      ? `${site}: palvelukierto kestää ${f(gap, 1)} h kauemmin kuin muissa toimipaikoissa.`
+      : `${site}: service cycles take ${f(gap, 1)} h longer than at other sites.`;
     const comparison = fi
       ? `Kohteen P90 ${f(actual, 1)} h (${f(count)} kiertoa). Muiden ${f(peerCount)} toimipaikan P90-mediaani ${f(reference, 1)} h.`
       : `Site P90 ${f(actual, 1)} h (${f(count)} cycles). Median P90 of ${f(peerCount)} other sites ${f(reference, 1)} h.`;
@@ -892,112 +883,21 @@
       : `Investigate long service cycles at ${site} and agree a pilot to track its effect on P90.`;
     return { title, headline, comparison, recurrence, boundary, action, finding };
   }
-  function renderSteeringFinding(visible) {
-    const card = $("#steering-finding");
-    const evidence = visible ? steeringEvidence() : null;
-    card.hidden = !evidence;
-    if (!evidence) return;
-    const { title, headline, comparison, recurrence, boundary, action } = evidence;
-    const added = state.nextSteps.some((step) => step.title === action.slice(0, stepLimits.title));
-    card.innerHTML = `<h2 id="steering-title">${esc(title)}</h2>
-      <h3>${esc(headline)}</h3><p>${esc(comparison)}</p><p>${esc(recurrence)}</p>
-      <p class="quiet">${esc(boundary)} · Service_Cycles</p><p>${esc(action)}</p>
-      <div class="kpi-actions">
-        <button type="button" class="secondary" data-steering-analysis>${t("Open analysis")}</button>
-        <button type="button" class="secondary" data-steering-plan ${added || state.nextSteps.length >= 5 ? "disabled" : ""}>${t(added ? "Added to plan" : "Add to plan")}</button>
-      </div>`;
-  }
-  $("#steering-finding").addEventListener("click", (event) => {
-    if (event.target.closest("[data-steering-analysis]")) {
-      state.view = "analysis";
-      render();
-      $("#service-cycles").focus();
-    }
-    if (event.target.closest("[data-steering-plan]")) {
-      const evidence = steeringEvidence();
-      if (!evidence || state.nextSteps.length >= 5) return;
-      state.nextSteps.push({
-        title: evidence.action.slice(0, stepLimits.title),
-        owner: "",
-        due: "",
-      });
-      state.evidenceAreas = areaOrder(new Set([...customerAreas(), "performance"]));
-      state.chatRevision += 1;
-      render();
-      const editor = $("#review-next-steps");
-      editor.closest("details").open = true;
-      editor
-        .querySelectorAll('[data-step-field="owner"]')
-        .item(state.nextSteps.length - 1)
-        ?.focus();
-    }
-  });
-  let assessingRelationship = false;
-  function renderRelationship() {
-    $("#relationship-description").value = state.cooperationDescription;
-    $("#relationship-status").value = state.cooperation;
-    $("#relationship-result").textContent = state.cooperationReason;
-    $("#relationship-status").style.borderLeft =
-      `8px solid ${{ green: "#578200", yellow: "#F4C542", red: "#E52330", unrated: "#667580" }[state.cooperation]}`;
-    $("#assess-relationship").disabled =
-      assessingRelationship || !state.cooperationDescription.trim();
-  }
-  $("#relationship-description").addEventListener("input", (event) => {
-    state.cooperationDescription = event.target.value;
-    state.cooperationReason = "";
-    $("#relationship-result").textContent = "";
-    $("#assess-relationship").disabled = assessingRelationship || !event.target.value.trim();
-    scheduleReviewSave();
-  });
-  $("#relationship-status").addEventListener("change", (event) => {
-    state.cooperation = event.target.value;
-    state.cooperationReason = "";
-    render();
-  });
-  $("#assess-relationship").addEventListener("click", async () => {
-    if (assessingRelationship) return;
-    const customer = state.customer,
-      description = state.cooperationDescription,
-      previous = state.cooperation;
-    assessingRelationship = true;
-    renderRelationship();
-    try {
-      const response = await fetch("/api/cooperation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description, language }),
-        signal: AbortSignal.timeout(95000),
-      });
-      const result = await response.json();
-      if (
-        customer !== state.customer ||
-        description !== state.cooperationDescription ||
-        previous !== state.cooperation
-      )
-        return;
-      if (!response.ok) throw new Error(result.error || t("The assistant request failed."));
-      state.cooperation = result.status;
-      state.cooperationReason = result.reason;
-      render();
-    } catch (error) {
-      if (
-        customer === state.customer &&
-        description === state.cooperationDescription &&
-        previous === state.cooperation
-      )
-        $("#relationship-result").textContent = error.message;
-    } finally {
-      assessingRelationship = false;
-      // Preserve an error message until the next edit.
-      $("#assess-relationship").disabled = !state.cooperationDescription.trim();
-    }
-  });
   function renderUpsells() {
     const proposals = globalThis.UpsellModel.proposals(data, state, language);
     const accepted = globalThis.UpsellModel.approved(proposals, state.approvedUpsells);
     const stale = state.approvedUpsells.length - accepted.length;
-    $("#upsell-proposals").innerHTML =
-      `<span class="section-kicker">${esc(t("NEXT OPPORTUNITIES"))}</span><h2 id="upsell-title">${esc(t("Customer-specific service opportunities"))}</h2><p>${esc(t("Approve proposals for the end of the presentation. Approvals are saved for this customer. Changed source data or filters require a new approval."))}</p><p role="status">${esc(t("Approved for this presentation"))}: ${accepted.length}${stale ? ` · ${esc(t("Saved approvals outside the current evidence"))}: ${stale}` : ""}</p><div class="upsell-grid">${proposals.map((proposal) => `<article class="upsell-card"><h3>${esc(proposal.title)}</h3><p><strong>${esc(t("Observation"))}:</strong> ${esc(proposal.observation)}</p><p><strong>${esc(t("Sites"))}:</strong> ${esc(proposal.siteSummary)}</p><p><strong>${esc(t("Potential benefit"))}:</strong> ${esc(proposal.benefit)}</p><p><strong>${esc(t("Next step"))}:</strong> ${esc(proposal.nextStep)}</p><p class="quiet">${esc(proposal.boundary)}</p><details><summary>${esc(t("Source"))}</summary><p class="quiet">${esc(proposal.source)}</p><p>${esc(proposal.sites)}</p></details><label class="kpi-checkbox"><input type="checkbox" data-upsell-id="${esc(proposal.id)}" aria-label="${esc(t("Include at the end of the presentation"))}: ${esc(proposal.title)}" ${accepted.some((item) => item.id === proposal.id) ? "checked" : ""} ${state.asking || state.generating ? "disabled" : ""}/><span>${esc(t("Include at the end of the presentation"))}</span></label></article>`).join("")}</div>${!proposals.length ? `<p>${esc(t("No service proposals are supported by the selected data."))}</p>` : ""}${state.approvedUpsells.length ? `<button type="button" id="clear-upsell-approvals" class="text-button">${esc(t("Clear all opportunity approvals for this customer"))}</button>` : ""}`;
+    const disabled = state.asking || state.generating ? "disabled" : "";
+    const rows = proposals
+      .map(
+        (proposal) =>
+          `<label class="kpi-checkbox"><input type="checkbox" data-upsell-id="${esc(proposal.id)}" ${accepted.some((item) => item.id === proposal.id) ? "checked" : ""} ${disabled} /><span title="${esc(proposal.benefit)}"><strong>${esc(proposal.title)}</strong><small>${esc(proposal.benefit)}</small></span></label>`,
+      )
+      .join("");
+    $("#upsell-proposals").hidden = !proposals.length;
+    $("#upsell-proposals").innerHTML = proposals.length
+      ? `<h3>${esc(t("Offer in the presentation"))}</h3>${rows}${stale ? `<button type="button" id="clear-upsell-approvals" class="text-button">${esc(t("Clear all opportunity approvals for this customer"))}</button>` : ""}`
+      : "";
   }
   $("#upsell-proposals").addEventListener("change", (event) => {
     const id = event.target.dataset.upsellId;
@@ -1148,110 +1048,6 @@
       .filter(Boolean)
       .join(" · ");
   }
-  function resetKpiForm() {
-    editedKpi = -1;
-    kpiForm.reset();
-    $("#cancel-contract-kpi").hidden = true;
-  }
-  function renderReviewEvidence() {
-    if (formCustomer !== state.customer) {
-      formCustomer = state.customer;
-      resetKpiForm();
-    }
-    const area = kpiForm.elements.area;
-    const selectedArea = area.value;
-    area.innerHTML = evidenceAreas
-      .map(([id, label]) => `<option value="${id}">${t(label)}</option>`)
-      .join("");
-    if (selectedArea) area.value = selectedArea;
-    $("#review-evidence-areas").innerHTML = evidenceAreas
-      .map(([, label, evidence]) => `<li><strong>${t(label)}</strong> · ${t(evidence)}</li>`)
-      .join("");
-    const kpis = customerKpis();
-    const agenda = kpis.filter((kpi) => kpi.priority);
-    $("#contract-agenda").innerHTML = agenda.length
-      ? `<ul class="contract-kpi-list">${agenda
-          .map((kpi) => `<li><strong>${esc(kpi.label)}</strong> · ${esc(kpiDescription(kpi))}</li>`)
-          .join("")}</ul>`
-      : `<p class="quiet">${t("No contract KPIs are highlighted for this customer.")}</p>`;
-    $("#contract-kpi-list").innerHTML = kpis
-      .map((kpi, index) => {
-        const label = evidenceAreas.find(([id]) => id === kpi.area)[1];
-        return `<li><strong>${esc(kpi.label)}</strong> · ${t(label)}<br />${esc(kpiDescription(kpi))}<div class="kpi-actions"><button type="button" class="text-button" data-edit-kpi="${index}">${t("Edit KPI")}</button><button type="button" class="text-button" data-remove-kpi="${index}">${t("Remove KPI")}</button></div></li>`;
-      })
-      .join("");
-    const includeAgenda = $("#include-contract-agenda");
-    includeAgenda.disabled = agenda.length === 0;
-    includeAgenda.checked = agenda.length > 0 && state.includeContractAgenda;
-
-    const difference = f(lowerPct);
-    $("#industry-benchmark-summary").textContent =
-      `${difference} % · ${t("Lower emissions intensity than the four-peer average (illustrative)")}`;
-    const benchmarkRows = [
-      ...peers,
-      [t("Four-peer average"), peerAverage],
-      ["Lindström Group", lindstromIntensity],
-    ];
-    $("#industry-benchmark").innerHTML =
-      `<table><thead><tr><th scope="col">${t("Company")}</th><th scope="col">${t("kg emissions / € turnover")}</th></tr></thead><tbody>${benchmarkRows.map(([name, intensity]) => `<tr><th scope="row">${name}</th><td>${f(intensity, 4)}</td></tr>`).join("")}</tbody></table><p class="quiet">${t("Source: supplied project figures. The average is unweighted and excludes Lindström. This company comparison is separate from the customer's laundry and delivery estimates.")}</p>`;
-  }
-  kpiForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const fields = new FormData(kpiForm);
-    const kpi = Object.fromEntries(fields);
-    for (const field of ["label", "actual", "target", "source"]) kpi[field] = kpi[field].trim();
-    if (!kpi.label) {
-      status(t("Enter a KPI name."));
-      kpiForm.elements.label.focus();
-      return;
-    }
-    kpi.priority = fields.has("priority");
-    const kpis = customerKpis();
-    if (editedKpi < 0 && kpis.length >= 12) {
-      status(t("This customer can have up to 12 contract KPIs."));
-      return;
-    }
-    if (
-      kpi.priority &&
-      kpis.filter((item, index) => item.priority && index !== editedKpi).length >= 3
-    ) {
-      status(t("Highlight up to three KPIs. Unmark another KPI first."));
-      return;
-    }
-    kpis[editedKpi < 0 ? kpis.length : editedKpi] = kpi;
-    state.contractKpis = kpis;
-    resetKpiForm();
-    render();
-    status(t("Contract KPI saved."));
-  });
-  $("#cancel-contract-kpi").addEventListener("click", () => {
-    resetKpiForm();
-    kpiForm.elements.label.focus();
-  });
-  $("#contract-kpi-list").addEventListener("click", (event) => {
-    const button = event.target.closest("button");
-    if (!button) return;
-    const kpis = customerKpis();
-    if (button.dataset.editKpi !== undefined) {
-      editedKpi = Number(button.dataset.editKpi);
-      const kpi = kpis[editedKpi];
-      for (const field of ["label", "area", "actual", "target", "source"])
-        kpiForm.elements[field].value = kpi[field];
-      kpiForm.elements.priority.checked = kpi.priority;
-      $("#cancel-contract-kpi").hidden = false;
-    } else {
-      kpis.splice(Number(button.dataset.removeKpi), 1);
-      resetKpiForm();
-      render();
-      status(t("Contract KPI removed."));
-    }
-    kpiForm.elements.label.focus();
-  });
-  $("#include-contract-agenda").addEventListener("change", (event) => {
-    state.includeContractAgenda = event.target.checked;
-    scheduleReviewSave();
-    invalidatePowerPoint();
-  });
   // Whole-customer basics for the full data year. Independent of review filters, like the overview.
   function customerBasicsHtml(overview) {
     // Latest data year only, compared with the year before when that year has data.
@@ -1484,7 +1280,9 @@
           : t(
               "This review focuses on water use, starting with the results and ending with a proposed improvement.",
             ),
-      efficiency: t("This review focuses on textile care and checks how allocations match demand."),
+      efficiency: t(
+        "This review focuses on textile care and on keeping garments available where they are needed.",
+      ),
       circularity: t(
         "This review looks at repairs and continued textile use, including where more evidence is needed.",
       ),
@@ -2013,6 +1811,28 @@
     };
   }
   // What the manager approves is what the file contains: each chosen area becomes a slide.
+  // These areas show as the core slides, so a figure never appears on two slides.
+  const areaSlides = {
+    water: "sustainability",
+    emissions: "sustainability",
+    repairs: "operations",
+    opportunity: "adoption",
+  };
+  function deckInsights() {
+    const areas = deckAreas();
+    const kept = state.included.filter((id) => areas.includes(areaSlides[id]));
+    if (kept.some((id) => id !== "opportunity")) return kept;
+    return [...kept, state.included.find((id) => id !== "opportunity") ?? "water"];
+  }
+  function deckAreas() {
+    const chosen = customerBasics();
+    const level = basicsPresets.find(
+      ([, , , ids]) => ids.length === chosen.length && ids.every((id) => chosen.includes(id)),
+    )?.[0];
+    if (level === "brief") return [];
+    if (level !== "full") return customerAreas();
+    return evidenceAreas.map(([id]) => id).filter((id) => !(state.hideUsage && id === "adoption"));
+  }
   function reviewAreas() {
     if (!context().metrics.hasData) return [];
     const evidence = areaEvidence();
@@ -2024,8 +1844,8 @@
       String(value)
         .replace(/<[^>]*>/g, "")
         .trim();
-    return customerAreas()
-      .filter((id) => id !== "scorecard")
+    return deckAreas()
+      .filter((id) => !["scorecard", ...Object.values(areaSlides)].includes(id))
       .filter((id) => !evidence[id]?.missing || kpis.some((kpi) => kpi.area === id && kpi.actual))
       .map((id) => {
         if (id === "performance" && steering) {
@@ -2036,25 +1856,27 @@
             headline,
             points: [comparison, recurrence, boundary].map((text) => text.slice(0, 160)),
             stats: [
-              { value: `${f(finding.actual, 1)} h`, label: t("Site service cycle P90") },
-              { value: `${f(finding.reference, 1)} h`, label: t("Peer site P90 median") },
+              { value: `${f(finding.actual, 1)} h`, label: t("90% of cycles finished within") },
+              { value: `${f(finding.reference, 1)} h`, label: t("Other sites, median") },
             ],
             note: (state.areaNotes[id] ?? "").slice(0, 2000),
             chart: {
               type: "line",
-              name: t("Site service cycle P90"),
+              name: t("90% of cycles finished within"),
               labels: finding.monthly.map(({ month }) => month),
               values: finding.monthly.map(({ actual }) => actual),
               reference: finding.monthly.map(({ reference }) => reference),
-              referenceName: t("Peer site P90 median"),
+              referenceName: t("Other sites, median"),
             },
           };
         }
         const block = evidence[id] ?? {};
         const kpi = kpis.find((item) => item.area === id && item.actual);
-        const stats = (block.stats ?? []).slice(0, 3).map(([value, label]) => ({
+        const stats = (block.stats ?? []).slice(0, 3).map(([value, label, change = ""]) => ({
           value: plain(value).slice(0, 40),
           label: plain(label).slice(0, 80),
+          delta: plain(change).split(" · ")[0].slice(0, 60) || null,
+          tone: /yoy-(better|worse|neutral)/.exec(change)?.[1] ?? null,
         }));
         return {
           id,
@@ -2139,6 +1961,7 @@
   function slideKind(id) {
     if (id.startsWith("area-")) return "area";
     if (id.startsWith("upsell-")) return "upsell";
+    if (id === "summary") return "summary";
     return "main";
   }
   function slideNote(id) {
@@ -2150,7 +1973,8 @@
     const { insightIds } = globalThis.MeetingModel;
     const main = deckSlides.filter((slide) => slideKind(slide.id) === "main").map(({ id }) => id);
     const removable = (id) =>
-      slideKind(id) !== "main" || (insightIds.includes(id) && state.included.length > 1);
+      ["area", "upsell"].includes(slideKind(id)) ||
+      (insightIds.includes(id) && state.included.length > 1);
     const movable = (id) => slideKind(id) === "main" && !fixedSlides.includes(id);
     const hidden = insightIds.filter((id) => !state.included.includes(id));
     const open = new Set(
@@ -2163,8 +1987,8 @@
         .map((slide) => {
           const { id } = slide;
           const position = main.indexOf(id);
-          const titled = slideKind(id) !== "upsell";
-          const noted = slideKind(id) !== "upsell";
+          const titled = !["upsell", "summary"].includes(slideKind(id));
+          const noted = titled;
           return `<div class="deck-item" data-slide="${esc(id)}">${globalThis.SlideRender.html(slide, deckFooter, t, { editableTitle: titled })}<div class="deck-actions">${noted ? `<button type="button" data-slide-action="note">${t("Add text")}</button>` : ""}<button type="button" data-slide-action="ask">${t("Ask the assistant")}</button>${movable(id) && movable(main[position - 1] ?? "cover") ? `<button type="button" data-slide-action="up" aria-label="${t("Move up")}">↑</button>` : ""}${movable(id) && movable(main[position + 1] ?? "limits") ? `<button type="button" data-slide-action="down" aria-label="${t("Move down")}">↓</button>` : ""}${removable(id) ? `<button type="button" data-slide-action="remove">${t("Remove slide")}</button>` : ""}</div>${noted ? `<textarea class="slide-note" data-slide-note="${esc(id)}" maxlength="2000" aria-label="${t("Add text")}" ${open.has(id) ? "" : "hidden"}>${esc(slideNote(id))}</textarea>` : ""}</div>`;
         })
         .join("") +
@@ -2298,7 +2122,7 @@
       .join("");
     return `<div class="evidence-blocks-wrap"><div class="evidence-blocks">${blocks}</div><p class="quiet">${t("All figures are based on synthetic demo data.")}</p></div>`;
   }
-  // Section 03 shows only next steps the KAM has written; suggestions stay in Explore data.
+  // Next steps come from saved reviews and the chat; the panel has no step editor.
   const stepLimits = { title: 160, owner: 80, due: 40 };
   const agreedSteps = () => state.nextSteps.filter((step) => step.title.trim());
   function stepText(step) {
@@ -2368,36 +2192,6 @@
         ? t("Next steps agreed for the coming period, each with an owner and a timeline.")
         : t("Next steps will be agreed together in this meeting.");
   }
-  function nextStepsEditorHtml() {
-    const suggestions = plan().filter((item) => item.length > 1);
-    const preview = suggestions
-      .map(
-        ([title, ...details]) =>
-          `<p><strong>${esc(title)}</strong><br />${esc(details.join(" "))}</p>`,
-      )
-      .join("");
-    const rows = state.nextSteps
-      .map(
-        (step, index) =>
-          `<li><label>${t("Action")}<input data-step="${index}" data-step-field="title" maxlength="${stepLimits.title}" value="${esc(step.title)}" /></label><label>${t("Owner")}<input data-step="${index}" data-step-field="owner" maxlength="${stepLimits.owner}" value="${esc(step.owner)}" /></label><label>${t("Timeline")}<input data-step="${index}" data-step-field="due" maxlength="${stepLimits.due}" value="${esc(step.due)}" placeholder="${t("E.g. Q2 2026")}" /></label><button type="button" class="text-button" data-step-remove="${index}">${t("Remove")}</button></li>`,
-      )
-      .join("");
-    return `<fieldset class="area-picker next-steps-editor"><legend>${t("Agreed next steps")}</legend><p class="quiet">${t("Only the steps written here are shown to the customer. Keep to one to three.")}</p><ol>${rows}</ol>${preview ? `<details><summary>${t("Data-based suggestions")}</summary>${preview}</details>` : ""}<div class="kpi-actions">${state.nextSteps.length < 5 ? `<button type="button" class="secondary" data-step-add>${t("Add step")}</button>` : ""}${state.nextSteps.length || !suggestions.length ? "" : `<button type="button" class="text-button" data-step-suggest>${t("Start from suggestions")}</button>`}</div></fieldset>`;
-  }
-  // KAM controls for the customer-facing review live in the review settings panel.
-  const openPanels = new Set();
-  const panelOpen = (id) => (openPanels.has(id) ? "open" : "");
-  document.addEventListener(
-    "toggle",
-    (event) => {
-      const id = event.target.dataset?.panel;
-      if (!id) return;
-      if (event.target.open) openPanels.add(id);
-      else openPanels.delete(id);
-    },
-    true,
-  );
-  const reads = { show: "Show", keep: "Keep internal", decide: "Your call" };
   // A manager may search in Finnish or English, whatever the page language is.
   const industryKeywords = {
     "Food & Beverage": "Elintarviketeollisuus ruoka",
@@ -2447,6 +2241,19 @@
     searchIndex = (searchIndex + step + options.length) % options.length;
     renderToday();
   });
+  // The customising panel stays closed behind a settings button at the page edge.
+  function setPanel(open) {
+    document.body.classList.toggle("panel-open", open);
+    $("#panel-toggle").setAttribute("aria-expanded", String(open));
+    $("#review-editor").inert = !open;
+    $(open ? "#panel-close" : "#panel-toggle").focus();
+  }
+  $("#review-editor").inert = true;
+  $("#panel-toggle").addEventListener("click", () => setPanel(true));
+  $("#panel-close").addEventListener("click", () => setPanel(false));
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && document.body.classList.contains("panel-open")) setPanel(false);
+  });
   function setMode(next) {
     mode = next;
     render();
@@ -2463,25 +2270,14 @@
     const sales = globalThis.SalesModel;
     const { metrics } = context();
     const advice = sales.audienceAdvice(state.audience, metrics, language);
-    const signals = metrics.hasData ? sales.salesSignals(data, selectionScope(), language) : null;
     const roles = Object.entries(sales.audiences)
       .map(
         ([id, audience]) =>
           `<option value="${id}" ${state.audience === id ? "selected" : ""}>${esc(audience[language === "fi" ? "fi" : "en"])}</option>`,
       )
       .join("");
-    const questions = sales
-      .conversation(state.audience, signals, language)
-      .map(({ ask, why }) => `<li><strong>${esc(ask)}</strong><small>${esc(why)}</small></li>`)
-      .join("");
     $("#meeting-advice").innerHTML =
-      `<fieldset class="area-picker meeting-advice"><legend>${t("Who are you meeting?")}</legend><select id="audience" aria-label="${t("Who are you meeting?")}"><option value="">${t("Choose a role")}</option>${roles}</select>${advice ? `<p>${esc(advice.points[0])}</p>` : ""}${state.audience ? `<h3>${t("Ask in the meeting")}</h3><ol>${questions}</ol>` : ""}</fieldset>`;
-    const rows = (signals?.signals ?? [])
-      .map((signal) => `<div><dt>${esc(signal.label)}</dt><dd>${esc(signal.value)}</dd></div>`)
-      .join("");
-    $("#sales-signals").innerHTML = signals
-      ? `<details class="sales-signals" data-panel="sales" ${panelOpen("sales")}><summary><span>${t("For you only")}</span><em class="sales-read read-${signals.usage.read}">${t(reads[signals.usage.read])}</em></summary><div class="sales-usage"><div><span>${t("Textiles in active use")}</span><strong>${esc(signals.usage.value)}</strong><small>${esc(signals.usage.trend)} · ${esc(signals.usage.period)}</small></div></div><p>${esc(signals.usage.advice)}</p><button type="button" class="secondary" data-usage-toggle>${t(state.hideUsage ? "Show usage to the customer" : "Hide usage from the customer")}</button><p class="quiet">${t(state.hideUsage ? "Usage figures are hidden from the review and presentation." : "Usage figures are visible to the customer.")}</p><dl>${rows}</dl><p class="quiet">${t("This is the share of textiles scanned, the closest figure to capacity use in the data. The thresholds are demo assumptions to agree with Lindström.")}</p></details>`
-      : "";
+      `<fieldset class="area-picker meeting-advice"><legend>${t("Who are you meeting?")}</legend><select id="audience" aria-label="${t("Who are you meeting?")}"><option value="">${t("Choose a role")}</option>${roles}</select>${advice ? `<p>${esc(advice.points[0])}</p>` : ""}</fieldset>`;
   }
   function selectionScope() {
     const { customer, from, to, country, continent, site } = state;
@@ -2496,61 +2292,26 @@
     render();
     $("#audience")?.focus();
   });
-  document.addEventListener("click", (event) => {
-    if (event.target.closest("[data-usage-toggle]")) {
-      state.hideUsage = !state.hideUsage;
-      if (!state.hideUsage) {
-        state.evidenceAreas = areaOrder(new Set([...customerAreas(), "adoption"]));
-        if (!state.visibleInsights.includes("opportunity"))
-          state.visibleInsights.push("opportunity");
-      }
-      invalidatePowerPoint(true);
-      state.chatRevision += 1;
-      render();
-      $("[data-usage-toggle]")?.focus();
-    }
-  });
   function renderReviewContent() {
     renderMeetingAdvice();
-    const meetingNotes = $("#kam-notes");
-    if (meetingNotes !== document.activeElement) meetingNotes.value = state.meetingNotes;
-    const editor = $("#review-next-steps");
-    if (
-      !editor.contains(document.activeElement) ||
-      editor.querySelectorAll("li").length !== state.nextSteps.length
-    )
-      editor.innerHTML = nextStepsEditorHtml();
     $("#review-basics-picker").innerHTML = basicsPickerHtml();
     const chosen = customerAreas();
-    const priorities = priorityAreas();
-    const areaRow = (id, reason) =>
-      `<label><input type="checkbox" data-area-toggle="${id}" ${chosen.includes(id) ? "checked" : ""} /><span>${t(evidenceAreas.find(([area]) => area === id)[1])}${reason ? `<small>${esc(reason)}</small>` : ""}</span></label>`;
-    const others = evidenceAreas.filter(([id]) => !priorities.some((row) => row.id === id));
-    $("#review-area-picker").innerHTML =
-      `<fieldset class="area-picker simple-areas"><legend>${t("What to show this customer")}</legend>${priorities
-        .map(({ id, reason }) => areaRow(id, reason))
-        .join(
-          "",
-        )}<details data-panel="other-areas" ${panelOpen("other-areas")}><summary>${t("Other areas")}</summary>${others
-        .map(([id]) => areaRow(id))
-        .join(
-          "",
-        )}</details><button type="button" class="text-button" data-area-reset>${t("Use suggested areas")}</button></fieldset>`;
     const evidence = context().metrics.hasData ? areaEvidence() : {};
     const kpis = customerKpis();
-    const gaps = chosen.filter(
-      (id) => evidence[id]?.missing && !kpis.some((kpi) => kpi.area === id && kpi.actual),
-    );
-    $("#review-area-gaps").innerHTML = gaps.length
-      ? `<div class="area-gaps"><strong>${t("Needs a figure before it can appear:")}</strong><ul>${gaps
-          .map(
-            (id) =>
-              `<li><span>${t(evidenceAreas.find(([area]) => area === id)[1])}</span> ${esc(evidence[id].hint)}</li>`,
-          )
-          .join("")}</ul></div>`
-      : "";
-    const note = $("#meeting-note");
-    if (document.activeElement !== note) note.value = state.note;
+    // Every pill is one slide: areas that cannot produce a slide are not offered.
+    const offered = evidenceAreas
+      .map(([id]) => id)
+      .filter(
+        (id) =>
+          !["scorecard", "future"].includes(id) &&
+          (!evidence[id]?.missing || kpis.some((kpi) => kpi.area === id && kpi.actual)),
+      );
+    const pill = (id) =>
+      `<label class="area-pill"><input type="checkbox" data-area-toggle="${id}" ${chosen.includes(id) ? "checked" : ""} /><span>${t(evidenceAreas.find(([area]) => area === id)[1])}</span></label>`;
+    const selected = offered.filter((id) => chosen.includes(id));
+    const available = offered.filter((id) => !chosen.includes(id));
+    $("#review-area-picker").innerHTML =
+      `<fieldset class="area-picker"><legend>${t("What to show this customer")}</legend><div class="area-pills">${selected.map(pill).join("")}</div>${available.length ? `<div class="area-pills is-available">${available.map(pill).join("")}</div>` : ""}</fieldset>`;
   }
   function renderStory() {
     const { metrics: m, focus, sites, order, customer } = context();
@@ -2591,11 +2352,7 @@
           ([title, ...details]) =>
             `<li>${esc(title)}${details.map((detail) => `<small>${esc(detail)}</small>`).join("")}</li>`,
         )
-        .join(
-          "",
-        )}</ol></div><details class="notes-details" ${state.note ? "open" : ""}><summary>Add a note to the presentation</summary><label for="meeting-note" class="sr-only">Meeting note</label><textarea id="meeting-note" maxlength="2000" placeholder="E.g. a customer goal or an agreed next step…">${esc(state.note)}</textarea><p class="quiet">The note stays in this tab until you change the customer, site or baseline.</p></details></section>`;
-    // The note editor is in More settings; the review shows the note in its opening.
-    $("#story .notes-details")?.remove();
+        .join("")}</ol></div></section>`;
     renderNextSteps();
     renderOpportunityForCustomer();
     if (state.hideUsage) $("#opportunity-title")?.closest("section")?.remove();
@@ -2686,55 +2443,11 @@
     }
   }
   document.addEventListener("change", (event) => {
-    const id = event.target.dataset?.basicsToggle;
-    if (!id) return;
-    const chosen = new Set(customerBasics());
-    if (event.target.checked) chosen.add(id);
-    else chosen.delete(id);
-    state.customerBasics = basicsSections.map(([key]) => key).filter((key) => chosen.has(key));
+    if (event.target.id !== "basics-level") return;
+    state.customerBasics = [...basicsPresets.find(([id]) => id === event.target.value)[3]];
     state.chatRevision += 1;
     render();
-    $(`[data-basics-toggle="${id}"]`)?.focus();
-  });
-  document.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-basics-preset]");
-    if (!button) return;
-    state.customerBasics = [...basicsPresets.find(([id]) => id === button.dataset.basicsPreset)[3]];
-    state.chatRevision += 1;
-    render();
-    $(`[data-basics-preset="${button.dataset.basicsPreset}"]`)?.focus();
-  });
-  document.addEventListener("input", (event) => {
-    const field = event.target.dataset?.stepField;
-    if (!field) return;
-    state.nextSteps[Number(event.target.dataset.step)][field] = event.target.value.slice(
-      0,
-      stepLimits[field],
-    );
-    invalidatePowerPoint();
-    scheduleReviewSave();
-  });
-  document.addEventListener("change", (event) => {
-    if (event.target.dataset?.stepField) render();
-  });
-  document.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-step-add], [data-step-remove], [data-step-suggest]");
-    if (!button) return;
-    if (button.dataset.stepRemove !== undefined)
-      state.nextSteps.splice(Number(button.dataset.stepRemove), 1);
-    else if (button.dataset.stepSuggest !== undefined)
-      state.nextSteps = plan()
-        .filter((item) => item.length > 1)
-        .map(([title]) => ({ title: title.slice(0, stepLimits.title), owner: "", due: "" }));
-    else state.nextSteps.push({ title: "", owner: "", due: "" });
-    state.chatRevision += 1;
-    render();
-    const inputs = $("#review-next-steps").querySelectorAll('[data-step-field="title"]');
-    (button.dataset.stepAdd !== undefined ? inputs[inputs.length - 1] : inputs[0])?.focus();
-  });
-  // Show the finished note in the review once the KAM leaves the field.
-  document.addEventListener("change", (event) => {
-    if (event.target.id === "meeting-note") render();
+    $("#basics-level")?.focus();
   });
   document.addEventListener("change", (event) => {
     const area = event.target.dataset?.areaToggle;
@@ -2758,16 +2471,9 @@
     },
     true,
   );
-  document.addEventListener("click", (event) => {
-    if (!event.target.closest("[data-area-reset]")) return;
-    state.evidenceAreas = null;
-    state.chatRevision += 1;
-    render();
-  });
   function renderDashboardEdits() {
     const targets = {
       cover: $("#story .intro"),
-      overview: $("#customer-overview"),
       water: $("[data-insight=water]"),
       emissions: $("[data-insight=emissions]"),
       repairs: $("[data-insight=repairs]"),
@@ -2860,7 +2566,6 @@
         "<h2>Säästöarvio</h2><p>Säästöarviota ei ole annettu. Kerro apurille summa euroina.</p>",
       );
     const modules = {
-      overview: $("#customer-overview"),
       intro: $("#story .intro"),
       savings,
       metrics,
@@ -3243,20 +2948,6 @@
       scheduleReviewSave();
     }
   });
-  document.querySelector(".view-tabs").addEventListener("keydown", (event) => {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-    event.preventDefault();
-    state.view =
-      event.key === "Home"
-        ? "summary"
-        : event.key === "End"
-          ? "analysis"
-          : state.view === "summary"
-            ? "analysis"
-            : "summary";
-    render();
-    $("#" + state.view + "-tab").focus();
-  });
   $("#customer").innerHTML = data.customers
     .map((r) => `<option value="${r.customer_id}">${esc(r.customer_name)}</option>`)
     .join("");
@@ -3295,24 +2986,9 @@
       if (field.value.trim()) ask(field.value.trim());
       field.value = "";
     });
-  document.addEventListener("input", (event) => {
-    if (event.target.id === "kam-notes") {
-      state.meetingNotes = event.target.value;
-      scheduleReviewSave();
-    }
-    if (event.target.id === "meeting-note") {
-      state.note = event.target.value;
-      invalidatePowerPoint();
-      scheduleReviewSave();
-    }
-  });
   document.addEventListener("click", (event) => {
     const button = event.target.closest("button");
     if (!button) return;
-    if (button.dataset.view) {
-      state.view = button.dataset.view;
-      render();
-    }
     if (button.dataset.close) $("#" + button.dataset.close).close();
     if (button.dataset.site) {
       state.site = button.dataset.site;
@@ -3320,32 +2996,6 @@
       clearScope();
       render();
       status("Review filtered to " + scopeName());
-    }
-  });
-  $("#back-today").addEventListener("click", () => {
-    flushReviewSave().catch(() => {});
-    setMode("home");
-    $("#customer-search").value = "";
-    searchIndex = 0;
-    renderToday();
-    $("#customer-search").focus();
-  });
-  $("#copy-summary").addEventListener("click", async () => {
-    const steps = agreedSteps();
-    if (!steps.length) {
-      $("#copy-status").textContent = t("Add an agreed next step first.");
-      return;
-    }
-    const { customer } = context();
-    const summary = [
-      `${customer.customer_name} · ${t("Agreed next steps")}`,
-      ...steps.map((step) => `• ${stepText(step)}`),
-    ].join("\n");
-    try {
-      await navigator.clipboard.writeText(summary);
-      $("#copy-status").textContent = t("Summary copied.");
-    } catch {
-      $("#copy-status").textContent = summary;
     }
   });
   $("#open-evidence").addEventListener("click", () => {
@@ -3371,47 +3021,42 @@
       ready &&
       ready.request === JSON.stringify(presentationRequest()) &&
       Date.now() < ready.expires
-    ) {
-      const link = $("#download-powerpoint");
-      link.href = ready.downloadUrl;
-      link.setAttribute("aria-disabled", "false");
-      link.title = t("Download PowerPoint");
-      renderApproval();
+    )
       return;
-    }
     state.readyPresentation = null;
-    const link = $("#download-powerpoint");
-    link.removeAttribute("href");
-    link.setAttribute("aria-disabled", "true");
-    link.title = t("Generate the presentation first");
-    renderApproval();
   }
-  // Any edit after approval takes the review back to approval, so the file always matches it.
-  function renderApproval() {
-    const approved =
-      Boolean(approvedRequest) && state.readyPresentation?.request === approvedRequest;
-    $("#approve-review").hidden = approved;
-    $("#approved-status").hidden = !approved;
-    $("#download-powerpoint").hidden = !approved;
-    $("#open-review").hidden = !approved;
+  // Reuses the file made for the current selection and makes a new one when needed.
+  async function currentPresentation() {
+    invalidatePowerPoint();
+    if (state.readyPresentation) {
+      const available = await fetch(`/api/presentations/${state.readyPresentation.id}`);
+      if (available.ok) return state.readyPresentation;
+      invalidatePowerPoint(true);
+    }
+    const ready = await startPresentation();
+    if (!ready) throw new Error(t("Could not create the presentation. Try again."));
+    return ready;
   }
-  $("#approve-review").addEventListener("click", async () => {
-    const button = $("#approve-review");
-    if (button.disabled) return;
+  $("#download-powerpoint").addEventListener("click", async () => {
+    if (state.generating) return;
+    const button = $("#download-powerpoint");
+    state.generating = true;
     button.disabled = true;
     button.textContent = t("Creating PowerPoint…");
     try {
       await flushReviewSave().catch(() => {});
-      const ready = await startPresentation();
-      if (!ready) throw new Error(t("Could not create the presentation. Try again."));
-      approvedRequest = ready.request;
-      status(t("Approved. The PowerPoint is ready."));
+      const { downloadUrl } = await currentPresentation();
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = "";
+      link.click();
+      status(t("Download started"));
     } catch (error) {
       status(error.message || t("Could not create the presentation. Try again."));
     } finally {
-      button.disabled = false;
-      button.textContent = t("Approve and create PowerPoint");
-      renderApproval();
+      state.generating = false;
+      button.textContent = t("Download PowerPoint");
+      button.disabled = !context().metrics.hasData || !state.included.length;
     }
   });
   function presentationRequest(includeAgenda = true) {
@@ -3436,7 +3081,7 @@
       : "";
     return {
       scope,
-      included: state.included,
+      included: deckInsights(),
       titleEdits: state.titleEdits,
       note: [state.note, stepsNote, agendaNote].filter(Boolean).join("\n\n"),
       cooperation: state.cooperation,
@@ -3475,17 +3120,12 @@
         request: JSON.stringify(presentationRequest()),
         expires: Date.now() + result.expiresInSeconds * 1000,
       };
-      const link = $("#download-powerpoint");
-      link.href = result.downloadUrl;
-      link.setAttribute("aria-disabled", "false");
-      link.title = t("Download PowerPoint");
       setTimeout(
         () => {
           if (state.readyPresentation?.id === result.id) invalidatePowerPoint();
         },
         result.expiresInSeconds * 1000 + 100,
       );
-      renderApproval();
       return state.readyPresentation;
     })().finally(() => {
       if (presentationJob?.promise === promise) presentationJob = null;
@@ -3500,7 +3140,6 @@
       status(t("Shorten the presentation note or exclude the KPI agenda."));
       return;
     }
-    invalidatePowerPoint();
     const viewer = window.open(`/kopperoinenp/presentation.html?lang=${language}`, "_blank");
     if (!viewer) {
       status(t("Allow the presentation to open in a new tab and try again."));
@@ -3512,21 +3151,7 @@
     button.disabled = true;
     button.textContent = t("Preparing…");
     try {
-      if (state.readyPresentation) {
-        const available = await fetch(`/api/presentations/${state.readyPresentation.id}`);
-        if (available.ok) {
-          if (!viewer.closed) viewer.location.replace(state.readyPresentation.viewUrl);
-          return;
-        }
-        invalidatePowerPoint(true);
-      }
-      const ready = await startPresentation();
-      if (!ready)
-        throw new Error(
-          t(
-            "The review changed during preparation. Open the presentation again with the current selection.",
-          ),
-        );
+      const ready = await currentPresentation();
       if (!viewer.closed) viewer.location.replace(ready.viewUrl);
     } catch (error) {
       const message = error.message || t("Could not create the presentation. Try again.");
@@ -3537,7 +3162,7 @@
         );
     } finally {
       state.generating = false;
-      button.textContent = t("Open slideshow");
+      button.textContent = t("Open presentation");
       button.disabled = !context().metrics.hasData || !state.included.length;
     }
   });
@@ -3546,9 +3171,6 @@
     if (storageMessage) storageStatus(storageMessage.fi, storageMessage.en);
     updateChatToggle();
     render();
-    $("#download-powerpoint").title = t(
-      state.readyPresentation ? "Download PowerPoint" : "Generate the presentation first",
-    );
   }
   bindLanguageControls(applyLanguage);
   applyLanguage();

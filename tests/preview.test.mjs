@@ -247,7 +247,7 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
   const presentation = await created.json();
   assert.deepEqual(
     presentation.slides.map((slide) => slide.id),
-    ["cover", "overview", "repairs", "plan", "sources"],
+    ["cover", "summary", "overview", "repairs", "plan", "sources"],
   );
   const reorderedResponse = await fetch(`${origin}/api/presentations`, {
     method: "POST",
@@ -283,11 +283,11 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
   assert.equal(finnish.status, 201);
   const localized = await finnish.json();
   assert.notEqual(localized.id, presentation.id);
-  assert.equal(localized.slides[1].title, "Palvelun käyttö ja huolto yhdellä silmäyksellä");
+  assert.equal(localized.slides[2].title, "Palvelun käyttö ja huolto yhdellä silmäyksellä");
   const fiBytes = await (await fetch(`${origin}${localized.downloadUrl}`)).arrayBuffer();
   const fiDeck = await JSZip.loadAsync(fiBytes);
   assert.match(
-    await fiDeck.file("ppt/slides/slide2.xml").async("string"),
+    await fiDeck.file("ppt/slides/slide3.xml").async("string"),
     /Palvelun käyttö ja huolto/,
   );
   const reused = await fetch(`${origin}/api/presentations`, {
@@ -310,7 +310,10 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
   const download = await fetch(`${origin}${presentation.downloadUrl}`);
   assert.equal(download.status, 200);
   assert.match(download.headers.get("content-type"), /presentationml/);
-  assert.match(download.headers.get("content-disposition"), /CUST003/);
+  assert.match(
+    download.headers.get("content-disposition"),
+    /Mediora-Health-Network-customer-review/,
+  );
   assert.ok((await download.arrayBuffer()).byteLength > 10000);
   const stream = await fetch(`${origin}/__preview_events`);
   assert.match(stream.headers.get("content-type"), /text\/event-stream/);

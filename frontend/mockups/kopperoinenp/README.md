@@ -18,8 +18,8 @@ scrolls to the changed section and briefly highlights it; chat lists the changes
 Slide commentary is mirrored in the matching dashboard card. The customer name
 stays factual even when the overview slide heading is customized. These edits
 also remain in the presentation request. The relationship rating can be set via
-chat or in Explore data. The relationship assessment is internal to Explore data
-and is never rendered on presentation slides.
+chat. The relationship assessment is internal and is never rendered on presentation
+slides.
 
 The review keeps a common evidence structure across customers. Use **Manage
 contract KPIs** to add or edit up to 12 customer-specific measures with an
@@ -48,8 +48,6 @@ The top menu switches two panels in the same page:
 - **Asiakaskatsaus:** automatically ordered visual findings, a site investigation,
   proposed next actions and the customer-review preview. Its chat input stays fixed
   to the bottom of the viewport; responses appear above it without a modal.
-- **Tutki dataa:** reporting months, continent, country, site, baseline and priority;
-  metric selection, monthly charts, country breakdown and a site comparison table.
 
 Both panels and exported reviews use the same selected scope. The summary always
 shows its geography and period. Switching views preserves the selection and notes.
