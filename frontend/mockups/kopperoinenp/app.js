@@ -28,9 +28,18 @@
     generating: false,
     readyPresentation: null,
     note: "",
+    cooperation: "unrated",
+    cooperationDescription: "",
+    cooperationReason: "",
+    cooperationSource: "unrated",
+    cooperationAssessing: false,
+    savings: null,
+    managerTexts: {},
+    dashboardLayout: globalThis.WorkspaceModel.defaultDashboardLayout(),
     chat: [],
   };
   let statusTimer;
+  let cooperationRevision = 0;
   const context = () => storyContext(data, state);
   const baselineName = () =>
     ({
@@ -102,6 +111,11 @@
         )}</select></div><div class="trend-chart" style="grid-template-columns:repeat(${points.length}, minmax(0,1fr))" role="img" aria-label="${def.label}: ${points.map((point) => `${point.month} ${f(point.value / def.divisor, 1)} ${def.unit}`).join(", ")}">${points.map((point) => `<div class="trend-column"><span>${f(point.value / def.divisor)}</span><div class="trend-track"><i style="height:${(point.value / max) * 100}%"></i></div><small>${point.month.slice(5)}</small></div>`).join("")}</div><p class="quiet">${def.label} (${def.unit}) · Synteettinen ${state.metric === "repairs" ? "tapahtumamäärä" : "allokoitu arvio"}. Kuukausien kokonaismäärät, ei tehokkuusvertailu.</p></section><section class="analysis-card"><h2>Jakauma maittain</h2>${countries.map((point) => `<div class="country-row"><div><span>${globalThis.WorkspaceModel.countryNames[point.country]}</span><strong>${f(point.value / def.divisor, 1)} ${def.unit}</strong></div><div class="bar-track"><div class="bar-fill" style="width:${(point.value / countryMax) * 100}%"></div></div></div>`).join("")}<p class="quiet">${def.label} valitulta ajalta. Maakohtainen kokonaismäärä riippuu myös palvelun laajuudesta.</p></section></div><section class="analysis-card"><h2>Toimipaikat ja tekstiilien käyttö</h2><p class="quiet">Tilanne ${snapshotName()}. Skannausosuus ei yksin osoita vajaakäyttöä. Vesi ja korjaukset ovat koko valitulta jaksolta.</p><div class="table-wrap"><table><thead><tr><th>Toimipaikka</th><th>Maa</th><th>Skannattu</th><th>Allokoitu</th><th>Vesi, m³</th><th>Korjaukset</th></tr></thead><tbody>${ctx.sites.map((site) => `<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${globalThis.WorkspaceModel.countryNames[site.country]}</td><td>${site.utilization == null ? "Ei tietoa" : f(site.utilization, 1) + " %"}</td><td>${f(site.allocated)}</td><td>${f(site.water / 1000)}</td><td>${f(site.repairs)}</td></tr>`).join("")}</tbody></table></div></section>`;
   }
   function render() {
+    const customerOverview = $("#customer-overview");
+    if (customerOverview) {
+      customerOverview.hidden = false;
+      $("#summary-panel").before(customerOverview);
+    }
     $("#customer").value = state.customer;
     invalidatePowerPoint();
     const ctx = context();
@@ -138,8 +152,57 @@
       tab.tabIndex = state.view === view ? 0 : -1;
     }
     $("#open-review").disabled = !ctx.metrics.hasData || state.generating || !state.included.length;
+    renderCustomerOverview();
     renderStory();
+    renderDashboardEdits();
+    renderDashboardLayout();
     renderAnalysis();
+  }
+  function renderCustomerOverview() {
+    const overview = globalThis.WorkspaceModel.customerOverview(data, state.customer);
+    const countryName = (country) => globalThis.WorkspaceModel.countryNames[country] || country;
+    const industry =
+      {
+        "Food & Beverage": "Elintarviketeollisuus",
+        Manufacturing: "Teollisuus",
+        Healthcare: "Terveydenhuolto",
+      }[overview.customer.industry] || overview.customer.industry;
+    $("#customer-overview").innerHTML = `
+      <div class="customer-overview-heading"><div><span class="section-kicker">ASIAKKAAN PERUSTIEDOT</span>
+      <h2>${esc(overview.customer.customer_name)}</h2>
+      <p>${esc(industry)} · Kotimaa ${esc(countryName(overview.customer.hq_country))} · ${esc(state.customer)}</p></div>
+      <span class="customer-snapshot">Viimeisin aineisto: ${esc(overview.snapshotMonth || "Ei tietoa")}</span></div>
+      <div class="customer-overview-kpis">
+      <div><strong>${overview.allocated === null ? "Ei tietoa" : f(overview.allocated)}</strong><span>asiakkaalle kohdistettua tekstiiliä${overview.complete ? "" : " (osittainen tieto)"}</span></div>
+      <div><strong>${overview.sites.length}</strong><span>toimipaikkaa</span></div>
+      <div><strong>${overview.countries.length}</strong><span>maata · ${esc(overview.countries.map(countryName).join(", "))}</span></div></div>
+      <details class="customer-locations"><summary>Kaikki sijainnit ja tekstiilimäärät (${overview.sites.length})</summary>
+      <ul>${overview.sites.map((site) => `<li><div><strong>${esc(site.site_name)}</strong><span>${esc(site.city)} · ${esc(countryName(site.country))}</span></div><span>${site.allocated === null ? "Ei tietoa" : f(site.allocated) + " kpl"}</span></li>`).join("")}</ul></details>
+      <p class="quiet">Koko asiakkuus, riippumatta katsauksen rajauksesta. Tekstiilimäärä kuvaa viimeisimmän aineistokuukauden kohdistettua kantaa, ei pesumääriä tai reaaliaikaista varastoa. Synteettinen aineisto.</p>`;
+    if (state.savings !== null)
+      $("#customer-overview").insertAdjacentHTML(
+        "beforeend",
+        `<article class="kam-savings"><span>Säästetty raha · KAM:in arvio</span><strong>${f(state.savings, 2)} €</strong><small>KAM:in antama arvio. Summaa ei ole laskettu tai todennettu tämän aineiston perusteella.</small></article>`,
+      );
+    const labels = {
+      unrated: "Ei arvioitu",
+      green: "Vihreä – yhteistyö sujuu hyvin",
+      yellow: "Keltainen – vaatii huomiota",
+      red: "Punainen – vaatii toimenpiteitä",
+    };
+    $("#customer-overview").insertAdjacentHTML(
+      "beforeend",
+      `<div class="cooperation-control"><h3>Yhteistyön tila</h3><label for="cooperation-description">Kuvaa asiakassuhteen tilanne</label><textarea id="cooperation-description" rows="4" maxlength="2000" placeholder="Mikä sujuu hyvin? Onko avoimia ongelmia, palautetta tai sovittuja jatkotoimia?">${esc(state.cooperationDescription)}</textarea><button id="assess-cooperation" type="button" class="secondary" ${state.cooperationAssessing ? "disabled" : ""}>${state.cooperationAssessing ? "Arvioidaan…" : "Pyydä apurin väriarvio"}</button><label for="cooperation">Yhteistyön väri · voit vaihtaa käsin</label><select id="cooperation">${Object.entries(
+        labels,
+      )
+        .map(
+          ([id, label]) =>
+            `<option value="${id}" ${state.cooperation === id ? "selected" : ""}>${label}</option>`,
+        )
+        .join(
+          "",
+        )}</select><p class="cooperation-indicator cooperation-${state.cooperation}"><i aria-hidden="true"></i>${labels[state.cooperation]}</p><p id="cooperation-feedback" role="status">${esc(state.cooperationReason)}</p><small>${state.cooperationSource === "assistant" ? "Apurin ehdotus kuvauksestasi. Voit korjata väriä käsin." : state.cooperationSource === "manual" ? "KAM:in käsin valitsema väri." : "Kirjoita kuvaus ja pyydä arvio, tai valitse väri itse."} Väri näkyy esikatselussa ja PowerPointin jokaisella dialla.</small></div>`,
+    );
   }
   function status(text) {
     $("#status").textContent = text;
@@ -279,15 +342,16 @@
     ];
     const cards = results();
     const visibleOrder = order.filter((id) => state.visibleInsights.includes(id));
-    const title = state.heading
-      ? esc(state.heading)
-      : `${shortName} ${periodName()}.<br />Mitä saatiin aikaan?`;
+    const title =
+      state.heading || state.titleEdits.cover
+        ? esc(state.heading || state.titleEdits.cover)
+        : `${shortName} ${periodName()}.<br />Mitä saatiin aikaan?`;
 
     $("#story").innerHTML =
       `<section class="intro"><span class="section-kicker">VUOSIPALAVERIN VALMISTELU</span><h1>${title}</h1><p>${opening()}</p><div class="scope"><strong>${esc(scopeName())}</strong> · ${m.sites} ${m.sites === 1 ? "toimipaikka" : "toimipaikkaa"} · Vertailu: ${baselineName()}</div></section><section class="story-section" aria-labelledby="results-title"${visibleOrder.length ? "" : " hidden"}><div class="section-heading"><span class="section-number">01</span><h2 id="results-title">Jakson tärkeimmät tulokset</h2></div><div class="results">${visibleOrder
         .map((key) => {
           const card = cards[key];
-          return `<article class="result"><div class="result-name">${card.name}</div><div class="result-value">${card.value}</div><span class="result-unit">${card.unit}</span>${card.visual}<h3>${card.title}</h3><p>${card.text}</p><div class="relevance"><strong>Miksi tämä nostetaan?</strong><p>${esc(globalThis.MeetingModel.relevance(key, state.priority, false))}</p></div><small>${card.boundary}</small></article>`;
+          return `<article class="result" data-insight="${key}"><div class="result-name">${card.name}</div><div class="result-value">${card.value}</div><span class="result-unit">${card.unit}</span>${card.visual}<h3>${card.title}</h3><p>${card.text}</p><div class="relevance"><strong>Miksi tämä nostetaan?</strong><p>${esc(globalThis.MeetingModel.relevance(key, state.priority, false))}</p></div><small>${card.boundary}</small></article>`;
         })
         .join(
           "",
@@ -297,6 +361,96 @@
           "",
         )}</ol></div><details class="notes-details" ${state.note ? "open" : ""}><summary>Lisää oma muistiinpano esitykseen</summary><label for="meeting-note" class="sr-only">Oma palaverimuistiinpano</label><textarea id="meeting-note" maxlength="2000" placeholder="Esimerkiksi asiakkaan tavoite tai palaverissa sovittu seuraava askel…">${esc(state.note)}</textarea><p class="quiet">Muistiinpano säilyy tässä välilehdessä. Asiakkaan, toimipaikan tai vertailun vaihtaminen tyhjentää sen.</p></details></section>`;
   }
+  function renderDashboardEdits() {
+    const targets = {
+      cover: $("#story .intro"),
+      overview: $("#customer-overview"),
+      water: $("[data-insight=water]"),
+      emissions: $("[data-insight=emissions]"),
+      repairs: $("[data-insight=repairs]"),
+      opportunity: $("#story .opportunity"),
+      plan: $("#next-title")?.closest("section"),
+    };
+    for (const [id, target] of Object.entries(targets)) {
+      if (!target) continue;
+      if (id === "overview" && state.titleEdits[id]) {
+        target
+          .querySelector(".customer-overview-heading")
+          .insertAdjacentHTML("afterend", `<h3>${esc(state.titleEdits[id])}</h3>`);
+      } else if (id !== "cover" && state.titleEdits[id]) {
+        const heading = target.querySelector("h3, h2");
+        if (heading) heading.textContent = state.titleEdits[id];
+      }
+      if (state.managerTexts[id])
+        target.insertAdjacentHTML(
+          "beforeend",
+          `<div class="kam-dashboard-note"><strong>KAM:in näkökulma</strong><p>${esc(state.managerTexts[id])}</p></div>`,
+        );
+    }
+    if (state.note)
+      $("#story .intro")?.insertAdjacentHTML(
+        "beforeend",
+        `<div class="kam-dashboard-note"><strong>Palaverin tavoite · KAM</strong><p>${esc(state.note)}</p></div>`,
+      );
+  }
+  function renderDashboardLayout() {
+    if (state.view !== "summary" || !context().metrics.hasData) return;
+    const story = $("#story"),
+      m = context().metrics;
+    const definitions = {
+      allocated: ["Tekstiilejä asiakkaalla", f(m.allocated) + " kpl", "Tilanne " + snapshotName()],
+      sites: ["Toimipaikkoja", f(m.sites), "Valittu rajaus"],
+      scanned: ["Skannattuja tekstiilejä", f(m.scanned) + " kpl", "Tilanne " + snapshotName()],
+      unscanned: [
+        "Ilman skannausta",
+        f(m.unscanned) + " kpl",
+        "Tilanne " + snapshotName() + " · ei todiste vajaakäytöstä",
+      ],
+      washed: ["Pestyjä tekstiilejä", f(m.washed) + " kpl", periodName() + " · tapahtumamäärä"],
+      water: ["Vedenkäyttö", f(m.water / 1000) + " m³", periodName() + " · laskennallinen arvio"],
+      emissions: [
+        "Pesun ja toimitusten päästöt",
+        f(m.emissions / 1000, 1) + " t CO₂e",
+        periodName() + " · laskennallinen arvio",
+      ],
+      repairs: ["Korjaukset", f(m.repairs) + " kpl", periodName() + " · tapahtumamäärä"],
+    };
+    const metrics = document.createElement("section");
+    metrics.className = "dashboard-metrics";
+    metrics.innerHTML = `<h2>Valitsemasi tiedot</h2><div class="dashboard-metric-grid">${state.dashboardLayout.metrics
+      .map((id) => {
+        const [label, value, scope] = definitions[id];
+        return `<article><span>${label}</span><strong>${value}</strong><small>${esc(scope)}</small></article>`;
+      })
+      .join("")}</div><p class="quiet">${esc(scopeName())} · Synteettinen aineisto</p>`;
+    const savings = $(".kam-savings") || document.createElement("section");
+    if (!savings.textContent)
+      savings.innerHTML =
+        "<h2>Säästöarvio</h2><p>Säästöarviota ei ole annettu. Kerro apurille summa euroina.</p>";
+    const modules = {
+      overview: $("#customer-overview"),
+      intro: $("#story .intro"),
+      savings,
+      metrics,
+      results: $("#results-title")?.closest("section"),
+      charts: $("#story .summary-graphics"),
+      opportunity: $("#opportunity-title")?.closest("section"),
+      plan: $("#next-title")?.closest("section"),
+    };
+    const selected = state.dashboardLayout.sections;
+    for (const id of [
+      ...selected,
+      ...Object.keys(modules).filter((id) => !selected.includes(id)),
+    ]) {
+      const module = modules[id];
+      if (!module) continue;
+      module.dataset.dashboardModule = id;
+      module.hidden =
+        !selected.includes(id) ||
+        (id === "savings" && state.savings === null && selected.includes("overview"));
+      story.append(module);
+    }
+  }
   function evidenceHtml() {
     if (!context().metrics.hasData)
       return "<p>Nykyisellä rajauksella ei ole dataa. Korjaa rajaus ennen laskennan tarkastelua.</p>";
@@ -305,6 +459,8 @@
   }
   function clearScope() {
     state.note = "";
+    state.savings = null;
+    state.managerTexts = {};
     state.titleEdits = {};
     state.slideOrder = [];
     state.chat = [];
@@ -319,6 +475,7 @@
       summaryMetric: state.summaryMetric,
       visibleInsights: state.visibleInsights,
       heading: state.heading,
+      dashboardLayout: state.dashboardLayout,
     };
   }
   function renderChat() {
@@ -359,6 +516,11 @@
       }
       const next = result.workspace;
       const customerChanged = state.customer !== next.scope.customer;
+      if (!customerChanged && result.changed.includes("cooperation")) {
+        cooperationRevision += 1;
+        state.cooperationSource = "manual";
+        state.cooperationReason = "Väri päivitetty KAM:in keskusteluohjeen perusteella.";
+      }
       for (const key of [
         "customer",
         "from",
@@ -380,15 +542,57 @@
         "heading",
         "titleEdits",
         "slideOrder",
+        "cooperation",
+        "savings",
+        "managerTexts",
+        "dashboardLayout",
       ])
         state[key] = next[key];
       if (customerChanged) {
+        state.cooperationDescription = "";
+        state.cooperationReason = "";
+        state.cooperationSource = "unrated";
+        cooperationRevision += 1;
         state.chat = [{ user: true, text: question }];
         state.chatRevision += 1;
       }
       render();
-      state.chat.push({ user: false, text: result.changed.length ? "Valmis" : "Ei muutoksia." });
-      if (result.changed.length) status("Valmis");
+      const labels = {
+        savings: "säästöarvio",
+        cooperation: "yhteistyön tila",
+        heading: "otsikot",
+        titleEdits: "otsikot",
+        managerTexts: "KAM:in tekstit",
+        dashboardLayout: "dashboardin rakenne",
+        note: "palaverin tavoite",
+        visibleInsights: "näkyvät nostot",
+        included: "esityksen nostot",
+        summaryMetric: "kaavio",
+        slideOrder: "diojen järjestys",
+      };
+      const changes = [
+        ...new Set(
+          result.changed.map(
+            (key) => labels[key] || (key.startsWith("scope.") ? "katsauksen rajaus" : "näkymä"),
+          ),
+        ),
+      ];
+      const acknowledgement = changes.length
+        ? "Päivitetty: " + changes.join(", ") + "."
+        : "Ei muutoksia.";
+      state.chat.push({ user: false, text: acknowledgement });
+      if (changes.length) {
+        status(acknowledgement);
+        const target = $(
+          !$("#customer-overview").hidden &&
+            result.changed.some((key) => ["savings", "cooperation"].includes(key))
+            ? "#customer-overview"
+            : "#story",
+        );
+        target.classList.remove("dashboard-updated");
+        requestAnimationFrame(() => target.classList.add("dashboard-updated"));
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     } catch (error) {
       if (revision !== state.chatRevision || snapshot !== JSON.stringify(chatWorkspace())) {
         status("Katsaus vaihtui. Voit lähettää uuden viestin nykyisestä rajauksesta.");
@@ -450,6 +654,13 @@
     .join("");
   $("#customer").addEventListener("change", (event) => {
     state.customer = event.target.value;
+    state.cooperation = "unrated";
+    state.cooperationDescription = "";
+    state.cooperationReason = "";
+    state.cooperationSource = "unrated";
+    cooperationRevision += 1;
+    state.savings = null;
+    state.managerTexts = {};
     state.included = [...globalThis.MeetingModel.insightIds];
     state.site = "all";
     state.country = "all";
@@ -478,14 +689,33 @@
       field.value = "";
     });
   document.addEventListener("input", (event) => {
+    if (event.target.id === "cooperation-description") {
+      state.cooperationDescription = event.target.value;
+      cooperationRevision += 1;
+      if (state.cooperationSource === "assistant")
+        $("#cooperation-feedback").textContent =
+          "Kuvaus muuttui. Pyydä uusi arvio päivittääksesi värin.";
+    }
     if (event.target.id === "meeting-note") {
       state.note = event.target.value;
       invalidatePowerPoint();
     }
   });
+  document.addEventListener("change", (event) => {
+    if (event.target.id === "cooperation") {
+      state.cooperation = event.target.value;
+      state.cooperationSource = "manual";
+      state.cooperationReason = "KAM vahvisti värin manuaalisesti.";
+      cooperationRevision += 1;
+      render();
+      invalidatePowerPoint();
+      status("Yhteistyön tila päivitetty. Avaa esitys uudelleen päivittääksesi diat.");
+    }
+  });
   document.addEventListener("click", (event) => {
     const button = event.target.closest("button");
     if (!button) return;
+    if (button.id === "assess-cooperation") assessRelationship();
     if (button.dataset.view) {
       state.view = button.dataset.view;
       render();
@@ -503,6 +733,50 @@
     $("#evidence-content").innerHTML = evidenceHtml();
     $("#evidence").showModal();
   });
+  $("#reset-dashboard").addEventListener("click", () => {
+    state.dashboardLayout = globalThis.WorkspaceModel.defaultDashboardLayout();
+    state.chatRevision += 1;
+    render();
+    status("Dashboardin oletusrakenne palautettu.");
+  });
+  async function assessRelationship() {
+    if (state.cooperationAssessing) return;
+    if (!state.cooperationDescription.trim()) {
+      $("#cooperation-feedback").textContent = "Kirjoita ensin kuvaus asiakassuhteesta.";
+      return;
+    }
+    const revision = cooperationRevision,
+      customer = state.customer;
+    state.cooperationAssessing = true;
+    const button = $("#assess-cooperation");
+    button.disabled = true;
+    button.textContent = "Arvioidaan…";
+    try {
+      const response = await fetch("/api/cooperation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: state.cooperationDescription }),
+        signal: AbortSignal.timeout(95000),
+      });
+      const result = await response.json();
+      if (revision !== cooperationRevision || customer !== state.customer) return;
+      if (!response.ok) throw new Error(result.error || "Arviointi epäonnistui.");
+      state.cooperation = result.status;
+      state.cooperationReason = result.reason;
+      state.cooperationSource = "assistant";
+      invalidatePowerPoint();
+      status("Apurin väriarvio päivitetty. Voit muuttaa sitä käsin.");
+    } catch (error) {
+      if (revision === cooperationRevision && customer === state.customer)
+        state.cooperationReason =
+          error.name === "TimeoutError"
+            ? "Arviointi aikakatkaistiin. Nykyinen väri säilytettiin."
+            : "Arviointi epäonnistui. Nykyinen väri säilytettiin. " + (error.message || "");
+    } finally {
+      state.cooperationAssessing = false;
+      render();
+    }
+  }
   function invalidatePowerPoint(force = false) {
     const ready = state.readyPresentation;
     if (
@@ -529,6 +803,9 @@
       included: state.included,
       titleEdits: state.titleEdits,
       note: state.note,
+      cooperation: state.cooperation,
+      savings: state.savings,
+      managerTexts: state.managerTexts,
       slideOrder: state.slideOrder,
     };
   }

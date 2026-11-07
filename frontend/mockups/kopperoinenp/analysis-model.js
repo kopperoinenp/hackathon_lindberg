@@ -104,7 +104,57 @@
       };
     });
   }
+  function customerOverview(data, customerId) {
+    const customer = data.customers.find((row) => row.customer_id === customerId);
+    const rows = data.records.filter((row) => row.customer === customerId);
+    const snapshotMonth =
+      rows
+        .map((row) => row.month)
+        .sort()
+        .at(-1) || null;
+    const snapshot = rows.filter((row) => row.month === snapshotMonth);
+    const sites = data.sites
+      .filter((site) => site.customer_id === customerId)
+      .map((site) => {
+        const records = snapshot.filter((row) => row.site === site.site_id);
+        return { ...site, allocated: records.length ? sum(records, "allocated_pieces") : null };
+      })
+      .sort((a, b) => a.country.localeCompare(b.country) || a.city.localeCompare(b.city, "fi"));
+    return {
+      customer,
+      snapshotMonth,
+      allocated: snapshot.length ? sum(snapshot, "allocated_pieces") : null,
+      complete: sites.every((site) => site.allocated !== null),
+      sites,
+      countries: [...new Set(sites.map((site) => site.country))],
+    };
+  }
   root.WorkspaceModel = {
+    dashboardSections: [
+      "overview",
+      "intro",
+      "savings",
+      "metrics",
+      "results",
+      "charts",
+      "opportunity",
+      "plan",
+    ],
+    dashboardMetrics: [
+      "allocated",
+      "sites",
+      "scanned",
+      "unscanned",
+      "washed",
+      "water",
+      "emissions",
+      "repairs",
+    ],
+    defaultDashboardLayout: () => ({
+      sections: ["overview", "intro", "savings", "results", "charts", "opportunity", "plan"],
+      metrics: ["allocated", "sites", "water", "emissions"],
+    }),
+    customerOverview,
     select,
     summarize,
     buildContext,

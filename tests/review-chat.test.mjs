@@ -7,7 +7,7 @@ import {
   validateChatInput,
   chatSchema,
 } from "../backend/review-chat.mjs";
-import { buildPresentation } from "../backend/presentation-model.mjs";
+import { buildPresentation, applyPlan, defaultPlan } from "../backend/presentation-model.mjs";
 const workspace = () => normalizeWorkspace({ scope: {} });
 const patch = (changes = {}) => ({
   ...Object.fromEntries(chatSchema.required.map((k) => [k, null])),
@@ -194,5 +194,90 @@ test("explicit slide swap survives AI planning, repeated swaps and unsupported r
   assert.throws(
     () => applyChatPatch(current, patch({ supported: false, heading: "English" }), "English"),
     (e) => e.status === 422,
+  );
+});
+
+test("KAM tools set monetary estimates, slide commentary and traffic lights without changing evidence", () => {
+  const current = workspace();
+  const evidence = buildPresentation(current).slides.find((s) => s.id === "water").chart.values;
+  const result = applyChatPatch(
+    current,
+    patch({
+      savingsText: "40000EUroa",
+      cooperation: "green",
+      slideEdit: { id: "plan", title: "Sovitaan seuranta", text: "Tarkistetaan sopimus" },
+    }),
+    "Haluan, että säästetty raha on 40000EUroa. Yhteistyö sujuu hyvin. Otsikko: Sovitaan seuranta. Teksti: Tarkistetaan sopimus",
+  );
+  assert.equal(result.workspace.savings, 40000);
+  assert.equal(result.workspace.cooperation, "green");
+  const draft = buildPresentation(result.workspace);
+  const deck = applyPlan(draft, defaultPlan(draft));
+  assert.match(deck.slides[0].paragraphs[0], /40\s*000/);
+  assert.match(deck.slides[0].paragraphs[0], /KAM:in antama arvio/);
+  assert.equal(deck.slides.find((s) => s.id === "plan").title, "Sovitaan seuranta");
+  assert.ok(
+    deck.slides
+      .find((s) => s.id === "plan")
+      .paragraphs.includes("KAM:in lisäys: Tarkistetaan sopimus"),
+  );
+  assert.deepEqual(deck.slides.find((s) => s.id === "water").chart.values, evidence);
+  assert.equal(
+    applyChatPatch(result.workspace, patch({ savingsText: "" }), "Poista säästöarvio").workspace
+      .savings,
+    null,
+  );
+  for (const text of ["90000 euroa", "-400 euroa", "Infinity"])
+    assert.throws(() =>
+      applyChatPatch(current, patch({ savingsText: text }), "Säästetty raha on 40000EUroa"),
+    );
+  assert.throws(() =>
+    applyChatPatch(
+      current,
+      patch({ slideEdit: { id: "water", title: "Keksitty väite", text: null } }),
+      "Vaihda vesidian otsikko",
+    ),
+  );
+  const switched = applyChatPatch(
+    result.workspace,
+    scoped({ customer: "CUST002" }),
+    "Vaihda asiakkaaksi CUST002",
+  );
+  assert.equal(switched.workspace.savings, null);
+  assert.deepEqual(switched.workspace.managerTexts, {});
+});
+
+test("dashboard layout changes structure and selected KPIs rather than creating a goal note", () => {
+  const current = workspace();
+  const structure = { sections: ["savings", "metrics", "charts"], metrics: ["allocated"] };
+  const changed = applyChatPatch(
+    current,
+    patch({ dashboardLayout: structure, summaryMetric: "emissions", savingsText: "40000 euroa" }),
+    "Näytä vain säästetty raha 40000 euroa, vaatemäärä ja päästökaavio",
+  );
+  assert.deepEqual(changed.workspace.dashboardLayout, structure);
+  assert.equal(changed.workspace.summaryMetric, "emissions");
+  assert.equal(changed.workspace.note, "");
+  assert.ok(changed.changed.includes("dashboardLayout"));
+  const followup = applyChatPatch(
+    changed.workspace,
+    patch({ dashboardLayout: { sections: ["metrics", "charts"], metrics: ["sites", "scanned"] } }),
+    "Poista säästöt ja näytä ensin toimipaikat ja skannatut tekstiilit",
+  );
+  assert.deepEqual(followup.workspace.dashboardLayout.sections, ["metrics", "charts"]);
+  for (const bad of [
+    { sections: [], metrics: ["sites"] },
+    { sections: ["code"], metrics: ["sites"] },
+    { sections: ["metrics"], metrics: ["invented"] },
+    { sections: ["metrics", "metrics"], metrics: ["sites"] },
+  ])
+    assert.throws(() =>
+      applyChatPatch(current, patch({ dashboardLayout: bad }), "Muuta rakennetta"),
+    );
+  const before = buildPresentation(current);
+  const after = buildPresentation({ ...changed.workspace, savings: null });
+  assert.deepEqual(
+    after.slides.map((s) => s.id),
+    before.slides.map((s) => s.id),
   );
 });

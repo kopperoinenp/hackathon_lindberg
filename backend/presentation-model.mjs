@@ -17,6 +17,12 @@ export const evidenceIds = ["water", "emissions", "repairs"];
 export const insightIds = [...evidenceIds, "opportunity"];
 export const slideIds = ["cover", "overview", ...insightIds, "plan", "sources", "limits"];
 export const storyVersion = "customer-value-story-v2";
+export const cooperationStates = {
+  unrated: { label: "Ei arvioitu", color: "667580" },
+  green: { label: "Vihreä – yhteistyö sujuu hyvin", color: "578200" },
+  yellow: { label: "Keltainen – vaatii huomiota", color: "F4C542" },
+  red: { label: "Punainen – vaatii toimenpiteitä", color: "E52330" },
+};
 const defaults = {
   customer: "CUST001",
   from: "2025-01",
@@ -92,7 +98,35 @@ export function validateRequest(input) {
     slideOrder.some((id) => !slideIds.includes(id))
   )
     throw new PresentationError("Virheellinen managerin diajärjestys.");
-  return { scope, included, note, titleEdits, slideOrder: [...slideOrder] };
+  const cooperation = input.cooperation ?? "unrated";
+  if (typeof cooperation !== "string" || !Object.hasOwn(cooperationStates, cooperation))
+    throw new PresentationError("Tuntematon yhteistyön tila.");
+  const savings = input.savings ?? null;
+  if (
+    savings !== null &&
+    (typeof savings !== "number" || !Number.isFinite(savings) || savings < 0 || savings > 1e12)
+  )
+    throw new PresentationError("Virheellinen KAM:in säästöarvio.");
+  const managerTexts = input.managerTexts ?? {};
+  if (
+    !managerTexts ||
+    typeof managerTexts !== "object" ||
+    Array.isArray(managerTexts) ||
+    Object.entries(managerTexts).some(
+      ([id, text]) => !slideIds.includes(id) || typeof text !== "string" || text.length > 2000,
+    )
+  )
+    throw new PresentationError("Virheellinen KAM:in diateksti.");
+  return {
+    scope,
+    included,
+    note,
+    titleEdits,
+    slideOrder: [...slideOrder],
+    cooperation,
+    savings,
+    managerTexts: { ...managerTexts },
+  };
 }
 export function buildPresentation(input) {
   const request = validateRequest(input);
@@ -269,6 +303,13 @@ export function buildPresentation(input) {
     },
   };
   if (request.note) slides.plan.paragraphs.push(`Account managerin muistiinpano: ${request.note}`);
+  if (request.savings !== null) {
+    const estimate = `Säästetty raha: ${f(request.savings)} € · KAM:in antama arvio, ei aineistosta laskettu tai todennettu säästö.`;
+    slides.cover.paragraphs.unshift(estimate);
+    slides.plan.paragraphs.push(estimate);
+  }
+  for (const [id, text] of Object.entries(request.managerTexts))
+    if (text.trim()) slides[id].paragraphs.push(`KAM:in lisäys: ${text}`);
   for (const id of insightIds)
     slides[id].relevance = globalThis.MeetingModel.relevance(id, request.scope.priority, false);
   const order = orderedSlides(
@@ -280,7 +321,10 @@ export function buildPresentation(input) {
     customer: { name: customer.customer_name, industry: customer.industry },
     period,
     footer,
-    slides: order.map((id) => slides[id]),
+    slides: order.map((id) => ({
+      ...slides[id],
+      cooperation: { status: request.cooperation, ...cooperationStates[request.cooperation] },
+    })),
   };
 }
 function orderedSlides(defaultIds, override = []) {

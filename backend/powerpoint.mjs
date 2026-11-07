@@ -54,6 +54,26 @@ export async function renderPowerPoint(deck, provenance) {
     const cover = item.kind === "cover";
     slide.background = { color: cover ? "003F72" : "FFFFFF" };
     const ink = cover ? "FFFFFF" : "003F72";
+    if (item.cooperation) {
+      slide.addShape(pptx.ShapeType.ellipse, {
+        x: 8.6,
+        y: 0.3,
+        w: 0.2,
+        h: 0.2,
+        fill: { color: item.cooperation.color },
+        line: { color: item.cooperation.color },
+      });
+      slide.addText(`Yhteistyö: ${item.cooperation.label}`, {
+        x: 8.9,
+        y: 0.28,
+        w: 3.8,
+        h: 0.3,
+        fontSize: 10,
+        color: ink,
+        margin: 0,
+        fit: "shrink",
+      });
+    }
     slide.addShape(pptx.ShapeType.rect, {
       x: 0,
       y: 0,
