@@ -400,6 +400,15 @@ export function applyChatPatch(current, patch, message) {
   if (typeof patch.supported !== "boolean")
     throw new PresentationError("The assistant returned an invalid change.", 502);
   if (!patch.supported) throw new PresentationError("This change is not supported.", 422);
+  if (
+    /(?:muuta|korvaa|aseta|change|replace|set)\b.*(?:lähdeaineisto|lähdedata|source data|dataset)/iu.test(
+      message,
+    )
+  )
+    throw new PresentationError(
+      "Source data cannot be edited through the assistant. Use a KAM note or estimate instead.",
+      422,
+    );
   requireNoBoasting([
     patch.heading,
     patch.presentationTitle,
@@ -414,7 +423,10 @@ export function applyChatPatch(current, patch, message) {
     patch.slideEdit?.text,
   ]);
   const wantsSlideSwap =
-    /(?:vaih|siirr|swap|switch)/iu.test(message) && /(?:dia|slide)/iu.test(message);
+    /(?:paikk|järjest|siirr|swap|switch|move)/iu.test(message) &&
+    /(?:dia|slide)/iu.test(message) &&
+    patch.slideEdit === null &&
+    patch.presentationTitle === null;
   if (wantsSlideSwap && patch.slideSwap === null)
     throw new PresentationError("The slide order could not be changed. Try again.", 502);
   let next = { ...current, scope: { ...current.scope }, titleEdits: { ...current.titleEdits } };
@@ -428,6 +440,8 @@ export function applyChatPatch(current, patch, message) {
       cooperation: "unrated",
       cooperationDescription: "",
       cooperationReason: "",
+      audience: "",
+      meetingNotes: "",
       savings: null,
       managerTexts: {},
       slideOrder: [],
@@ -553,11 +567,16 @@ export function applyChatPatch(current, patch, message) {
       swap.second > order.length
     )
       throw new PresentationError("The requested slide is not in this presentation.", 502);
+    if ([order[swap.first - 1], order[swap.second - 1]].some((id) => !slideIds.includes(id)))
+      throw new PresentationError(
+        "Approved service proposals stay at the end of the presentation.",
+        422,
+      );
     [order[swap.first - 1], order[swap.second - 1]] = [
       order[swap.second - 1],
       order[swap.first - 1],
     ];
-    next.slideOrder = order;
+    next.slideOrder = order.filter((id) => slideIds.includes(id));
   }
   for (const [key, maximum] of [
     ["note", 2000],
@@ -659,6 +678,28 @@ function describeChange(before, { workspace: after, changed }) {
   if (changed.includes("note")) parts.push(say("Lisäsin muistiinpanon.", "Added the note."));
   if (changed.includes("heading") || changed.includes("titleEdits"))
     parts.push(say("Vaihdoin otsikon.", "Changed the title."));
+  if (changed.includes("slideOrder"))
+    parts.push(say("Vaihdoin diojen järjestyksen.", "Changed the slide order."));
+  if (changed.includes("summaryMetric"))
+    parts.push(say("Vaihdoin dashboardin päägraafin.", "Changed the dashboard's main graph."));
+  if (changed.includes("savings"))
+    parts.push(
+      after.savings === null
+        ? say("Poistin KAM:in säästöarvion.", "Cleared the KAM savings estimate.")
+        : say(
+            `KAM:in säästöarvio on nyt ${new Intl.NumberFormat("fi-FI").format(after.savings)} €.`,
+            `The KAM savings estimate is now EUR ${new Intl.NumberFormat("en-GB").format(after.savings)}.`,
+          ),
+    );
+  if (changed.includes("nextSteps"))
+    parts.push(say("Päivitin sovittavat jatkotoimet.", "Updated the next steps."));
+  if (changed.includes("cooperation"))
+    parts.push(
+      say(
+        "Päivitin sisäisen asiakassuhdearvion Tutki dataa -sivulle.",
+        "Updated the internal relationship assessment in Explore data.",
+      ),
+    );
   return parts.join(" ") || null;
 }
 const quickQueries = new Map([
@@ -805,7 +846,7 @@ export async function runReviewChat(
     {
       instructions:
         instructions +
-        " When the manager explicitly asks to open or filter the detailed analysis view with evidence, choose one to three analysisTools from the supplied catalog, set supported=true and view=analysis, and set dataQuery=null. Use the scope fields to specify the requested scope. For direct data questions and ordinary workspace edits, set analysisTools=null. A comparison with the same months last year overrides the direct-question route: select only yoy in analysisTools, set view=analysis and dataQuery=null. Keep the current selection unless the user requests a different 2025 period. Use only one route per request. For customer review customization, evidenceAreas selects visible blocks in the results module using the schema IDs, customerBasics selects the detail shown above the blocks (Brief: empty list; Standard: scope and year; Full: all IDs), areaEdit changes the title or commentary of one block, and nextSteps replaces the list of up to five customer-facing steps. Keep existing steps and fields unless asked to change them. New titles, notes, step text, owners and timelines must come verbatim from the current instruction. Use empty strings for omitted owners and timelines. Keep these fields null for data queries and internal analysis.",
+        " Routing clarifications: a short country follow-up such as Entä Suomessa? after a workspace filtering command continues that command: set scope.country and dataQuery=null, preserving the period and KAM edits. If lastQuery is present, continue the read-only query instead. Explicit muistiinpano/muistiinpanoksi/note commands set note using the exact supplied text; do not turn these into nextSteps. When the manager explicitly asks to open or filter the detailed analysis view with evidence, choose one to three analysisTools from the supplied catalog, set supported=true and view=analysis, and set dataQuery=null. Use the scope fields to specify the requested scope. For direct data questions and ordinary workspace edits, set analysisTools=null. A comparison with the same months last year overrides the direct-question route: select only yoy in analysisTools, set view=analysis and dataQuery=null. Keep the current selection unless the user requests a different 2025 period. Use only one route per request. For customer review customization, evidenceAreas selects visible blocks in the results module using the schema IDs, customerBasics selects the detail shown above the blocks (Brief: empty list; Standard: scope and year; Full: all IDs), areaEdit changes the title or commentary of one block, and nextSteps replaces the list of up to five customer-facing steps. Keep existing steps and fields unless asked to change them. New titles, notes, step text, owners and timelines must come verbatim from the current instruction. Use empty strings for omitted owners and timelines. Keep these fields null for data queries and internal analysis.",
       input: JSON.stringify({ ...inputContext, analysisCatalog: analysis.catalog }),
       schema: analysisChatSchema,
       name: "review_workspace_analysis_request",
@@ -814,7 +855,16 @@ export async function runReviewChat(
   );
   if (!object(proposal))
     throw new PresentationError("The assistant returned an invalid proposal.", 502);
-  const { analysisTools = null, ...patch } = proposal;
+  let { analysisTools = null, ...patch } = proposal;
+  // Explicit year-on-year requests must use the available prior-year evidence,
+  // rather than silently falling back to a single-year monthly chart.
+  if (
+    /(?:vertaa|vertail|compare|comparison)/iu.test(request.message) &&
+    /(?:viime vuo|last year|year.over.year|\byoy\b)/iu.test(request.message)
+  ) {
+    analysisTools = ["yoy"];
+    patch = { ...patch, dataQuery: null, view: "analysis", supported: true };
+  }
   if (
     analysisTools !== null &&
     (!Array.isArray(analysisTools) ||
@@ -853,10 +903,24 @@ export async function runReviewChat(
     },
     options,
   );
-  // The comparison is already calculated, so a read-only search suggested here is not needed.
+  if (
+    !object(finalPatch) ||
+    !object(finalPatch.scope) ||
+    scopeKeys.some(
+      (key) => finalPatch.scope[key] !== null && finalPatch.scope[key] !== analyzedScope[key],
+    ) ||
+    (finalPatch.view !== null && finalPatch.view !== "analysis")
+  )
+    throw new PresentationError("The assistant changed the analyzed scope. Try again.", 502);
+  // Retain the new analysis reply flow while keeping validated scope and view authoritative.
   const applied = applyChatPatch(
     proposed.workspace,
-    { ...finalPatch, dataQuery: null },
+    {
+      ...finalPatch,
+      dataQuery: null,
+      scope: { ...analyzedScope },
+      view: "analysis",
+    },
     request.message,
   );
   if (scopeKeys.some((key) => applied.workspace.scope[key] !== analyzedScope[key]))

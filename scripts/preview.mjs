@@ -48,7 +48,7 @@ const server = createServer(async (request, response) => {
       request.on("close", () => clients.delete(response));
       return;
     }
-    if (url.pathname === "/") {
+    if (["/", "/kopperoinenp-v2/", "/kopperoinenp-v2/index.html"].includes(url.pathname)) {
       response.writeHead(302, { Location: "/kopperoinenp/index.html" });
       response.end();
       return;
