@@ -12,6 +12,23 @@ assessment controls. The relationship rating can be set through review chat and
 is passed to the presentation request.
 Same-origin checks, request limits and the shared chat concurrency lock apply.
 
+## Assistant tools
+
+The assistant has exactly two tools. The workspace patch changes the dashboard.
+`dataQuery` is read-only: the model returns only `{topic, compareBy}`, and
+`backend/data-query.mjs` calculates and writes the answer with the same dashboard
+functions. The model never writes figures. A successful question adds `answer` and
+`source` and a chart-ready `view` to the response and leaves the workspace unchanged.
+The search tool shows `view` as a chart in the chat, and the dashboard tool shows it as a
+result card above the dashboard. Topics: water, emissions,
+repairs, washed, scan, late, requests, energy, waste, overview, meeting, explain.
+Comparisons: none, month, quarter, country, site, product, baseline. A query can also
+choose totals or rates, a period, a rank and a row limit. The browser returns the last
+query as `lastQuery`, so follow-up questions keep their context; the server validates it.
+
+Free text from the user is still applied only verbatim, and a percentage in a note,
+heading, title or slide text must already exist in the current evidence.
+
 ## KAM editing tools
 
 `dashboardLayout` changes actual dashboard structure, not meeting notes. Null
