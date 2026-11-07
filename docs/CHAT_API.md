@@ -67,6 +67,10 @@ This adds one local interface; existing presentation requests remain compatible.
 
 ## POST /api/chat
 
+The Find and compare data tool displays results and follow-ups in the conversation
+and never applies a workspace edit. Its five preset questions use the local
+data-query calculations directly. Free-form questions use the configured assistant.
+
 JSON input: `{message, history, workspace, lastQuery?}`.
 
 - `message`: nonempty instruction, at most 1,000 characters.

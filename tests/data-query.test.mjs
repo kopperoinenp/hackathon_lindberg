@@ -45,10 +45,24 @@ test("unsupported comparisons and unknown topics are refused", () => {
   assert.equal(runDataQuery({ topic: "secrets", compareBy: "none" }, workspace()).source, null);
 });
 
+test("preset analysis questions return scoped results without calling a provider", async () => {
+  const current = workspace({ country: "Finland" });
+  for (const message of ["Compare water by quarter", "Vertaa vettä kvartaaleittain"]) {
+    const result = await runReviewChat(
+      { message, workspace: current },
+      { generate: async () => assert.fail("A preset question should use local analysis") },
+    );
+    assert.deepEqual(result.changed, []);
+    assert.deepEqual(result.workspace.scope, current.scope);
+    assert.equal(result.view.rows.length, 4);
+    assert.equal(result.query.topic, "water");
+  }
+});
+
 test("a question leaves the workspace untouched and the model writes no figures", async () => {
   const current = workspace();
   const result = await runReviewChat(
-    { message: "Vertaa vettä kvartaaleittain", workspace: current },
+    { message: "Voitko vertailla vettä kvartaaleittain?", workspace: current },
     {
       generate: async () => emptyPatch({ dataQuery: { topic: "water", compareBy: "quarter" } }),
     },
