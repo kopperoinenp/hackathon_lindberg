@@ -1686,3 +1686,8 @@ main {
   flex: 0 0 100%;
   font-size: 12px;
 }
+#create-customer-review {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+}

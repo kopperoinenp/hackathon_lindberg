@@ -5,6 +5,10 @@
     "Dashboard view": "Dashboard-näkymä",
     "Saved customer review": "Asiakkaan tallennettu katsaus",
     "Original template": "Alkuperäinen pohja",
+    "No saved review": "Ei tallennettua katsausta",
+    "Create customer review": "Luo asiakkaalle oma katsaus",
+    "No review has been created for this customer. Create a customer review to edit and save it.":
+      "Tälle asiakkaalle ei ole vielä luotu katsausta. Luo asiakkaalle oma katsaus, jotta voit muokata ja tallentaa sen.",
     "Edits are saved to this customer’s review.":
       "Muutokset tallentuvat tämän asiakkaan katsaukseen.",
     "Original template preview. Your saved review is unchanged. Select Saved customer review to edit.":

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, writeFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createReviewStore } from "../backend/review-store.mjs";
@@ -22,7 +22,10 @@ test("customer reviews persist across store restart, retain dashboard edits, and
   });
   const store = createReviewStore(dir);
   assert.equal((await store.read("CUST001")).revision, 0);
+  assert.equal((await store.read("CUST002")).workspace, null);
+  assert.deepEqual(await readdir(dir), [], "Browsing customers must not create saved reviews");
   const saved = await store.save("CUST001", { revision: 0, workspace: workspace() });
+  assert.deepEqual(await readdir(dir), ["CUST001.json"], "Only the created customer review exists");
   assert.equal(saved.revision, 1);
   const restarted = createReviewStore(dir);
   const loaded = await restarted.read("CUST001");

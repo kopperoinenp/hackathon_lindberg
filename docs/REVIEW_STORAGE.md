@@ -27,14 +27,25 @@ window. Switching customers flushes pending changes and loads that customer's
 saved review (or defaults when none exists); assistant customer switches also load
 the saved target review before accepting further edits. Chat transcript is intentionally session-only.
 
-The dashboard selector defaults to **Saved customer review**. Switching to
+The dashboard selector opens **Saved customer review** only when that customer's
+backend record exists. An uncreated customer opens **Original template**, with the
+saved-review option disabled and an explicit **Create customer review** button.
+Browsing, filtering, switching customers and reloading do not create a record.
+Creation saves the current template settings for the selected customer and opens
+its editable review only after a successful save. Failed creation keeps the
+template visible and does not present an unsaved view as an existing profile.
+The selector and helper text identify the customer by name. There is no global
+saved review shared across customer IDs; existing customer records are retained.
+
+Switching to
 **Original template** first flushes pending saves, keeps the full current review
 in memory, and displays the original defaults for the same customer. Template
 filtering is temporary and never written to the customer profile. Assistant edits,
 contract KPI editing and presentation generation are unavailable in the template
 preview; select the saved review to edit or export. Returning restores the saved
 review's filters, layout, commentary and session conversation. Switching customers
-or reloading always opens the selected customer's saved review. Switching is
+or reloading opens the selected customer's saved review when one exists, otherwise
+the original template. Switching is
 blocked while assistant edits or presentation generation are running; failed saves
 keep the current review visible. Reset dashboard is separate and asks for
 confirmation before saving the default layout as the new preference.

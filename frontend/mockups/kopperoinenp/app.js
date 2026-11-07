@@ -84,7 +84,7 @@
     saveTimer;
   let saveQueue = Promise.resolve();
   let switchingReview = false;
-  let profileMode = "saved";
+  let profileMode = "original";
   let customerDraft = null;
   function storageStatus(fi, en) {
     $("#review-storage-status").textContent = language === "fi" ? fi : en;
@@ -98,7 +98,7 @@
       flushReviewSave().catch(() => {});
     }, 250);
   }
-  function flushReviewSave() {
+  function flushReviewSave(force = false) {
     clearTimeout(saveTimer);
     if (profileMode !== "saved") return saveQueue;
     if (storageBlocked) return Promise.reject(new Error("Reload the page before saving."));
@@ -106,7 +106,7 @@
     const workspace = structuredClone(chatWorkspace());
     const operation = saveQueue.then(async () => {
       const signature = JSON.stringify(workspace);
-      if (signature === savedSignature) return;
+      if (!force && signature === savedSignature) return;
       if (storageBlocked) throw new Error("Reload the page before saving.");
       try {
         const response = await fetch(
@@ -180,7 +180,7 @@
         ])
           state[key] = record.workspace[key];
       }
-      profileMode = "saved";
+      profileMode = record.workspace ? "saved" : "original";
       customerDraft = null;
       savedRevision = record.revision;
       savedSignature = JSON.stringify(chatWorkspace());
@@ -188,8 +188,10 @@
       storageBlocked = false;
       localStorage.setItem("lindstrom-review-customer", customer);
       storageStatus(
-        record.workspace ? "Tallennettu katsaus ladattu" : "Uusi asiakaskohtainen katsaus",
-        record.workspace ? "Saved review loaded" : "New customer review",
+        record.workspace
+          ? "Tallennettu katsaus ladattu"
+          : "Tälle asiakkaalle ei ole vielä tallennettua katsausta.",
+        record.workspace ? "Saved review loaded" : "This customer has no saved review yet.",
       );
       return true;
     } catch {
@@ -209,6 +211,7 @@
   async function switchProfileMode(nextMode) {
     $("#review-profile-mode").value = profileMode;
     if (nextMode === profileMode || switchingReview || storageLoading) return;
+    if (nextMode === "saved" && savedRevision === 0) return;
     if (!storageReady || state.asking || state.generating) {
       status(t("Wait until loading or editing has finished before switching views."));
       return;
@@ -244,6 +247,26 @@
   }
   $("#review-profile-mode").addEventListener("change", (event) => {
     switchProfileMode(event.target.value);
+  });
+  $("#create-customer-review").addEventListener("click", async () => {
+    if (savedRevision > 0 || !storageReady || storageBlocked || switchingReview || storageLoading)
+      return;
+    switchingReview = true;
+    $("#workspace").inert = true;
+    const original = structuredClone(state);
+    try {
+      profileMode = "saved";
+      state.chatRevision += 1;
+      await flushReviewSave(true);
+    } catch {
+      profileMode = "original";
+      Object.assign(state, original);
+    } finally {
+      switchingReview = false;
+      $("#workspace").inert = false;
+      render();
+      renderChat();
+    }
   });
   window.addEventListener("pagehide", () => {
     flushReviewSave().catch(() => {});
@@ -594,12 +617,24 @@
     renderDashboardLayout();
     if (state.view === "analysis") renderAnalysis();
     const original = profileMode === "original";
+    const hasSavedReview = savedRevision > 0;
+    const customerName = data.customers.find(
+      (row) => row.customer_id === state.customer,
+    ).customer_name;
+    const savedOption = $("#review-profile-mode option[value=saved]");
+    savedOption.disabled = !hasSavedReview;
+    savedOption.textContent = `${t(hasSavedReview ? "Saved customer review" : "No saved review")} · ${customerName}`;
+    $("#create-customer-review").hidden = hasSavedReview;
+    $("#create-customer-review").disabled = !storageReady || storageBlocked || switchingReview;
+    $("#create-customer-review").textContent = `${t("Create customer review")} · ${customerName}`;
     $("#review-profile-mode").value = profileMode;
-    $("#profile-mode-help").textContent = t(
-      original
-        ? "Original template preview. Your saved review is unchanged. Select Saved customer review to edit."
-        : "Edits are saved to this customer’s review.",
-    );
+    $("#profile-mode-help").textContent = `${customerName}: ${t(
+      !hasSavedReview
+        ? "No review has been created for this customer. Create a customer review to edit and save it."
+        : original
+          ? "Original template preview. Your saved review is unchanged. Select Saved customer review to edit."
+          : "Edits are saved to this customer’s review.",
+    )}`;
     $("#reset-dashboard").disabled = original;
     $("#customer-profile-kpis").hidden = original;
     $("#composer").inert = original || switchingReview || storageLoading;
