@@ -2,6 +2,8 @@
 (function (root) {
   "use strict";
   const finnish = {
+    "Preparing dashboard metrics in the background…":
+      "Dashboardin mittareita valmistellaan taustalla…",
     "Shared customer data": "Yhteinen asiakasdata",
     "Import the project's synthetic data through the background pipeline. Your own review is preserved.":
       "Tuo projektin feikkidata taustalla toimivan tuontiputken kautta. Oma katsauksesi säilyy.",

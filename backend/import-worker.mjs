@@ -1,5 +1,6 @@
 import pg from "pg";
 import { validateImport, importCalculationVersion } from "./fixture-import.mjs";
+import { runDashboardJob } from "./dashboard-worker.mjs";
 
 // A row lock is the lease: process death rolls back the entire attempt and releases the job.
 // SKIP LOCKED supports multiple workers; publication and job completion commit together.
@@ -21,8 +22,9 @@ export function createImportWorker(connectionString) {
         )
       ).rows[0];
       if (!job) {
+        const analyzed = await runDashboardJob(client);
         await client.query("COMMIT");
-        return false;
+        return analyzed;
       }
       // Serialize per customer, including independently enqueued versions.
       const lock = (

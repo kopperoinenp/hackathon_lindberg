@@ -16,6 +16,7 @@
     repairs: { label: "Repairs", unit: "items", divisor: 1 },
   };
   function comparisonPoints(ctx, metric) {
+    if (ctx.comparisonPoints) return ctx.comparisonPoints[metric];
     const actual = root.WorkspaceModel.series(ctx, metric);
     const factor =
       metric === "water"

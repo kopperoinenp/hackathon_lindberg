@@ -31,8 +31,8 @@
   function renderImportPanel(visible) {
     if (!sharedSession?.enabled) return;
     if (!$("#fixture-import-panel")) {
-      $("#customer-overview").insertAdjacentHTML(
-        "beforebegin",
+      $("#more-settings").insertAdjacentHTML(
+        "beforeend",
         `<section id="fixture-import-panel" class="review-priorities"><h2>${esc(t("Shared customer data"))}</h2><p>${esc(t("Import the project's synthetic data through the background pipeline. Your own review is preserved."))}</p><button id="fixture-import-start" type="button" class="secondary">${esc(t("Import demo data"))}</button> <button id="fixture-import-reload" type="button" class="text-button" hidden>${esc(t("Load published data"))}</button><p id="fixture-import-status" role="status"></p></section>`,
       );
       $("#fixture-import-start").addEventListener("click", async () => {
@@ -157,14 +157,24 @@
     $("#dataset-issue").textContent = t("Restart the shared prototype and reload this page.");
     return;
   }
-  let source;
+  let source, catalog;
   try {
-    const response = await fetch("data.js", { signal: AbortSignal.timeout(10000) });
-    if (response.ok) source = await response.text();
+    const response = await fetch(sharedSession?.enabled ? "/api/v1/customers" : "data.js", {
+      signal: AbortSignal.timeout(10000),
+    });
+    if (response.ok) {
+      if (sharedSession?.enabled) catalog = await response.json();
+      else source = await response.text();
+    }
   } catch {
     // An unavailable source is handled like an empty dataset file.
   }
-  const { data, issue } = globalThis.ReviewDataset.inspect(source);
+  const { data, issue } = sharedSession?.enabled
+    ? {
+        data: catalog,
+        issue: catalog?.customers?.length ? null : { message: "Shared database unavailable" },
+      }
+    : globalThis.ReviewDataset.inspect(source);
   if (issue) {
     function showDatasetIssue() {
       updateLanguage();
@@ -178,6 +188,48 @@
   }
   $("#dataset-status").hidden = true;
   $("#workspace").hidden = false;
+  const dashboardClient = sharedSession?.enabled ? globalThis.DashboardClient.create(data) : null;
+  let metricsRequest = "",
+    metricsBusy = false;
+  $("#workspace").insertAdjacentHTML(
+    "afterbegin",
+    '<section id="metrics-status" role="status" hidden></section>',
+  );
+  async function prepareMetrics() {
+    if (!dashboardClient || dashboardClient.ready(state)) return;
+    const wanted = JSON.stringify([
+      state.customer,
+      state.from,
+      state.to,
+      state.site,
+      state.country,
+      state.continent,
+      state.baseline,
+    ]);
+    if (metricsBusy && metricsRequest === wanted) return;
+    metricsRequest = wanted;
+    metricsBusy = true;
+    clearTimeout(deckTimer);
+    const scope = { ...state };
+    $("#metrics-status").hidden = false;
+    $("#metrics-status").textContent = t("Preparing dashboard metrics in the background…");
+    for (const id of ["deck", "summary-panel", "analysis-panel"]) $("#" + id).hidden = true;
+    $("#composer").inert = true;
+    for (const id of ["open-review", "download-powerpoint"]) $("#" + id).disabled = true;
+    try {
+      await dashboardClient.ensure(scope);
+      if (metricsRequest === wanted) {
+        metricsBusy = false;
+        $("#metrics-status").hidden = true;
+        render();
+      }
+    } catch (error) {
+      if (metricsRequest === wanted) {
+        metricsBusy = false;
+        $("#metrics-status").textContent = error.message;
+      }
+    }
+  }
   const countryName = (country) => t(globalThis.WorkspaceModel.countryNames[country]);
   const f = (number, digits = 0) =>
     new Intl.NumberFormat(t("en-GB"), { maximumFractionDigits: digits }).format(number);
@@ -313,6 +365,8 @@
   }
   async function loadCustomerReview(customer) {
     storageLoading = true;
+    storageReady = false;
+    clearTimeout(deckTimer);
     $("#customer-load-status").textContent = "";
     state.chatRevision += 1;
     toggleChatMenu(false);
@@ -363,7 +417,9 @@
           state[key] = record.workspace[key];
         // Evidence blocks, customer basics and next steps, when the backend stores them.
         applyChatAreas(record.workspace);
-      } else {
+      }
+      if (dashboardClient) await dashboardClient.ensure(state);
+      if (!record.workspace) {
         // A first review follows the panel's advice: falling use stays internal until shown.
         const signals = globalThis.SalesModel.salesSignals(data, selectionScope(), language);
         state.hideUsage = signals?.usage.read === "keep";
@@ -762,6 +818,10 @@
     if (event.target.open) renderAnalysis();
   });
   function renderAnalysis() {
+    if (dashboardClient && !dashboardClient.ready(state)) {
+      void prepareMetrics();
+      return;
+    }
     const ctx = context(),
       m = ctx.metrics;
     if (!m.hasData) {
@@ -780,7 +840,7 @@
     const max = Math.max(...points.map((point) => point.value), 1),
       countryMax = Math.max(...countries.map((point) => point.value), 1);
     $("#analysis-content").innerHTML =
-      t`<div class="analysis-scope"><strong>${esc(scopeLabel())}</strong><span>${periodName()} · ${ctx.rows.length} monthly site records</span></div><div class="analysis-kpis">${[
+      t`<div class="analysis-scope"><strong>${esc(scopeLabel())}</strong><span>${periodName()} · ${ctx.recordCount ?? ctx.rows.length} monthly site records</span></div><div class="analysis-kpis">${[
         [t("Water used for washing"), f(m.water / 1000) + " m³"],
         [t("Laundry and delivery"), f(m.emissions / 1000, 1) + " t CO₂e"],
         [t("Repairs"), f(m.repairs) + " " + t("items")],
@@ -803,10 +863,19 @@
         )}</select></div><div class="trend-chart" style="grid-template-columns:repeat(${points.length}, minmax(0,1fr))" role="img" aria-label="${t(def.label)}: ${points.map((point) => `${point.month} ${f(point.value / def.divisor, 1)} ${def.unit}`).join(", ")}">${points.map((point) => `<div class="trend-column"><span>${f(point.value / def.divisor)}</span><div class="trend-track"><i style="height:${(point.value / max) * 100}%"></i></div><small>${point.month.slice(5)}</small></div>`).join("")}</div><p class="quiet">${t(def.label)} (${def.unit}) · Synthetic ${state.metric === "repairs" ? t("event count") : t("allocated estimate")}. Monthly totals reflect service volume.</p></section><section class="analysis-card"><h2>Breakdown by country</h2>${countries.map((point) => `<div class="country-row"><div><span>${countryName(point.country)}</span><strong>${f(point.value / def.divisor, 1)} ${def.unit}</strong></div><div class="bar-track"><div class="bar-fill" style="width:${(point.value / countryMax) * 100}%"></div></div></div>`).join("")}<p class="quiet">${t(def.label)} for the selected period. Country totals reflect service volume.</p></section></div><section class="analysis-card"><h2>Sites and textile use</h2><p class="quiet">Snapshot for ${snapshotName()}. Scan coverage flags where to investigate. Water and repairs cover the full period.</p><div class="table-wrap"><table><thead><tr><th>Site</th><th>Country</th><th>Scanned</th><th>Allocated</th><th>Water, m³</th><th>Repairs</th></tr></thead><tbody>${ctx.sites.map((site) => t`<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${countryName(site.country)}</td><td>${site.utilization == null ? t("Unavailable") : f(site.utilization, 1) + " %"}</td><td>${f(site.allocated)}</td><td>${f(site.water / 1000)}</td><td>${f(site.repairs)}</td></tr>`).join("")}</tbody></table></div></section>${detailedAnalysis()}`;
   }
   function render() {
+    if (dashboardClient && storageLoading) {
+      renderToday();
+      return;
+    }
+    if (dashboardClient && !dashboardClient.ready(state)) {
+      void prepareMetrics();
+      return;
+    }
+    $("#metrics-status").hidden = true;
     $("#customer").value = state.customer;
     invalidatePowerPoint();
     const ctx = context();
-    const months = [...new Set(data.records.map((row) => row.month))]
+    const months = (data.months ?? [...new Set(data.records.map((row) => row.month))])
       .filter((month) => month.startsWith(data.year + "-"))
       .sort();
     for (const id of ["from", "to"]) {
@@ -1050,85 +1119,94 @@
   }
   // Whole-customer basics for the full data year. Independent of review filters, like the overview.
   function customerBasicsHtml(overview) {
-    // Latest data year only, compared with the year before when that year has data.
-    const mine = (rows) => (rows ?? []).filter((row) => row.customer === state.customer);
-    const inYear = (rows, wanted) => rows.filter((row) => row.month.startsWith(wanted));
-    const allRecords = mine(data.records);
-    const year =
-      allRecords
-        .map((row) => row.month.slice(0, 4))
-        .sort()
-        .at(-1) ?? "";
-    const before = String(Number(year) - 1);
-    const records = inYear(allRecords, year);
-    const detail = inYear(mine(data.detail), year);
-    const cycles = inYear(mine(data.cycleGroups), year);
-    const sumOf = (rows, key) => rows.reduce((total, row) => total + (row[key] || 0), 0);
-    const cycleCount = (rows) => rows.reduce((total, row) => total + row.hours.length, 0);
-    const previous = {
-      records: inYear(allRecords, before),
-      detail: inYear(mine(data.detail), before),
-      cycles: inYear(mine(data.cycleGroups), before),
-    };
-    // A previous value is shown only when that table has rows for the previous year.
-    const earlier = (table, value) => (previous[table].length ? value(previous[table]) : null);
-    const volumes = [
-      [
-        sumOf(records, "washed_pieces"),
-        "washes",
-        0,
-        earlier("records", (rows) => sumOf(rows, "washed_pieces")),
-      ],
-      [
-        sumOf(records, "customer_washed_kg") / 1000,
-        "tonnes of textiles washed",
-        0,
-        earlier("records", (rows) => sumOf(rows, "customer_washed_kg") / 1000),
-      ],
-      [cycleCount(cycles), "pickup and return cycles", 0, earlier("cycles", cycleCount)],
-      [
-        sumOf(records, "repair_count"),
-        "repairs",
-        0,
-        earlier("records", (rows) => sumOf(rows, "repair_count")),
-      ],
-      [
-        sumOf(detail, "service_requests"),
-        "service requests",
-        0,
-        earlier("detail", (rows) => sumOf(rows, "service_requests")),
-      ],
-    ];
-    const counts = (values) =>
-      [...values.reduce((map, value) => map.set(value, (map.get(value) ?? 0) + 1), new Map())].sort(
-        (a, b) => b[1] - a[1],
-      );
-    const siteTypes = counts(overview.sites.map((site) => site.site_type));
-    const countries = overview.countries.map((country) => {
-      const sites = overview.sites.filter((site) => site.country === country);
-      return {
-        country,
-        sites: sites.length,
-        allocated: sites.every((site) => site.allocated != null)
-          ? sites.reduce((total, site) => total + site.allocated, 0)
-          : null,
-      };
-    });
-    const snapshot = detail.filter((row) => row.month === overview.snapshotMonth);
-    const products = data.products
-      .map((product) => ({
-        ...product,
-        allocated: sumOf(
-          snapshot.filter((row) => row.product === product.product_id),
-          "allocated_pieces",
-        ),
-      }))
-      .filter((product) => product.allocated > 0)
-      .sort((a, b) => b.allocated - a.allocated);
-    const perSite =
-      overview.allocated != null && overview.sites.length
-        ? overview.allocated / overview.sites.length
-        : null;
+    const { year, before, volumes, siteTypes, countries, products, perSite } = dashboardClient
+      ? dashboardClient.read(state).basics
+      : (() => {
+          // Latest data year only, compared with the year before when that year has data.
+          const mine = (rows) => (rows ?? []).filter((row) => row.customer === state.customer);
+          const inYear = (rows, wanted) => rows.filter((row) => row.month.startsWith(wanted));
+          const allRecords = mine(data.records);
+          const year =
+            allRecords
+              .map((row) => row.month.slice(0, 4))
+              .sort()
+              .at(-1) ?? "";
+          const before = String(Number(year) - 1);
+          const records = inYear(allRecords, year);
+          const detail = inYear(mine(data.detail), year);
+          const cycles = inYear(mine(data.cycleGroups), year);
+          const sumOf = (rows, key) => rows.reduce((total, row) => total + (row[key] || 0), 0);
+          const cycleCount = (rows) => rows.reduce((total, row) => total + row.hours.length, 0);
+          const previous = {
+            records: inYear(allRecords, before),
+            detail: inYear(mine(data.detail), before),
+            cycles: inYear(mine(data.cycleGroups), before),
+          };
+          // A previous value is shown only when that table has rows for the previous year.
+          const earlier = (table, value) =>
+            previous[table].length ? value(previous[table]) : null;
+          const volumes = [
+            [
+              sumOf(records, "washed_pieces"),
+              "washes",
+              0,
+              earlier("records", (rows) => sumOf(rows, "washed_pieces")),
+            ],
+            [
+              sumOf(records, "customer_washed_kg") / 1000,
+              "tonnes of textiles washed",
+              0,
+              earlier("records", (rows) => sumOf(rows, "customer_washed_kg") / 1000),
+            ],
+            [cycleCount(cycles), "pickup and return cycles", 0, earlier("cycles", cycleCount)],
+            [
+              sumOf(records, "repair_count"),
+              "repairs",
+              0,
+              earlier("records", (rows) => sumOf(rows, "repair_count")),
+            ],
+            [
+              sumOf(detail, "service_requests"),
+              "service requests",
+              0,
+              earlier("detail", (rows) => sumOf(rows, "service_requests")),
+            ],
+          ];
+          const counts = (values) =>
+            [
+              ...values.reduce(
+                (map, value) => map.set(value, (map.get(value) ?? 0) + 1),
+                new Map(),
+              ),
+            ].sort((a, b) => b[1] - a[1]);
+          const siteTypes = counts(overview.sites.map((site) => site.site_type));
+          const countries = overview.countries.map((country) => {
+            const sites = overview.sites.filter((site) => site.country === country);
+            return {
+              country,
+              sites: sites.length,
+              allocated: sites.every((site) => site.allocated != null)
+                ? sites.reduce((total, site) => total + site.allocated, 0)
+                : null,
+            };
+          });
+          const snapshot = detail.filter((row) => row.month === overview.snapshotMonth);
+          const products = data.products
+            .map((product) => ({
+              ...product,
+              allocated: sumOf(
+                snapshot.filter((row) => row.product === product.product_id),
+                "allocated_pieces",
+              ),
+            }))
+            .filter((product) => product.allocated > 0)
+            .sort((a, b) => b.allocated - a.allocated);
+          const perSite =
+            overview.allocated != null && overview.sites.length
+              ? overview.allocated / overview.sites.length
+              : null;
+          return { year, before, volumes, siteTypes, countries, products, perSite };
+        })();
     const row = (label, value) => `<li><span>${label}</span><strong>${value}</strong></li>`;
     return `<section class="customer-year" data-basics="year" aria-labelledby="customer-year-title"><h3 id="customer-year-title">${t("The service in")} ${esc(year)}</h3><div class="customer-year-stats">${volumes
       .map(
@@ -1163,12 +1241,16 @@
   }
   // Broad customer basics shown before any figures, so the customer knows what the service covers.
   function serviceScopeHtml(overview) {
-    const customerRows = (data.detail ?? []).filter((row) => row.customer === state.customer);
-    const laundries = new Set(overview.sites.map((site) => site.primary_laundry_id));
-    const months = [...new Set(customerRows.map((row) => row.month))].sort();
+    const prepared = dashboardClient?.read(state).serviceScope;
+    const customerRows = prepared
+      ? []
+      : (data.detail ?? []).filter((row) => row.customer === state.customer);
+    const laundryCount =
+      prepared?.laundries ?? new Set(overview.sites.map((site) => site.primary_laundry_id)).size;
+    const months = prepared?.months ?? [...new Set(customerRows.map((row) => row.month))].sort();
     const item = (label, value) => `<div><dt>${t(label)}</dt><dd>${value}</dd></div>`;
     return `<section class="service-scope" data-basics="scope" aria-labelledby="service-scope-title"><h3 id="service-scope-title">${t("What the service covers")}</h3><p>${t("Lindström provides workwear as a service: textiles are supplied, picked up, washed, repaired and returned to each site.")}</p><dl>${[
-      item("Serving laundries", f(laundries.size)),
+      item("Serving laundries", f(laundryCount)),
       item(
         "Data period",
         months.length ? `${esc(months[0])} – ${esc(months.at(-1))}` : t("Unavailable"),
@@ -1470,6 +1552,7 @@
   // Same months one year earlier, only when the owner's comparison finds matching
   // site-months. Values are computed with the same model as the current period.
   function previousYear() {
+    if (dashboardClient) return dashboardClient.read(state).previous;
     const comparison = analysisTools.periodComparison(data, state, "yoy");
     if (!comparison) return null;
     const scope = { ...state, ...comparison.previousPeriod };
@@ -1531,6 +1614,7 @@
     );
   }
   function financialEvidence(prev, metrics) {
+    if (dashboardClient) return dashboardClient.read(state).financial;
     const rows = financialRows(state);
     if (!rows.length) return null;
     const sumOf = (list, key) => list.reduce((total, row) => total + (Number(row[key]) || 0), 0);
@@ -1594,6 +1678,7 @@
     };
   }
   function monthlyEvidence(selection = state) {
+    if (dashboardClient) return dashboardClient.read(selection).monthly;
     const ctx = storyContext(data, selection);
     const months = [...new Set(ctx.rows.map((row) => row.month))].sort();
     const sumOf = (rows, key) => rows.reduce((total, row) => total + (row[key] || 0), 0);
@@ -2280,8 +2365,8 @@
       `<fieldset class="area-picker meeting-advice"><legend>${t("Who are you meeting?")}</legend><select id="audience" aria-label="${t("Who are you meeting?")}"><option value="">${t("Choose a role")}</option>${roles}</select>${advice ? `<p>${esc(advice.points[0])}</p>` : ""}</fieldset>`;
   }
   function selectionScope() {
-    const { customer, from, to, country, continent, site } = state;
-    return { customer, from, to, country, continent, site };
+    const { customer, from, to, country, continent, site, baseline } = state;
+    return { customer, from, to, country, continent, site, baseline };
   }
   document.addEventListener("change", (event) => {
     if (event.target.id !== "audience") return;
@@ -2953,7 +3038,7 @@
     .join("");
   async function openCustomer(customer) {
     $("#customer").value = state.customer;
-    if (switchingReview) return;
+    if (switchingReview || storageLoading) return;
     switchingReview = true;
     $("#workspace").inert = true;
     $("#composer").inert = true;
@@ -3191,8 +3276,8 @@
       sharedSession?.enabled &&
       resumeImport === `${sharedSession.user.id}:${state.customer}`
     ) {
-      state.view = "analysis";
       setMode("prepare");
+      $("#more-settings").open = true;
       render();
     } else $("#customer-search").focus();
   });

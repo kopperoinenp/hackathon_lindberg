@@ -44,7 +44,7 @@ export function createPostgresStore(connectionString) {
     await ready;
     return (await pool.query("SELECT id, display_name FROM prototype_users ORDER BY id")).rows;
   }
-  async function context(id) {
+  async function context(id, { metadataOnly = false } = {}) {
     await ready;
     const user = (
       await pool.query("SELECT id, tenant_id, display_name FROM prototype_users WHERE id=$1", [id])
@@ -52,10 +52,14 @@ export function createPostgresStore(connectionString) {
     if (!user) throw new PresentationError("Unknown prototype user.", 403);
     return transaction(user, async (client) => {
       const { rows } = await client.query(
-        "SELECT d.customer_id, d.dataset, a.can_write FROM customer_datasets d JOIN customer_access a USING (tenant_id,customer_id) ORDER BY d.customer_id",
+        `SELECT d.customer_id, ${metadataOnly ? "NULL" : "d.dataset"} AS dataset, a.can_write FROM customer_datasets d JOIN customer_access a USING (tenant_id,customer_id) ORDER BY d.customer_id`,
       );
       const permissions = new Map(rows.map((row) => [row.customer_id, row.can_write]));
-      return { user, permissions, data: combineCustomerDatasets(rows.map((row) => row.dataset)) };
+      return {
+        user,
+        permissions,
+        data: metadataOnly ? null : combineCustomerDatasets(rows.map((row) => row.dataset)),
+      };
     });
   }
   async function access(client, user, customer, write = false) {

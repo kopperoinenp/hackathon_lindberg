@@ -31,6 +31,9 @@ export async function setupPrototype(adminUrl, { data, password, role = "kam_pro
     await client.query(
       await readFile(new URL("./migrations/002_fixture_imports.sql", import.meta.url), "utf8"),
     );
+    await client.query(
+      await readFile(new URL("./migrations/003_dashboard_metrics.sql", import.meta.url), "utf8"),
+    );
     const exists = (await client.query("SELECT 1 FROM pg_roles WHERE rolname=$1", [role])).rowCount;
     if (!exists)
       await client.query(
@@ -52,6 +55,7 @@ export async function setupPrototype(adminUrl, { data, password, role = "kam_pro
       `GRANT SELECT (id,sequence,tenant_id,customer_id,source_id,checksum,calculation_version,status,attempts,created_at,updated_at,report,error) ON data_imports TO ${pg.escapeIdentifier(role)}`,
     );
     await client.query(`GRANT INSERT ON data_imports TO ${pg.escapeIdentifier(role)}`);
+    await client.query(`GRANT SELECT, INSERT ON dashboard_jobs TO ${pg.escapeIdentifier(role)}`);
     await client.query(
       `GRANT USAGE ON SEQUENCE data_imports_sequence_seq TO ${pg.escapeIdentifier(role)}`,
     );
@@ -70,12 +74,14 @@ export async function setupPrototype(adminUrl, { data, password, role = "kam_pro
       `GRANT UPDATE (dataset,name,updated_at,publication_sequence,active_import_id) ON customer_datasets TO ${worker}`,
     );
     await client.query(`GRANT SELECT, INSERT ON dataset_versions TO ${worker}`);
+    await client.query(`GRANT SELECT, UPDATE ON dashboard_jobs TO ${worker}`);
     for (const table of [
       "data_imports",
       "customer_access",
       "source_customer_mapping",
       "customer_datasets",
       "dataset_versions",
+      "dashboard_jobs",
     ]) {
       const policy = pg.escapeIdentifier(`${workerRole}_service`);
       await client.query(`DROP POLICY IF EXISTS ${policy} ON ${table}`);

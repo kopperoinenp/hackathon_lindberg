@@ -303,11 +303,10 @@ test(
       if (process.platform === "win32") paths.push("/KOPPEROINENP/DATA.JS");
       for (const url of paths) {
         const response = await call("kam-b", url);
-        assert.equal(response.status, 200);
+        assert.equal(response.status, 410);
         const source = await response.text();
         assert.ok(!source.includes("NorthStar"));
-        assert.ok(source.includes("Apex shared update"));
-        assert.equal(globalThis.ReviewDataset.inspect(source).issue, null);
+        assert.ok(!source.includes("washed_pieces"));
       }
       assert.equal((await call("kam-b", "/api/reviews/CUST001")).status, 403);
       assert.equal((await call("unknown", "/api/demo/session")).status, 403);
@@ -482,6 +481,106 @@ test(
         });
         assert.equal(response.status, 200); // Same checksum returns the existing job, never a new publication.
         assert.equal((await response.json()).duplicate, true);
+      },
+    );
+    await t.test(
+      "dashboard requests enqueue scoped background work and return only versioned read models",
+      async (t) => {
+        const workerUrl = new URL(runtimeUrl);
+        workerUrl.username += "_worker";
+        workerUrl.password += "_worker";
+        const worker = createImportWorker(workerUrl.toString());
+        t.after(() => worker.close());
+        const catalog = await (await call("kam-b", "/api/v1/customers")).json();
+        assert.deepEqual(
+          catalog.customers.map((c) => c.customer_id),
+          ["CUST002", "CUST003"],
+        );
+        assert.equal(catalog.records.length, 0);
+        assert.equal(catalog.cycleGroups.length, 0);
+        assert.equal(catalog.sites.length, 0);
+        const base = "/api/v1/customers/CUST002/dashboard";
+        assert.equal((await call("kam-b", "/api/v1/customers/CUST001/dashboard")).status, 403);
+        assert.equal((await call("kam-a", base + "?from=2025-12&to=2025-01")).status, 400);
+        assert.equal((await call("kam-a", base + "?site=NOT_THIS_CUSTOMER")).status, 400);
+        const first = await call("kam-a", base);
+        assert.equal(first.status, 202);
+        const pending = await first.json();
+        assert.equal(pending.metrics, undefined);
+        assert.equal((await (await call("kam-b", base)).json()).id, pending.id);
+        for (let i = 0; i < 5; i++) await worker.runOnce();
+        const response = await call("kam-a", base);
+        assert.equal(response.status, 200);
+        const ready = await response.json();
+        assert.equal(
+          ready.metrics.contexts.neutral.metrics.repairs,
+          importControls(subsetDataset(fixtureDataset, ["CUST002"])).repairs,
+        );
+        assert.equal(ready.metrics.contexts.neutral.rows, undefined);
+        assert.ok(Buffer.byteLength(JSON.stringify(ready)) < 200 * 1024);
+        assert.equal((await (await call("viewer", base)).json()).id, ready.id);
+        const second = await call("viewer", base + "?from=2025-01&to=2025-03");
+        assert.equal(second.status, 202);
+        await worker.runOnce();
+        const quarter = await (await call("viewer", base + "?from=2025-01&to=2025-03")).json();
+        assert.equal(quarter.status, "ready");
+        assert.equal(quarter.metrics.contexts.neutral.recordCount, 18);
+        assert.equal(quarter.datasetVersion, ready.datasetVersion);
+        await assert.rejects(
+          store.transaction(a.user, (c) => c.query("UPDATE dashboard_jobs SET result='{}'::jsonb")),
+          (e) => e.code === "42501",
+        );
+        // Connection loss during calculation makes the unfinished request available again.
+        const locked = await (await call("kam-a", base + "?from=2025-04&to=2025-06")).json();
+        const connection = new pg.Client({ connectionString: workerUrl.toString() });
+        await connection.connect();
+        await connection.query("BEGIN");
+        await connection.query("SELECT 1 FROM dashboard_jobs WHERE id=$1 FOR UPDATE", [locked.id]);
+        assert.equal(await worker.runOnce(), false);
+        await connection.end();
+        await worker.runOnce();
+        assert.equal(
+          (await (await call("kam-a", base + "?from=2025-04&to=2025-06")).json()).status,
+          "ready",
+        );
+        const admin = new pg.Client({ connectionString: adminUrl });
+        await admin.connect();
+        try {
+          const payload = subsetDataset(fixtureDataset, ["CUST002"]);
+          payload.customers[0].customer_name = "Apex new published version";
+          await admin.query(
+            "INSERT INTO data_imports(id,tenant_id,customer_id,requested_by,source_id,checksum,calculation_version,payload,expected_controls) VALUES($1,'demo','CUST002','kam-a','project-fixture',$2,'fixture-controls-v1',$3,$4)",
+            [
+              randomUUID(),
+              checksum(payload),
+              JSON.stringify(payload),
+              JSON.stringify(importControls(payload)),
+            ],
+          );
+          await worker.runOnce();
+          const pinned = await (
+            await call("kam-a", base + "?version=" + encodeURIComponent(ready.datasetVersion))
+          ).json();
+          assert.equal(pinned.id, ready.id);
+          assert.equal(
+            (
+              await call(
+                "kam-a",
+                base +
+                  "?from=2025-07&to=2025-09&version=" +
+                  encodeURIComponent(ready.datasetVersion),
+              )
+            ).status,
+            409,
+          );
+          assert.equal((await call("kam-a", base)).status, 202);
+          await worker.runOnce();
+          const next = await (await call("kam-a", base)).json();
+          assert.notEqual(next.datasetVersion, ready.datasetVersion);
+          assert.equal(next.metrics.overview.customer.customer_name, "Apex new published version");
+        } finally {
+          await admin.end();
+        }
       },
     );
     await t.test("database failure never falls back to filesystem customer data", async () => {

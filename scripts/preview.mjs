@@ -4,7 +4,6 @@ import { watch, existsSync } from "node:fs";
 import { readFile, stat, realpath } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { requestContext } from "../backend/request-context.mjs";
 
 const envFile = fileURLToPath(new URL("../.env", import.meta.url));
 if (existsSync(envFile)) process.loadEnvFile(envFile);
@@ -66,12 +65,12 @@ async function handleRequest(request, response, url) {
       return;
     }
     if (datasetPath(url)) {
-      const activeData = requestContext.getStore()?.data;
-      const source = shared
-        ? activeData
-          ? `globalThis.REVIEW_DATA = ${JSON.stringify(activeData)};`
-          : ""
-        : datasetSource;
+      if (shared) {
+        response.writeHead(410, { "Content-Type": "text/plain", "Cache-Control": "no-store" });
+        response.end("Raw browser datasets are disabled. Use the versioned dashboard API.");
+        return;
+      }
+      const source = datasetSource;
       response.writeHead(source ? 200 : 503, {
         "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-store",

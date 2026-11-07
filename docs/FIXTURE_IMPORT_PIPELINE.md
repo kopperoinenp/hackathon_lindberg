@@ -7,7 +7,7 @@ Nykyiset katsaus-, apuri- ja esitysrajapinnat säilyvät yhteensopivina.
 
 ## Käyttö
 
-Käynnistä `pnpm preview:shared` ja avaa asiakkaan **Explore data / Tutki dataa**.
+Käynnistä `pnpm preview:shared`, valitse asiakas ja avaa **Muokkaa katsausta → Lisää asetuksia**.
 **Shared customer data / Yhteinen asiakasdata** sisältää tuontipainikkeen ja viimeisimmän työn tilan.
 Valitse **Import demo data / Tuo feikkidata**. Erillinen työntekijä tarkistaa
 asiakkaan aineiston ja julkaisee sen yhteiseen tietokantaan.
@@ -90,11 +90,8 @@ Paikallinen `preview:shared` hoitaa migraatiot ja kummankin prosessin käynnisty
 
 ## Rajaus seuraaviin vaiheisiin
 
-Tämä on vaihe 2 feikkidataliittimellä. Vaiheen 3 rajattu mittari-API ja selaimen
-raakadatalatauksen poistaminen eivät kuulu tähän muutokseen. Dashboard, apuri ja esitys
-käyttävät edelleen samaa nykyistä laskentamallia yhteisestä julkaistusta asiakasaineistosta.
-Tuonti tallentaa valmiin kontrolli-/mittariraportin, mutta käyttöliittymää ei ole siirretty
-kokonaan käyttämään raportin lukuja.
+Tuonti tallentaa kontrolliraportin ja julkaisee aineistoversion. Vaiheen 3
+[mittariputki](DASHBOARD_METRICS.md) laskee dashboardin rajatut tulokset samasta aineistosta.
 
 Alustava demodata lisätään edelleen bootstrapissa vain puuttuville asiakkaille, jotta
 prototyyppi toimii ennen ensimmäistä putken kautta tehtyä julkaisua. Käyttöliittymä

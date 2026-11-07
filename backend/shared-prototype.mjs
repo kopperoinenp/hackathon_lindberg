@@ -1,6 +1,7 @@
 import { createPostgresStore } from "./postgres-store.mjs";
 import { requestContext } from "./request-context.mjs";
 import { fixtureImports } from "./fixture-import.mjs";
+import { dashboardApi } from "./dashboard-api.mjs";
 
 function json(response, status, value) {
   response.writeHead(status, {
@@ -31,7 +32,19 @@ export function sharedPrototype(env = process.env) {
       const id = cookie ?? "demo-all";
       if (!/^[a-z0-9-]{1,64}$/.test(id))
         return json(response, 403, { error: "Unknown prototype user." });
-      const context = await store.context(id);
+      const context = await store.context(id, {
+        metadataOnly: url.pathname.startsWith("/api/v1/") || url.pathname.startsWith("/api/demo/"),
+      });
+      const dashboard = dashboardApi(store, context.user);
+      if (url.pathname === "/api/v1/customers" && request.method === "GET")
+        return json(response, 200, await dashboard.catalog());
+      const dashboardMatch = url.pathname.match(
+        /^\/api\/v1\/customers\/([A-Za-z0-9_-]{1,64})\/dashboard$/,
+      );
+      if (dashboardMatch && request.method === "GET") {
+        const result = await dashboard.get(dashboardMatch[1], url.searchParams);
+        return json(response, result.status, result.body);
+      }
       const imports = fixtureImports(store, context.user);
       const customerImports = url.pathname.match(
         /^\/api\/v1\/customers\/([A-Za-z0-9_-]{1,64})\/imports$/,
@@ -71,7 +84,7 @@ export function sharedPrototype(env = process.env) {
         const next = JSON.parse(body).user;
         if (typeof next !== "string")
           return json(response, 400, { error: "Choose a prototype profile." });
-        await store.context(next);
+        await store.context(next, { metadataOnly: true });
         response.setHeader("Set-Cookie", `demo_user=${next}; HttpOnly; SameSite=Strict; Path=/`);
         return json(response, 200, { ok: true });
       }

@@ -6,7 +6,7 @@ pyynnöstä kirjautumista tai OIDC-palvelua ei ole toteutettu.
 
 Vaiheen 2 [pysyvä feikkidatan tuontiputki](FIXTURE_IMPORT_PIPELINE.md) lisää
 asiakaskohtaiset tuonnit, taustatyöntekijän, tarkistukset ja atomiset julkaisuversiot.
-`preview:shared` käynnistää myös tämän työntekijän. Tuonti löytyy Tutki dataa -näkymästä.
+`preview:shared` käynnistää myös tämän työntekijän. Tuonti löytyy katsauksen lisäasetuksista.
 
 ## Käynnistys
 
@@ -94,8 +94,8 @@ nimettyyn demokäyttäjään, koska niiden alkuperäistä omistajaa ei tunneta.
   saman alkuperän JSON-pyynnön; käyttäjä tunnistetaan tietokannan profiililistasta.
 - Nykyisten review-reittien vastausmuoto ja revisionumerointi säilyvät.
   PostgreSQL-tilassa katsaukset ovat lisäksi käyttäjäkohtaisia.
-- `data.js` palauttaa edelleen nykyiselle käyttöliittymälle sopivan aineistomuodon,
-  mutta sisältö luetaan PostgreSQL:stä ja rajataan demoprofiilin oikeuksilla.
+- PostgreSQL-tilassa selain hakee [valmiit mittarit](DASHBOARD_METRICS.md).
+  Vanha `data.js`-reitti palauttaa tilakoodin `410`.
 
 ## Testit ja rajaus
 

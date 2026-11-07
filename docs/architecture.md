@@ -23,5 +23,6 @@ The [phase-two fixture pipeline](FIXTURE_IMPORT_PIPELINE.md) stages repository-o
 synthetic data in PostgreSQL, processes a durable queue in a separate Node worker and
 atomically publishes validated customer versions without altering personal reviews.
 Production sign-in, large-file ingestion and deployment remain open decisions.
-The scoped, precomputed dashboard API is phase three; the current UI still loads the
-authorized customer dataset and uses the existing calculation modules.
+The [dashboard metrics API](DASHBOARD_METRICS.md) reads scoped results prepared by the
+PostgreSQL worker. The shared dashboard fetches customer metadata and versioned results.
+The file preview remains available as a standalone synthetic demo.
