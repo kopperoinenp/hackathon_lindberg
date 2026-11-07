@@ -278,24 +278,18 @@
       "Customer priorities, opportunities and agreed next actions.",
     ],
   ];
-  const peers = [
-    ["Elis", 0.4],
-    ["Cintas", 0.2],
-    ["Salesianer", 0.31],
-    ["Johnson Service Group", 0.38],
-  ];
-  const lindstromIntensity = 0.28;
-  const peerAverage = peers.reduce((sum, [, intensity]) => sum + intensity, 0) / peers.length;
+  const analysisTools = globalThis.ReviewAnalysisTools;
+  const { companies: peers, lindstromIntensity, peerAverage, lowerPct } = analysisTools.benchmark;
   let editedKpi = -1;
   let formCustomer;
   let statusTimer;
   const context = () => storyContext(data, state);
-  const baselineName = () =>
+  const baselineName = (id = state.baseline) =>
     ({
       B_LOCAL: t("local outsourced laundry"),
       B_HOME: t("home laundering"),
       B_INHOUSE: t("in-house laundry"),
-    })[state.baseline];
+    })[id];
   const scopeName = () => scopeLabel();
   function periodName() {
     return state.from === "2025-01" && state.to === "2025-12"
@@ -322,6 +316,15 @@
   }
   function detailedAnalysis() {
     const detail = globalThis.WorkspaceModel.analyzeDetails(data, state);
+    const [periodResult, baselineResult, driverResult, laundryResult, actionResult] =
+      analysisTools.run(data, presentationRequest(false).scope, [
+        "period",
+        "baselines",
+        "drivers",
+        "laundry",
+        "actions",
+      ]);
+    const period = periodResult.values;
     const number = (value, unit = "", digits = 1) =>
       value == null ? t("Unavailable") : [f(value, digits), unit].filter(Boolean).join(" ");
     const table = (headings, rows) =>
@@ -338,6 +341,83 @@
       incineration_kg: t("Incineration"),
     };
     return t`
+      <section class="analysis-card">
+        <h2>${t("Period comparison")}</h2>
+        ${
+          period
+            ? table(
+                [t("Metric"), t("Previous period"), t("Selected period"), t("Change")],
+                [
+                  [t("Washed kg"), "washedKg", "kg"],
+                  [t("Water"), "waterLitres", "l"],
+                  [t("Emissions"), "emissionsKgCo2e", "kg CO₂e"],
+                  [t("Repairs"), "repairs", ""],
+                  [t("Scan coverage"), "scanPct", "%"],
+                ].map(([label, key, unit]) => [
+                  label,
+                  number(period.before[key], unit),
+                  number(period.after[key], unit),
+                  number(period.delta[key], key === "scanPct" ? t("percentage points") : unit),
+                ]),
+              ) +
+              `<p class="quiet">${esc(period.previousPeriod.from)} – ${esc(period.previousPeriod.to)} · ${esc(t("Previous period has the same length and site filters. Scan coverage compares period-end snapshots."))}</p>`
+            : `<p>${t("The preceding period of equal length is outside the available data.")}</p>`
+        }
+      </section>
+      <section class="analysis-card">
+        <h2>${t("Laundry baseline scenarios")}</h2>
+        ${table(
+          [t("Baseline"), t("Water difference"), t("Energy difference"), t("Emissions difference")],
+          baselineResult.values.scenarios.map((scenario) => [
+            baselineName(scenario.id),
+            number(scenario.waterDifferenceLitres, "l"),
+            number(scenario.energyDifferenceKwh, "kWh"),
+            number(scenario.emissionsDifferenceKgCo2e, "kg CO₂e"),
+          ]),
+        )}
+        <p class="quiet">${t("Each scenario uses the same washed weight. Differences are baseline minus actual.")}</p>
+      </section>
+      <section class="analysis-card">
+        <h2>${t("Largest site contributions to emissions")}</h2>
+        ${table(
+          [t("Site"), t("Washed kg"), t("Emissions"), t("Share"), t("Emissions / kg washed")],
+          driverResult.values.sitesByEmissions.map((site) => [
+            site.name,
+            number(site.washedKg, "kg"),
+            number(site.emissionsKgCo2e, "kg CO₂e"),
+            number(site.sharePct, "%"),
+            number(site.emissionsKgCo2ePerKg, "kg CO₂e/kg", 3),
+          ]),
+        )}
+        <p class="quiet">${t("Shows up to six sites. Absolute emissions also reflect service volume. Source: Customer_Impacts.")}</p>
+      </section>
+      <section class="analysis-card">
+        <h2>${t("Customer footprint by laundry")}</h2>
+        ${
+          laundryResult.values
+            ? table(
+                [t("Laundry ID"), t("Washed kg"), t("Water / kg"), t("Emissions / kg washed")],
+                laundryResult.values.byWashedKg.map((laundry) => [
+                  laundry.id,
+                  number(laundry.washedKg, "kg"),
+                  number(laundry.waterLitresPerKg, "l/kg", 2),
+                  number(laundry.emissionsKgCo2ePerKg, "kg CO₂e/kg", 3),
+                ]),
+              )
+            : `<p>${t("Unavailable")}</p>`
+        }
+        <p class="quiet">${t("Customer-allocated figures for up to six laundries, sorted by washed weight. Source: Customer_Impacts.")}</p>
+      </section>
+      <section class="analysis-card">
+        <h2>${t("Questions for the customer review")}</h2>
+        <ul>${actionResult.values
+          .map(
+            (action) =>
+              `<li><strong>${esc(action.site)}</strong> · ${esc(action.scanPct == null ? number(action.p90Hours, "h P90") : number(action.scanPct, "%"))}. ${esc(t(action.question))}</li>`,
+          )
+          .join("")}</ul>
+        <p class="quiet">${t("These are questions for discussion. SLA, unique wearers and verified savings require separate evidence.")}</p>
+      </section>
       <section class="analysis-card">
         <h2>Textile use by product</h2>
         <p class="quiet">Allocation and scan coverage for ${esc(detail.snapshotMonth ?? "–")}.
@@ -576,7 +656,7 @@
     includeAgenda.disabled = agenda.length === 0;
     includeAgenda.checked = agenda.length > 0 && includedAgendas.has(state.customer);
 
-    const difference = f((1 - lindstromIntensity / peerAverage) * 100);
+    const difference = f(lowerPct);
     $("#industry-benchmark-summary").textContent =
       `${difference} % · ${t("Lower emissions intensity than the four-peer average (illustrative)")}`;
     const benchmarkRows = [

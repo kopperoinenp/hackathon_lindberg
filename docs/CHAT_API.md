@@ -85,6 +85,13 @@ errors retain the shared adapter's status mapping.
 
 ## Boundaries
 
+For evidence requests, the provider can select up to three internal analysis
+tools before returning its final workspace patch. The server evaluates the
+tools on the validated proposed scope and checks that the final patch keeps
+that scope. Both calls share the existing deadline. The public request,
+response and action-only acknowledgement keep the same shape.
+See [Analysis tools](ANALYSIS_TOOLS.md).
+
 Loopback only, same-origin POST checks, 32 KiB request limit, one chat request at a
 time. Shared provider transport uses a 90-second deadline, no automatic retry,
 fixed HTTPS endpoints, bounded responses and strict structured output. The

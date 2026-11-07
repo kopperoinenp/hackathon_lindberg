@@ -14,6 +14,42 @@
     "Replace this customer's saved dashboard layout with the original layout?":
       "Korvataanko tämän asiakkaan tallennettu dashboard-rakenne alkuperäisellä rakenteella?",
 
+    Metric: "Mittari",
+    Change: "Muutos",
+    "Washed kg": "Pesty paino",
+    "percentage points": "prosenttiyksikköä",
+    "Period comparison": "Jaksovertailu",
+    "Previous period": "Edeltävä jakso",
+    "Selected period": "Valittu jakso",
+    "Previous period has the same length and site filters. Scan coverage compares period-end snapshots.":
+      "Edeltävällä jaksolla on sama pituus ja toimipaikkarajaus. Skannausosuus vertaa jaksojen lopputilanteita.",
+    "The preceding period of equal length is outside the available data.":
+      "Samanpituinen edeltävä jakso jää käytettävissä olevan aineiston ulkopuolelle.",
+    "Laundry baseline scenarios": "Pesumallien vertailuskenaariot",
+    "Water difference": "Vedenkäytön ero",
+    "Energy difference": "Energiankäytön ero",
+    "Emissions difference": "Päästöero",
+    "Each scenario uses the same washed weight. Differences are baseline minus actual.":
+      "Skenaariot käyttävät samaa pestyä kilomäärää. Ero lasketaan vähentämällä toteuma vertailuarvosta.",
+    "Largest site contributions to emissions": "Toimipaikkojen suurimmat päästöosuudet",
+    "Customer footprint by laundry": "Asiakkaan ympäristöluvut pesuloittain",
+    "Laundry ID": "Pesulan tunniste",
+    "Customer-allocated figures for up to six laundries, sorted by washed weight. Source: Customer_Impacts.":
+      "Asiakkaalle kohdistetut luvut enintään kuudelta pesulalta pestyn kilomäärän mukaan. Lähde: Customer_Impacts.",
+    "Questions for the customer review": "Kysymykset asiakaskatsaukseen",
+    "Can we reconcile the scan gap with local stock and scanning practices?":
+      "Voidaanko skannausvaje täsmäyttää paikalliseen tekstiilikantaan ja skannauskäytäntöihin?",
+    "Which steps explain the longer recorded cycles, and what target has been agreed?":
+      "Mitkä vaiheet selittävät pidemmät kirjatut kierrot ja mikä tavoite on sovittu?",
+    "These are questions for discussion. SLA, unique wearers and verified savings require separate evidence.":
+      "Kysymykset ovat keskustelunavauksia. SLA, yksilölliset käyttäjät ja todennetut säästöt edellyttävät omaa aineistoa.",
+    "Emissions / kg washed": "Päästöt / pesty kg",
+    "Shows up to six sites. Absolute emissions also reflect service volume. Source: Customer_Impacts.":
+      "Näytetään enintään kuusi toimipaikkaa. Päästöjen kokonaismäärään vaikuttaa myös palvelun laajuus. Lähde: Customer_Impacts.",
+    "The assistant selected invalid analysis tools.":
+      "Apuri valitsi virheellisen analyysityökalun.",
+    "The assistant changed the analyzed scope. Try again.":
+      "Apuri muutti analyysin rajausta. Yritä uudelleen.",
     "Checking the dataset…": "Tarkistetaan aineistoa…",
     "Analysis unavailable": "Analyysiä ei voi aloittaa",
     "Activate a compatible dataset and reopen the workspace.":
