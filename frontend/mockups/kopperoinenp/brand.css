@@ -1185,3 +1185,196 @@ button:disabled {
 .message {
   white-space: pre-wrap;
 }
+
+/* Chat as a corner widget. Same controls and behaviour; #toggle-chat opens and closes it. */
+main {
+  padding-bottom: 96px;
+}
+#composer {
+  position: fixed;
+  top: auto;
+  right: 22px;
+  bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+  left: auto;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  width: min(390px, calc(100vw - 32px));
+  max-width: none;
+  height: min(600px, calc(100vh - 44px));
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+  transform: none;
+  box-shadow: 0 12px 40px #10243a4d;
+}
+#composer[hidden] {
+  display: none;
+}
+#composer .chat-dock-heading {
+  display: flex;
+  flex: none;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0;
+  padding: 12px 14px;
+  background: var(--brand-blue);
+}
+#composer .chat-dock-heading > span {
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+}
+#toggle-chat {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font-size: 0;
+  text-decoration: none;
+  cursor: pointer;
+}
+#toggle-chat::before {
+  content: "×";
+  font-size: 22px;
+  line-height: 1;
+}
+#composer #chat {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  margin: 0;
+  padding: 14px;
+  overflow-y: auto;
+}
+#composer #chat:empty::before {
+  content: "Kerro, mitä haluat muuttaa katsauksessa.";
+  display: block;
+  margin-right: 28px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: #edf3f7;
+  font-size: 13px;
+  line-height: 1.5;
+}
+#composer .message {
+  margin: 0 28px 10px 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+#composer .message.user {
+  margin: 0 0 10px 28px;
+}
+#composer form {
+  display: flex;
+  flex: none;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px 6px;
+  border: 0;
+  border-top: 1px solid #e1e6eb;
+  background: none;
+}
+#composer input {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #cbd3da;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 14px;
+}
+#composer form button {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--brand-blue);
+  color: #fff;
+  font-size: 16px;
+}
+#composer > small {
+  flex: none;
+  margin: 0;
+  padding: 0 14px 12px;
+  font-size: 11px;
+  color: #5f6b76;
+}
+
+/* Closed state: a round launcher. The toggle covers it, so the whole bubble opens the chat. */
+#composer:has(#chat[hidden]) {
+  width: auto;
+  height: 46px;
+  border-radius: 999px;
+  background: var(--brand-blue);
+  box-shadow: 0 6px 20px #10243a40;
+}
+#composer:has(#chat[hidden]):hover {
+  background: #002f56;
+}
+#composer:has(#toggle-chat:focus-visible) {
+  outline: 2px solid var(--brand-teal);
+  outline-offset: 2px;
+}
+#composer:has(#chat[hidden]) form,
+#composer:has(#chat[hidden]) > small,
+#composer:has(#chat[hidden]) .chat-dock-heading > span {
+  display: none;
+}
+#composer:has(#chat[hidden]) .chat-dock-heading {
+  gap: 8px;
+  height: 46px;
+  padding: 0 18px;
+  background: none;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+#composer:has(#chat[hidden]) .chat-dock-heading::before {
+  content: "";
+  width: 20px;
+  height: 20px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H9l-5 4v-4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z'/%3E%3C/svg%3E")
+    center / contain no-repeat;
+}
+#composer:has(#chat[hidden]) .chat-dock-heading::after {
+  content: "Kysy apurilta";
+}
+#composer:has(#chat[hidden]) #toggle-chat {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  outline: none;
+}
+#composer:has(#chat[hidden]) #toggle-chat::before {
+  content: "";
+}
+@media (max-width: 760px) {
+  #composer {
+    right: 16px;
+    bottom: 16px;
+    height: calc(100vh - 32px);
+  }
+  #composer:has(#chat[hidden]) {
+    width: 48px;
+    height: 48px;
+  }
+  #composer:has(#chat[hidden]) .chat-dock-heading {
+    justify-content: center;
+    height: 48px;
+    padding: 0;
+  }
+  #composer:has(#chat[hidden]) .chat-dock-heading::after {
+    content: none;
+  }
+}
