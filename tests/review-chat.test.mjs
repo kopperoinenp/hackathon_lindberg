@@ -60,8 +60,7 @@ test("chat changes scope atomically and export retains the same selection", () =
   const deck = buildPresentation(result.workspace);
   assert.equal(result.reply, "Done");
   assert.ok(!deck.slides.some((s) => s.id === "repairs"));
-  for (const id of ["overview", "sources"])
-    assert.ok(deck.slides.some((s) => s.id === id));
+  for (const id of ["overview", "sources"]) assert.ok(deck.slides.some((s) => s.id === id));
   const followup = applyChatPatch(result.workspace, scoped({ country: "Sweden" }), "Entä Ruotsi?");
   assert.equal(followup.workspace.scope.from, "2025-01");
   assert.equal(followup.workspace.scope.to, "2025-03");
@@ -292,11 +291,7 @@ test("KAM tools set monetary estimates, slide commentary and traffic lights with
   assert.match(deck.slides[0].paragraphs[0], /40\s*000/);
   assert.match(deck.slides[0].paragraphs[0], /KAM:in antama arvio/);
   assert.equal(deck.slides.find((s) => s.id === "plan").title, "Sovitaan seuranta");
-  assert.ok(
-    deck.slides
-      .find((s) => s.id === "plan")
-      .paragraphs.includes("Tarkistetaan sopimus"),
-  );
+  assert.ok(deck.slides.find((s) => s.id === "plan").paragraphs.includes("Tarkistetaan sopimus"));
   assert.deepEqual(deck.slides.find((s) => s.id === "water").chart.values, evidence);
   assert.equal(
     applyChatPatch(result.workspace, patch({ savingsText: "" }), "Poista säästöarvio").workspace
