@@ -6,7 +6,7 @@ import {
   slideIds,
 } from "./presentation-model.mjs";
 import { generateStructured, providerConfig } from "./ai-provider.mjs";
-const data = globalThis.REVIEW_DATA;
+import { dataset as data } from "./dataset.mjs";
 const scopeKeys = [
   "customer",
   "from",
@@ -18,13 +18,13 @@ const scopeKeys = [
   "priority",
 ];
 const scopeChoices = {
-  customer: data.customers.map((c) => c.customer_id),
-  from: [...new Set(data.records.map((r) => r.month))].sort(),
-  to: [...new Set(data.records.map((r) => r.month))].sort(),
+  customer: data?.customers.map((c) => c.customer_id) ?? [],
+  from: [...new Set(data?.records.map((r) => r.month))].sort(),
+  to: [...new Set(data?.records.map((r) => r.month))].sort(),
   country: ["all", "Finland", "Sweden", "Poland"],
   continent: ["all", "Europe"],
-  site: ["all", ...data.sites.map((s) => s.site_id)],
-  baseline: data.baselines.map((b) => b.baseline_id),
+  site: ["all", ...(data?.sites.map((s) => s.site_id) ?? [])],
+  baseline: data?.baselines.map((b) => b.baseline_id) ?? [],
   priority: ["neutral", "water", "emissions", "efficiency", "circularity"],
 };
 const nullableEnum = (values) => ({ type: ["string", "null"], enum: [...values, null] });

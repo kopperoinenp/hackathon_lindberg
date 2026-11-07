@@ -1,6 +1,5 @@
-(function () {
+(async function () {
   "use strict";
-  const data = globalThis.REVIEW_DATA;
   const { escapeHtml: esc } = globalThis.ReviewModel;
   const { storyContext } = globalThis.StoryModel;
   const $ = (query) => document.querySelector(query);
@@ -8,6 +7,43 @@
   let translate = globalThis.ReviewLanguage.translator(language);
   const t = (...args) => translate(...args);
   const localizePage = globalThis.ReviewLanguage.page();
+  function updateLanguage() {
+    translate = globalThis.ReviewLanguage.translator(language);
+    localizePage(language);
+    for (const button of document.querySelectorAll("[data-language]"))
+      button.setAttribute("aria-pressed", String(button.dataset.language === language));
+  }
+  function bindLanguageControls(update) {
+    for (const button of document.querySelectorAll("[data-language]"))
+      button.addEventListener("click", () => {
+        language = button.dataset.language;
+        localStorage.setItem("lindstrom-language", language);
+        update();
+      });
+  }
+  updateLanguage();
+  let source;
+  try {
+    const response = await fetch("data.js", { signal: AbortSignal.timeout(10000) });
+    if (response.ok) source = await response.text();
+  } catch {
+    // An unavailable source is handled like an empty dataset file.
+  }
+  const { data, issue } = globalThis.ReviewDataset.inspect(source);
+  if (issue) {
+    function showDatasetIssue() {
+      updateLanguage();
+      $("#dataset-title").textContent = t("Analysis unavailable");
+      $("#dataset-issue").textContent = [t(issue.message), issue.field].filter(Boolean).join(" · ");
+      $("#dataset-recovery").hidden = false;
+    }
+    bindLanguageControls(showDatasetIssue);
+    showDatasetIssue();
+    return;
+  }
+  $("#dataset-status").hidden = true;
+  $("#workspace").hidden = false;
+  $(".view-tabs").hidden = false;
   const countryName = (country) => t(globalThis.WorkspaceModel.countryNames[country]);
   const f = (number, digits = 0) =>
     new Intl.NumberFormat(t("en-GB"), { maximumFractionDigits: digits }).format(number);
@@ -584,19 +620,26 @@
     return t`<div class="site-benchmark"><div><h3>${shown.length === 1 ? t("Scan coverage at the selected site") : shown.length + t(" sites with the lowest scan coverage")}</h3><p class="quiet">${snapshotName()} · Starting point for a joint review.</p></div><div class="site-ranking">${shown.map((site) => `<div><span>${esc(site.site_name)}</span><div><i style="width:${Math.min(site.utilization, 100)}%"></i></div><strong>${f(site.utilization, 1)} %</strong></div>`).join("")}</div></div>`;
   }
   function renderStory() {
-    const { metrics: m, focus, sites, order } = context();
+    const { metrics: m, focus, sites, order, customer } = context();
     if (!m.hasData) {
       $("#story").innerHTML =
         t`<section class="intro"><h1>No data matches the filters.</h1><p>${context().invalidPeriod ? t("The start month is after the end month.") : t("Choose another date range or location in Explore data.")}</p></section>`;
       return;
     }
-    const shortName = { CUST001: "NorthStar", CUST002: "Apex", CUST003: "Mediora" }[state.customer];
+    const shortNames = {
+      "NorthStar Foods Group": "NorthStar",
+      "Apex Industrial Systems": "Apex",
+      "Mediora Health Network": "Mediora",
+    };
+    const displayName = Object.hasOwn(shortNames, customer.customer_name)
+      ? shortNames[customer.customer_name]
+      : customer.customer_name;
     const cards = results();
     const visibleOrder = order.filter((id) => state.visibleInsights.includes(id));
     const title =
       state.heading || state.titleEdits.cover
         ? esc(state.heading || state.titleEdits.cover)
-        : t`${shortName} · ${periodName()}<br />What did we achieve?`;
+        : t`${esc(displayName)} · ${periodName()}<br />What did we achieve?`;
 
     $("#story").innerHTML =
       t`<section class="intro"><span class="section-kicker">ANNUAL REVIEW PREPARATION</span><h1>${title}</h1><p>${opening()}</p><div class="scope"><strong>${esc(scopeName())}</strong> · ${m.sites} ${t(m.sites === 1 ? "site" : "sites")} · Baseline: ${baselineName()}</div></section><section class="story-section" aria-labelledby="results-title"${visibleOrder.length ? "" : " hidden"}><div class="section-heading"><span class="section-number">01</span><h2 id="results-title">Key results for the period</h2></div><div class="results">${visibleOrder
@@ -723,7 +766,7 @@
     if (!context().metrics.hasData)
       return t("<p>No data matches the filters. Adjust them to view the calculation.</p>");
     const { metrics: m, compare: c, baseline: b, customer } = context();
-    return t`<p class="quiet">${esc(customer.customer_name)} · ${esc(scopeName())} · ${periodName()}</p><p class="quiet">All customer figures are synthetic. Water and emissions are calculated estimates allocated from laundry-level data.</p><section class="method-section"><h3>Baseline: ${baselineName()}</h3><p>The baselines apply different water and emissions factors to the same washed weight. They represent illustrative laundry models.</p><div class="formula">Water difference: ${f(m.kg, 1)} kg × ${f(b.water_l_per_kg, 2)} l/kg − ${f(m.water)} l = ${f(c.waterDifference)} l<br />Emissions difference: ${f(m.kg, 1)} kg × ${f(b.process_kgco2e_per_kg + b.delivery_kgco2e_per_kg, 3)} kg CO₂e/kg − ${f(m.emissions)} kg CO₂e = ${f(c.emissionsDifference)} kg CO₂e</div><p>The scope covers water used in washing and laundry and delivery emissions. Figures in the review are rounded.</p></section><section class="method-section"><h3>Sources and calculations</h3><p>Lindstrom_SinceAI_Customer_Value_Synthetic_Data_Pack.xlsx, in the repository's data/source folder.</p><ul><li>Customers and Sites: synthetic customer and site records.</li><li>Service_Activity: washed kilograms in the period and allocations and scans for ${snapshotName()}.</li><li>Customer_Impacts: allocated_water_l, allocated_process_kgco2e and allocated_delivery_kgco2e, summed over the period.</li><li>Repairs: number of repair events in the selected period.</li><li>Baselines: factors for the selected comparison.</li></ul></section><section class="method-section"><h3>Interpretation limits</h3><ul><li>Scan coverage highlights where to investigate actual textile use.</li><li>Repair scenarios depend on assumptions about delayed purchases. Their estimated impact is shown separately from laundry emissions.</li><li>Unique wearer counts require person identifiers.</li><li>Cost savings, request resolution and regulatory claims require further evidence.</li><li>Industry focus is an editable suggestion.</li></ul></section>`;
+    return t`<p class="quiet">${esc(customer.customer_name)} · ${esc(scopeName())} · ${periodName()}</p><p class="quiet">All customer figures are synthetic. Water and emissions are calculated estimates allocated from laundry-level data.</p><section class="method-section"><h3>Baseline: ${baselineName()}</h3><p>The baselines apply different water and emissions factors to the same washed weight. They represent illustrative laundry models.</p><div class="formula">Water difference: ${f(m.kg, 1)} kg × ${f(b.water_l_per_kg, 2)} l/kg − ${f(m.water)} l = ${f(c.waterDifference)} l<br />Emissions difference: ${f(m.kg, 1)} kg × ${f(b.process_kgco2e_per_kg + b.delivery_kgco2e_per_kg, 3)} kg CO₂e/kg − ${f(m.emissions)} kg CO₂e = ${f(c.emissionsDifference)} kg CO₂e</div><p>The scope covers water used in washing and laundry and delivery emissions. Figures in the review are rounded.</p></section><section class="method-section"><h3>Sources and calculations</h3><p>${esc(data.source)}</p><ul><li>Customers and Sites: synthetic customer and site records.</li><li>Service_Activity: washed kilograms in the period and allocations and scans for ${snapshotName()}.</li><li>Customer_Impacts: allocated_water_l, allocated_process_kgco2e and allocated_delivery_kgco2e, summed over the period.</li><li>Repairs: number of repair events in the selected period.</li><li>Baselines: factors for the selected comparison.</li></ul></section><section class="method-section"><h3>Interpretation limits</h3><ul><li>Scan coverage highlights where to investigate actual textile use.</li><li>Repair scenarios depend on assumptions about delayed purchases. Their estimated impact is shown separately from laundry emissions.</li><li>Unique wearer counts require person identifiers.</li><li>Cost savings, request resolution and regulatory claims require further evidence.</li><li>Industry focus is an editable suggestion.</li></ul></section>`;
   }
   function clearScope() {
     state.note = "";
@@ -1074,21 +1117,13 @@
     }
   });
   function applyLanguage() {
-    translate = globalThis.ReviewLanguage.translator(language);
-    localizePage(language);
-    for (const button of document.querySelectorAll("[data-language]"))
-      button.setAttribute("aria-pressed", String(button.dataset.language === language));
+    updateLanguage();
     updateChatToggle();
     render();
     $("#download-powerpoint").title = t(
       state.readyPresentation ? "Download PowerPoint" : "Generate the presentation first",
     );
   }
-  for (const button of document.querySelectorAll("[data-language]"))
-    button.addEventListener("click", () => {
-      language = button.dataset.language;
-      localStorage.setItem("lindstrom-language", language);
-      applyLanguage();
-    });
+  bindLanguageControls(applyLanguage);
   applyLanguage();
 })();

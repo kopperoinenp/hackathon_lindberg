@@ -1,13 +1,14 @@
 // Loopback-only workspace and presentation API. Provider secrets stay server-side.
 import { createServer } from "node:http";
 import { watch, existsSync } from "node:fs";
-import { handlePresentationApi } from "../backend/presentation-api.mjs";
 import { readFile, stat } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const envFile = fileURLToPath(new URL("../.env", import.meta.url));
 if (existsSync(envFile)) process.loadEnvFile(envFile);
+const { datasetSource } = await import("../backend/dataset.mjs");
+const { handlePresentationApi } = await import("../backend/presentation-api.mjs");
 
 const root = fileURLToPath(new URL("../frontend/mockups/", import.meta.url));
 const mime = {
@@ -50,6 +51,15 @@ const server = createServer(async (request, response) => {
     if (url.pathname === "/") {
       response.writeHead(302, { Location: "/kopperoinenp/index.html" });
       response.end();
+      return;
+    }
+    if (url.pathname === "/kopperoinenp/data.js") {
+      response.writeHead(datasetSource ? 200 : 503, {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Content-Type-Options": "nosniff",
+      });
+      response.end(datasetSource);
       return;
     }
     const pathname = decodeURIComponent(

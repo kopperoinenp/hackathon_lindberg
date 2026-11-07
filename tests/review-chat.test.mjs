@@ -8,6 +8,7 @@ import {
   chatSchema,
 } from "../backend/review-chat.mjs";
 import { buildPresentation, applyPlan, defaultPlan } from "../backend/presentation-model.mjs";
+import { dataset } from "../backend/dataset.mjs";
 const workspace = () => normalizeWorkspace({ scope: {} });
 const patch = (changes = {}) => ({
   ...Object.fromEntries(chatSchema.required.map((k) => [k, null])),
@@ -63,9 +64,7 @@ test("customer switch clears customer-specific material and presentation selecti
 test("invalid patches cannot mutate the current workspace or manufacture text", () => {
   const current = workspace(),
     before = structuredClone(current);
-  const foreignSite = globalThis.REVIEW_DATA.sites.find(
-    (s) => s.customer_id !== current.scope.customer,
-  ).site_id;
+  const foreignSite = dataset.sites.find((s) => s.customer_id !== current.scope.customer).site_id;
   const invalid = [
     scoped({ country: "Germany" }),
     scoped({ from: "2025-12", to: "2025-01" }),
