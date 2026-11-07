@@ -15,7 +15,8 @@
     index = 0;
   function chart(item) {
     if (!item.chart) return "";
-    const { labels, values, unit } = item.chart,
+    const { labels, values } = item.chart,
+      unit = t(item.chart.unit),
       max = Math.max(...values, 1),
       monthly = item.kind === "repairs";
     const height = monthly ? 260 : 100 + labels.length * 70;

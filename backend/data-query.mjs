@@ -207,6 +207,7 @@ const fields = {
   lastMonths: { type: ["integer", "null"], minimum: 1, maximum: 12 },
   only: { anyOf: [{ type: "array", items: { type: "string" } }, { type: "null" }] },
   subject: nullable(Object.keys(explanations)),
+  clarify: { type: ["string", "null"] },
   reason: { type: "string", enum: queryReasons },
 };
 export const dataQuerySchema = {
@@ -352,13 +353,41 @@ export function refineQuery(query, message, lastQuery = null) {
       subject: query.subject ?? (lastQuery?.topic in explanations ? lastQuery.topic : null),
     };
   const next = { ...query };
-  if (
-    (next.measure ?? "auto") === "auto" &&
+  // Filters must come from the question or the previous search, never from the model alone.
+  const named = {
+    country: [
+      ["Finland", /suom|finland/u],
+      ["Sweden", /ruots|sweden/u],
+      ["Poland", /puol|poland/u],
+    ].some(([country, pattern]) => country === next.country && pattern.test(text)),
+    quarter: Boolean(next.quarter) && text.includes(next.quarter.toLowerCase()),
+    site: (() => {
+      const site = data.sites.find((row) => row.site_id === next.site);
+      if (!site) return false;
+      const city = site.city.toLocaleLowerCase("fi");
+      const stems = [city.slice(0, 4), { turku: "turu", lahti: "lahde", warsaw: "varso" }[city]];
+      return stems.some((stem) => stem && text.includes(stem));
+    })(),
+    customer: (() => {
+      const row = data.customers.find((item) => item.customer_id === next.customer);
+      return (
+        Boolean(row) && text.includes(row.customer_name.split(" ")[0].toLowerCase().slice(0, 4))
+      );
+    })(),
+  };
+  for (const key of ["country", "quarter", "site", "customer"])
+    if (next[key] && !named[key] && next[key] !== lastQuery?.[key]) next[key] = null;
+  // Totals follow volume, so comparisons use rates unless a total was asked for.
+  const wantsTotal =
     /\bsum|\bsome the|total|yhteen|summa|paljonko|montako|kuinka monta|how many|how much/u.test(
       text,
-    )
-  )
-    next.measure = "total";
+    ) ||
+    (lastQuery?.measure === "total" && lastQuery.topic === next.topic);
+  next.measure = wantsTotal
+    ? "total"
+    : next.compareBy === "none"
+      ? (next.measure ?? "auto")
+      : "rate";
   const last = text.match(/(?:viime|viimeis\w*|last|past)\s+(\d+|\p{L}+)\s+(?:kuukau|month)/u);
   if (last && !next.lastMonths) {
     const value = Number(last[1]) || counts[last[1]];

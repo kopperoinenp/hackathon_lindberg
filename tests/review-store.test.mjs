@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile, readdir } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createReviewStore } from "../backend/review-store.mjs";
@@ -12,6 +12,17 @@ const workspace = (customer = "CUST001") => ({
   cooperation: "yellow",
   dashboardLayout: { sections: ["savings", "metrics"], metrics: ["allocated"] },
   managerTexts: { plan: "Meet next month" },
+  contractKpis: [
+    {
+      label: "Delivery",
+      area: "performance",
+      actual: "97 %",
+      target: "99 %",
+      source: "Q4 report",
+      priority: true,
+    },
+  ],
+  includeContractAgenda: true,
 });
 test("customer reviews persist across store restart, retain dashboard edits, and remain customer-specific", async (t) => {
   const dir = await mkdtemp(path.join(tmpdir(), "kam-review-"));
@@ -31,6 +42,8 @@ test("customer reviews persist across store restart, retain dashboard edits, and
   const loaded = await restarted.read("CUST001");
   assert.deepEqual(loaded, saved);
   assert.equal(loaded.workspace.savings, 40000);
+  assert.deepEqual(loaded.workspace.contractKpis, workspace().contractKpis);
+  assert.equal(loaded.workspace.includeContractAgenda, true);
   assert.deepEqual(loaded.workspace.dashboardLayout.sections, ["savings", "metrics"]);
   assert.equal((await restarted.read("CUST002")).workspace, null);
   await restarted.save("CUST002", { revision: 0, workspace: workspace("CUST002") });
@@ -61,4 +74,39 @@ test("stale or simultaneous writes cannot overwrite newer edits; invalid data an
     store.save("CUST001", { revision: 1, workspace: workspace() }),
     (e) => e.status === 500,
   );
+});
+
+test("the first edit creates one customer review and later edits update it", async (t) => {
+  const dir = await mkdtemp(path.join(tmpdir(), "kam-review-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const store = createReviewStore(dir);
+  assert.equal((await store.read("CUST002")).workspace, null);
+  const first = await store.save("CUST002", {
+    revision: 0,
+    workspace: {
+      ...workspace("CUST002"),
+      evidenceAreas: ["performance"],
+      customerBasics: [],
+      nextSteps: [{ title: "Review deliveries", owner: "KAM", due: "Q2" }],
+    },
+  });
+  assert.equal(first.revision, 1);
+  const edited = { ...first.workspace, heading: "Water focus" };
+  await store.save("CUST002", { revision: first.revision, workspace: edited });
+  const reopened = await createReviewStore(dir).read("CUST002");
+  assert.equal(reopened.revision, 2);
+  assert.equal(reopened.workspace.heading, "Water focus");
+  assert.deepEqual(reopened.workspace.evidenceAreas, ["performance"]);
+  assert.deepEqual(reopened.workspace.customerBasics, []);
+  assert.equal(reopened.workspace.nextSteps[0].title, "Review deliveries");
+});
+
+test("the workspace has no mode that keeps the assistant from editing", async () => {
+  const root = new URL("../frontend/mockups/kopperoinenp/", import.meta.url);
+  const page = await readFile(new URL("index.html", root), "utf8");
+  const app = await readFile(new URL("app.js", root), "utf8");
+  assert.doesNotMatch(page, /review-profile-mode|create-customer-review/);
+  assert.doesNotMatch(app, /profileMode/);
+  assert.doesNotMatch(app, /flushReviewSave\(true\)/);
+  assert.equal(page.match(/id="query-result"/g).length, 1);
 });

@@ -2,19 +2,11 @@
 (function (root) {
   "use strict";
   const finnish = {
+    "KAM estimates are customer-specific and do not change with filters.":
+      "KAM:in arviot ovat asiakaskohtaisia eivätkä muutu rajausten mukana.",
+    "Textile use by product": "Tekstiilien käyttö tuotteittain",
+    "Allocation and scan coverage for": "Allokointi ja skannausosuus kuukaudelta",
     "Dashboard view": "Dashboard-näkymä",
-    "Saved customer review": "Asiakkaan tallennettu katsaus",
-    "Original template": "Alkuperäinen pohja",
-    "No saved review": "Ei tallennettua katsausta",
-    "Create customer review": "Luo asiakkaalle oma katsaus",
-    "No review has been created for this customer. Create a customer review to edit and save it.":
-      "Tälle asiakkaalle ei ole vielä luotu katsausta. Luo asiakkaalle oma katsaus, jotta voit muokata ja tallentaa sen.",
-    "Edits are saved to this customer’s review.":
-      "Muutokset tallentuvat tämän asiakkaan katsaukseen.",
-    "Original template preview. Your saved review is unchanged. Select Saved customer review to edit.":
-      "Alkuperäisen pohjan esikatselu. Tallennettu katsaus säilyy ennallaan. Muokkaa valitsemalla asiakkaan tallennettu katsaus.",
-    "Wait until loading or editing has finished before switching views.":
-      "Odota latauksen tai muokkauksen valmistumista ennen näkymän vaihtamista.",
     "Replace this customer's saved dashboard layout with the original layout?":
       "Korvataanko tämän asiakkaan tallennettu dashboard-rakenne alkuperäisellä rakenteella?",
 
@@ -44,6 +36,7 @@
     "There is insufficient data for a proposal in this selection.":
       "Valitulla rajauksella ei ole riittävää näyttöä kehitysehdotukselle.",
     "Same period last year": "Sama jakso vuotta aiemmin",
+    "Data-based suggestions": "Dataan perustuvat ehdotukset",
     "Historical change": "Jaksovertailu",
     "Previous value: 0": "Vertailujakson arvo: 0",
     "Preceding period": "Edeltävä jakso",
@@ -131,6 +124,186 @@
       "Tuote-erittely ei täsmää toimipaikan kuukausisummaa vasten.",
     "Service-cycle data is invalid or has no matching activity.":
       "Palvelukierron tiedot ovat virheelliset tai vastaava käyttörivi puuttuu.",
+    // Evidence blocks
+    improved: "parantunut",
+    weakened: "heikentynyt",
+    pp: "%-yks.",
+    vs: "vs.",
+    "Laundry and delivery CO₂e per washed kg": "Pesun ja toimitusten CO₂e pestyä kiloa kohden",
+    "service cost in the period": "palvelun kustannus jaksolla",
+    "per washed kg": "pestyä kiloa kohden",
+    invoiced: "laskutettu",
+    "per textile per month": "tekstiiliä ja kuukautta kohden",
+    "verified savings": "todennettu säästö",
+    "Invoiced, € per month": "Laskutus, € kuukausittain",
+    "Synthetic invoicing data. Cost per washed kilogram makes years comparable.":
+      "Synteettinen laskutusaineisto. Kustannus pestyä kiloa kohden tekee vuosista vertailukelpoisia.",
+    "ANNUAL REVIEW": "VUOSIKATSAUS",
+    "How the service performed, the value we created together, and what we propose to work on next.":
+      "Miten palvelu toimi, mitä arvoa loimme yhdessä ja mitä ehdotamme seuraavaksi.",
+    "at the same wash volume": "samalla pesumäärällä",
+    "All figures are based on synthetic demo data.":
+      "Kaikki luvut perustuvat synteettiseen demoaineistoon.",
+    "less CO₂e": "vähemmän CO₂e-päästöjä",
+    "more CO₂e": "enemmän CO₂e-päästöjä",
+    "less water": "vähemmän vettä",
+    "more water": "enemmän vettä",
+    "Comparison: the same wash volume washed at": "Vertailu: sama pesumäärä pestynä vaihtoehdossa",
+    "lower emissions intensity for Lindström Group than the average of four industry peers. Company-level figure, indicative and unverified.":
+      "pienempi päästöintensiteetti Lindström-konsernilla kuin neljän alan verrokin keskiarvo. Yritystason luku, suuntaa antava ja vahvistamaton.",
+    "Your priorities and where they are covered": "Teidän painopisteenne ja missä ne näkyvät",
+    See: "Katso",
+    "Measure to be agreed together": "Mittari sovitaan yhdessä",
+    "textiles allocated to this site had no active scan in":
+      "tälle toimipaikalle kohdistettua tekstiiliä oli ilman aktiivista skannausta kuukautena",
+    "This site has the lowest scan coverage in the selection, so it is a natural place to start a joint review.":
+      "Tällä toimipaikalla on valinnan matalin skannauskattavuus, joten se on luonteva paikka aloittaa yhteinen tarkastelu.",
+    Owner: "Vastuu",
+    Timeline: "Aikataulu",
+    Action: "Toimenpide",
+    Remove: "Poista",
+    "Add step": "Lisää toimenpide",
+    "Start from suggestions": "Aloita ehdotuksista",
+    "E.g. Q2 2026": "Esim. Q2 2026",
+    "Agreed next steps": "Sovitut jatkotoimet",
+    "Next steps shown in section 03": "Osiossa 03 näytettävät jatkotoimet",
+    "Only the steps written here are shown to the customer. Keep to one to three.":
+      "Asiakkaalle näytetään vain tähän kirjoitetut toimet. Pidä määrä yhdestä kolmeen.",
+    "Next steps agreed for the coming period, each with an owner and a timeline.":
+      "Tulevalle kaudelle sovitut jatkotoimet, kullakin vastuuhenkilö ja aikataulu.",
+    "Next steps will be agreed together in this meeting.":
+      "Jatkotoimet sovitaan yhdessä tässä tapaamisessa.",
+    "The service in numbers": "Palvelu lukuina",
+    "List of all locations": "Kaikkien sijaintien lista",
+    Brief: "Lyhyt",
+    "Customer knows the service": "Asiakas tuntee palvelun",
+    Standard: "Perus",
+    "Regular review": "Tavallinen katsaus",
+    Full: "Laaja",
+    "First review or new contacts": "Ensimmäinen katsaus tai uudet yhteyshenkilöt",
+    "Customer basics before the figures": "Asiakkaan perustiedot ennen lukuja",
+    "Name, industry, textiles, sites and countries are always shown.":
+      "Nimi, toimiala, tekstiilit, toimipaikat ja maat näytetään aina.",
+    "The service in": "Palvelu vuonna",
+    washes: "pesukertaa",
+    "tonnes of textiles washed": "tonnia pestyjä tekstiilejä",
+    "pickup and return cycles": "nouto- ja palautuskiertoa",
+    "service requests": "palvelupyyntöä",
+    "Sites by type": "Toimipaikat tyypeittäin",
+    "On average": "Keskimäärin",
+    "textiles per site": "tekstiiliä toimipaikkaa kohden",
+    Countries: "Maat",
+    textiles: "tekstiiliä",
+    "Allocated textiles in": "Kohdistetut tekstiilit",
+    "Central Laundry Hub": "Keskuspesula",
+    "Distribution Center": "Jakelukeskus",
+    Hospital: "Sairaala",
+    "Manufacturing Plant": "Valmistava tehdas",
+    "Office & Operations": "Toimisto ja operatiiviset toiminnot",
+    "Production Plant": "Tuotantolaitos",
+    "Service Center": "Palvelukeskus",
+    "Food Industry Coat": "Elintarviketeollisuuden takki",
+    "Healthcare Tunic": "Hoitajan tunika",
+    "High-Visibility Jacket": "Huomiotakki",
+    "Protective Coverall": "Suojahaalari",
+    "Work Jacket Standard": "Työtakki, perusmalli",
+    "Work Trouser Standard": "Työhousut, perusmalli",
+    Coveralls: "Haalarit",
+    "Food Industry": "Elintarviketeollisuus",
+    Healthcare: "Terveydenhuolto",
+    "Hi-Vis": "Huomiovaatteet",
+    Jackets: "Takit",
+    Trousers: "Housut",
+    "CUSTOMER REVIEW CONTENT": "ASIAKASKATSAUKSEN SISÄLTÖ",
+    "What the customer sees": "Mitä asiakas näkee",
+    "These choices update the Customer review, the view shown to the customer.":
+      "Nämä valinnat päivittävät asiakaskatsauksen, joka on asiakkaalle näytettävä näkymä.",
+    "Note for the review and presentation": "Muistiinpano katsaukseen ja esitykseen",
+    "E.g. a customer goal or an agreed next step…":
+      "Esim. asiakkaan tavoite tai sovittu seuraava askel…",
+    "Shown in the review opening until the customer, site or baseline changes.":
+      "Näkyy katsauksen alussa, kunnes asiakas, toimipaikka tai vertailukohta vaihtuu.",
+    "Show customer review": "Näytä asiakaskatsaus",
+    "To be agreed together": "Sovitaan yhdessä",
+    "Measures for this area will be agreed with you and followed in future reviews.":
+      "Tämän alueen mittarit sovitaan kanssanne ja niitä seurataan tulevissa katsauksissa.",
+    "Shown to the customer as “to be agreed together”:":
+      "Näkyy asiakkaalle muodossa ”sovitaan yhdessä”:",
+    "No recorded service cycles in the selection": "Valinnassa ei ole kirjattuja huoltokiertoja",
+    "of service cycles were completed on time": "huoltokierroista valmistui ajallaan",
+    "on time": "ajallaan",
+    "typical turnaround": "tyypillinen kiertoaika",
+    "On time, % per month": "Ajallaan, % kuukausittain",
+    "Service requests": "Palvelupyynnöt",
+    "of textiles in service were scanned in": "palvelun tekstiileistä skannattiin kuukautena",
+    scanned: "skannattu",
+    "textiles in service": "tekstiiliä palvelussa",
+    "Scanned, % per month": "Skannattu, % kuukausittain",
+    "Textiles without a scan": "Tekstiilit ilman skannausta",
+    "repairs kept textiles in use": "korjausta piti tekstiilit käytössä",
+    "Repairs per month": "Korjaukset kuukausittain",
+    Energy: "Energia",
+    "lower laundry and delivery emissions than": "pienemmät pesun ja toimitusten päästöt kuin",
+    "higher laundry and delivery emissions than": "suuremmat pesun ja toimitusten päästöt kuin",
+    water: "vesi",
+    "Lindström, t CO₂e per month": "Lindström, t CO₂e kuukausittain",
+    "Textile waste reused or recycled": "Tekstiilijäte uudelleenkäyttöön tai kierrätykseen",
+    "For discussion today": "Tänään sovittavaksi:",
+    "Agree one improvement, an owner and a follow-up date (section 03).":
+      "yksi parannus, vastuuhenkilö ja seurantapäivä (osio 03).",
+    "A trend needs at least two months of data.":
+      "Trendi vaatii vähintään kahden kuukauden tiedot.",
+    "What the service covers": "Mitä palvelu kattaa",
+    "Lindström provides workwear as a service: textiles are supplied, picked up, washed, repaired and returned to each site.":
+      "Lindström tarjoaa työvaatteet palveluna: tekstiilit toimitetaan, noudetaan, pestään, korjataan ja palautetaan jokaiseen toimipaikkaan.",
+    "Textiles in the service": "Palvelun tekstiilit",
+    "Serving laundries": "Palvelevat pesulat",
+    "Data period": "Aineiston ajanjakso",
+    "Are we delivering successfully overall?": "Onnistummeko kokonaisuutena?",
+    "Are our users and stakeholders satisfied?": "Ovatko käyttäjät ja sidosryhmät tyytyväisiä?",
+    "Is the service reliable?": "Onko palvelu luotettava?",
+    "Are we actually using the service effectively?": "Käytämmekö palvelua tehokkaasti?",
+    "Is the service making operations better?": "Parantaako palvelu toimintaamme?",
+    "Are we getting value for what we spend?": "Saammeko vastinetta rahoillemme?",
+    "What environmental value are we creating together?": "Mitä ympäristöarvoa luomme yhdessä?",
+    "Are the issues we raise actually being solved?": "Ratkaistaanko esiin nostamamme asiat?",
+    "What should we work on next?": "Mihin keskitymme seuraavaksi?",
+    "Areas for this customer": "Tämän asiakkaan aihealueet",
+    "Use customer priorities": "Palauta asiakkaan painopisteet",
+    "Show more": "Näytä lisää",
+    "Status colours are shown once thresholds have been agreed with the customer.":
+      "Tilavärit näytetään, kun raja-arvoista on sovittu asiakkaan kanssa.",
+    "No customer experience data yet. Add CSAT, NPS or customer feedback as a contract KPI.":
+      "Asiakaskokemuksen tietoa ei vielä ole. Lisää CSAT, NPS tai asiakaspalaute sopimusmittariksi.",
+    "No cost or invoice data yet. Add agreed savings or cost development as a contract KPI.":
+      "Kustannus- tai laskutustietoa ei vielä ole. Lisää sovitut säästöt tai kustannuskehitys sopimusmittariksi.",
+    "No action tracking yet. Add open actions or recurring issues as a contract KPI.":
+      "Toimenpiteiden seurantaa ei vielä ole. Lisää avoimet toimenpiteet tai toistuvat ongelmat sopimusmittariksi.",
+    "Recorded cycles": "Kirjattuja kiertoja",
+    "90% of cycles within": "90 % kierroista alle",
+    late: "myöhässä",
+    "Late flags come from the source data. Contract SLA targets are not in the dataset.":
+      "Myöhästymismerkinnät tulevat lähdeaineistosta. Sopimuksen SLA-tavoitteita ei ole aineistossa.",
+    "Scan coverage shows where to investigate. It is not proof of unused textiles.":
+      "Skannauskattavuus näyttää, mitä kannattaa selvittää. Se ei todista tekstiilien käyttämättömyyttä.",
+    repairs: "korjausta",
+    "repairs / 100 washes": "korjausta / 100 pesua",
+    "washes / item / month": "pesua / tuote / kk",
+    "Repairs keep textiles in use. Avoided purchases need separate evidence.":
+      "Korjaukset pitävät tekstiilit käytössä. Vältetyt hankinnat vaativat erillisen näytön.",
+    "Compared with": "Verrattuna:",
+    "Agree next steps in section 03 below.": "Sovi jatkotoimet alla osiossa 03.",
+    "Water efficiency": "Vesitehokkuus",
+    "Scope 3 evidence": "Scope 3 -näyttö",
+    Hygiene: "Hygienia",
+    "Service continuity": "Palvelun jatkuvuus",
+    "Service reliability": "Palvelun luotettavuus",
+    Compliance: "Vaatimustenmukaisuus",
+    Safety: "Turvallisuus",
+    "Cost optimization": "Kustannusten optimointi",
+    "Garment utilization": "Vaatteiden käyttöaste",
+    Traceability: "Jäljitettävyys",
+    Repair: "Korjaus",
     "CUSTOMER FOCUS": "ASIAKASKOHTAINEN PAINOTUS",
     "SHARED REVIEW": "YHTEINEN KATSAUSPOHJA",
     "Contract KPIs and meeting agenda": "Sopimusmittarit ja palaverin agenda",
@@ -447,8 +620,8 @@
       '</tbody></table></div><p class="quiet">Avaa toimipaikka nähdäksesi sen oman katsauksen. Palaa kokonaisuuteen pyytämällä apurilta ”näytä kaikki toimipaikat”.</p></details></section><section class="story-section" aria-labelledby="next-title"><div class="section-heading"><span class="section-number">03</span><h2 id="next-title">Yhteinen suunta ensi vuodelle</h2></div><div class="next-chapter"><div><h3>Yksi hyvä parannus<br />kerrallaan.</h3><p>Ota palaveriin mukaan selkeä keskustelunavaus. Nämä ovat ehdotuksia, joista sovitaan asiakkaan kanssa.</p></div><ol class="next-steps">',
     '><summary>Add a note to the presentation</summary><label for="meeting-note" class="sr-only">Meeting note</label><textarea id="meeting-note" maxlength="2000" placeholder="E.g. a customer goal or an agreed next step…">':
       '><summary>Lisää oma muistiinpano esitykseen</summary><label for="meeting-note" class="sr-only">Oma palaverimuistiinpano</label><textarea id="meeting-note" maxlength="2000" placeholder="E.g. a customer goal or an agreed next step…">',
-    '</textarea><p class="quiet">The note stays in this tab until you change the customer, site or baseline.</p></details></section>':
-      '</textarea><p class="quiet">Muistiinpano säilyy tässä välilehdessä. Asiakkaan, toimipaikan tai vertailun vaihtaminen tyhjentää sen.</p></details></section>',
+    '</textarea><p class="quiet">The note is saved for this customer and retained when filters change.</p></details></section>':
+      '</textarea><p class="quiet">Muistiinpano tallentuu tälle asiakkaalle ja säilyy myös rajauksia vaihtaessa.</p></details></section>',
     '</p><div class="relevance"><strong>Why this matters</strong><p>':
       '</p><div class="relevance"><strong>Miksi tämä nostetaan?</strong><p>',
     "<p>No data matches the filters. Adjust them to view the calculation.</p>":

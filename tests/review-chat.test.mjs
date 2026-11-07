@@ -17,6 +17,33 @@ const patch = (changes = {}) => ({
   ...changes,
 });
 const scoped = (changes) => patch({ scope: { ...patch().scope, ...changes } });
+test("customer review selections and exact-text edits survive scope changes", () => {
+  const nextSteps = [{ title: "Review reserve stock", owner: "", due: "" }];
+  const result = applyChatPatch(
+    workspace(),
+    patch({
+      evidenceAreas: ["performance", "sustainability"],
+      customerBasics: [],
+      nextSteps,
+      areaEdit: { id: "performance", title: "Delivery review", text: null },
+    }),
+    "Show a brief review. Add Review reserve stock and call the block Delivery review.",
+  );
+  assert.deepEqual(result.workspace.evidenceAreas, ["performance", "sustainability"]);
+  assert.deepEqual(result.workspace.customerBasics, []);
+  assert.deepEqual(result.workspace.nextSteps, nextSteps);
+  assert.equal(result.workspace.areaTitles.performance, "Delivery review");
+  const filtered = applyChatPatch(result.workspace, scoped({ country: "Finland" }), "Show Finland");
+  assert.deepEqual(filtered.workspace.nextSteps, nextSteps);
+  assert.equal(filtered.workspace.areaTitles.performance, "Delivery review");
+  const switched = applyChatPatch(result.workspace, scoped({ customer: "CUST002" }), "Show Apex");
+  assert.equal(switched.workspace.evidenceAreas, null);
+  assert.deepEqual(switched.workspace.nextSteps, []);
+  assert.throws(
+    () => applyChatPatch(workspace(), patch({ nextSteps }), "Show a brief review."),
+    /must come from your instruction/,
+  );
+});
 test("chat changes scope atomically and export retains the same selection", () => {
   const current = workspace(),
     before = structuredClone(current);
@@ -321,4 +348,74 @@ test("dashboard layout changes structure and selected KPIs rather than creating 
     after.slides.map((s) => s.id),
     before.slides.map((s) => s.id),
   );
+});
+
+test("filter changes preserve customer KAM material and contract KPIs; customer changes clear it", () => {
+  const current = normalizeWorkspace({
+    scope: {},
+    savings: 40000,
+    note: "Follow up",
+    heading: "Our priorities",
+    titleEdits: { cover: "Meeting" },
+    slideOrder: ["cover", "overview"],
+    managerTexts: { plan: "Agree dates" },
+    contractKpis: [
+      {
+        label: "Delivery",
+        area: "performance",
+        actual: "97 %",
+        target: "99 %",
+        source: "Report",
+        priority: true,
+      },
+    ],
+    includeContractAgenda: true,
+  });
+  const filtered = applyChatPatch(
+    current,
+    scoped({ country: "Finland", from: "2025-04", to: "2025-06" }),
+    "Näytä Suomen huhti–kesäkuu",
+  ).workspace;
+  for (const key of [
+    "savings",
+    "note",
+    "heading",
+    "titleEdits",
+    "slideOrder",
+    "managerTexts",
+    "contractKpis",
+    "includeContractAgenda",
+  ])
+    assert.deepEqual(filtered[key], current[key]);
+  const other = applyChatPatch(
+    current,
+    scoped({ customer: "CUST002" }),
+    "Vaihda asiakkaaksi Apex",
+  ).workspace;
+  assert.deepEqual(other.contractKpis, []);
+  assert.equal(other.includeContractAgenda, false);
+  assert.equal(other.savings, null);
+  assert.equal(other.note, "");
+});
+
+test("contract KPI storage rejects invalid content and supports older reviews", () => {
+  assert.deepEqual(normalizeWorkspace({ scope: {} }).contractKpis, []);
+  const kpi = {
+    label: "Delivery",
+    area: "performance",
+    actual: "97 %",
+    target: "99 %",
+    source: "Report",
+    priority: true,
+  };
+  for (const invalid of [
+    [{ ...kpi, area: "unknown" }],
+    [{ ...kpi, label: "" }],
+    Array(13).fill(kpi),
+    Array(4).fill(kpi),
+    [{ ...kpi, priority: "yes" }],
+    [{ ...kpi, actual: "x".repeat(41) }],
+  ])
+    assert.throws(() => normalizeWorkspace({ scope: {}, contractKpis: invalid }));
+  assert.throws(() => normalizeWorkspace({ scope: {}, includeContractAgenda: "yes" }));
 });

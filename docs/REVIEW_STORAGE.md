@@ -5,7 +5,7 @@ The local single-user backend saves one current review per customer under
 tests/deployment. Data is independent of the synthetic source fixture and survives
 service restarts. Only validated workspace settings are stored: scope, dashboard
 layout, visible metrics, headings, manager commentary, notes, estimates, relationship
-color and presentation choices. API keys, generated files and chat history are not
+color, contract KPIs, agenda inclusion and presentation choices. API keys, generated files and chat history are not
 stored here. Language remains a browser preference.
 
 - `GET /api/reviews/{customer}` returns `{customer,revision,updatedAt,workspace}`.
@@ -21,38 +21,33 @@ hosting. Production needs authenticated ownership and shared transactional stora
 
 The UI loads the saved review on startup/customer selection, saves edits after a
 short debounce, and waits for assistant-edit saves before completion. The browser
-remembers only the last customer ID. The persistent storage indicator reports
+remembers the selected customer ID separately in each tab (sessionStorage). The persistent storage indicator reports
 loading/saving/saved/errors. On conflicts, reload rather than overwriting another
 window. Switching customers flushes pending changes and loads that customer's
-saved review (or defaults when none exists); assistant customer switches also load
+saved review; assistant customer switches also load
 the saved target review before accepting further edits. Chat transcript is intentionally session-only.
 
-The dashboard selector opens **Saved customer review** only when that customer's
-backend record exists. An uncreated customer opens **Original template**, with the
-saved-review option disabled and an explicit **Create customer review** button.
-Browsing, filtering, switching customers and reloading do not create a record.
-Creation saves the current template settings for the selected customer and opens
-its editable review only after a successful save. Failed creation keeps the
-template visible and does not present an unsaved view as an existing profile.
-The selector and helper text identify the customer by name. There is no global
-saved review shared across customer IDs; existing customer records are retained.
-
-Switching to
-**Original template** first flushes pending saves, keeps the full current review
-in memory, and displays the original defaults for the same customer. Template
-filtering is temporary and never written to the customer profile. Assistant edits,
-contract KPI editing and presentation generation are unavailable in the template
-preview; select the saved review to edit or export. Returning restores the saved
-review's filters, layout, commentary and session conversation. Switching customers
-or reloading opens the selected customer's saved review when one exists, otherwise
-the original template. Switching is
-blocked while assistant edits or presentation generation are running; failed saves
-keep the current review visible. Reset dashboard is separate and asks for
-confirmation before saving the default layout as the new preference.
-
-Browser checks cover saved/original/saved round trips, temporary template filters,
-customer switching from template mode and reloading from template mode, verifying
-that the saved review's monetary estimate and filters remain unchanged.
+Every customer has one dashboard. On first open, the UI displays the defaults.
+The first edit creates the saved review. After that, edits from the dashboard and
+the assistant are saved to the same record, and reopening the customer restores
+them. There is no mode to choose and nothing to create by hand. If the first save
+fails, the default view stays usable and the storage indicator says the changes are
+only on this page. Reset dashboard asks for confirmation before it saves the default
+layout. Assistant edits and customer switching wait until the selected review has
+loaded. There is no global saved review shared across customer IDs.
 
 Tests cover disk persistence across a new store instance, customer isolation,
 concurrent/stale revisions, validation/corruption, and actual HTTP PUT/GET/409.
+
+Contract KPIs are part of the validated workspace: `contractKpis` contains up to
+12 entries (label, evidence area, actual, target, source, priority), of which up to
+three may be highlighted. `includeContractAgenda` persists the export selection.
+Older records default to an empty list and false. Creating/editing/removing a KPI
+or changing agenda inclusion triggers the same autosave queue as dashboard edits.
+
+KAM commentary, savings estimates, custom headings and slide choices belong to the
+customer and survive date/country/site/baseline filtering and clearing filters.
+They remain manually supplied material, not recalculated evidence. Selecting a
+different customer loads that customer's profile. The AI patch validator also
+preserves KAM material for same-customer scope changes and clears it on a customer
+change. The assistant stays available in both workspace tabs.

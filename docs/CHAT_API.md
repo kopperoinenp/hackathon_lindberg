@@ -14,8 +14,8 @@ Same-origin checks, request limits and the shared chat concurrency lock apply.
 
 ## Assistant tools
 
-The assistant routes requests to a workspace edit, a scoped analysis view, or
-a read-only data query. For `dataQuery`, the model returns structured filters, and
+The assistant has exactly two tools. The workspace patch changes the dashboard.
+`dataQuery` is read-only: the model returns only `{topic, compareBy}`, and
 `backend/data-query.mjs` calculates and writes the answer with the same dashboard
 functions. The model never writes figures. A successful question adds `answer` and
 `source` and a chart-ready `view` to the response and leaves the workspace unchanged.
@@ -56,7 +56,7 @@ instruction (null preserves, empty string clears). Text is added as labeled KAM
 commentary; source calculations and mandatory limitations remain intact.
 
 Workspace and presentation requests preserve optional `savings:number|null` and
-`managerTexts:{slideId:string}`. Customer/data-scope changes clear scoped estimates
+`managerTexts:{slideId:string}`. Customer changes clear customer-specific estimates
 and commentary before applying new instructions. These backward-compatible tools
 extend the user-authorized KAM editing workflow, without new external endpoints.
 
@@ -90,7 +90,7 @@ field paths. `reply` is exactly `Done` or `No changes.`. Edits may also return a
 short `message` describing the changes. Queries add `answer`, `source`, `view`,
 `followUps` and `query` while keeping `changed` empty. The browser escapes
 user text and renders charts from computed results. Customer changes clear customer-specific
-notes/titles/selections; other data-scope changes clear notes and edited titles.
+notes/titles/selections; other data-scope changes preserve KAM material.
 A country follow-up preserves the period and priority. Site/customer membership
 and nonempty data are checked before the entire patch is applied.
 
@@ -150,3 +150,25 @@ The regenerated browser deck showed the common overview as slide 1/9 and the
 customer cover as slide 2/9. The HTTP test separately checked the actual generated
 PPTX slide1.xml and slide2.xml contents. kopperoinenp Codex owns integration and
 merge after successful review/CI under the updated AGENTS.md authorization.
+
+Validated workspace snapshots also include contractKpis (up to 12, at most three prioritized) and includeContractAgenda. Chat cannot author these fields; it preserves the current customer’s validated selections. See REVIEW_STORAGE.md.
+
+## Customer review content
+
+The optional workspace fields below are shared by chat and saved reviews.
+Older reviews use customer defaults and an empty next-step list.
+
+- `evidenceAreas` selects the visible blocks: scorecard, experience, performance,
+  adoption, operations, financial, sustainability, improvement and future.
+- `customerBasics` selects scope, year, siteTypes, countries, products and locations.
+  An empty list keeps the brief view. Null uses the default.
+- `nextSteps` stores up to five entries with title, owner and due (160, 80 and
+  40 characters). The selected steps are also included in the presentation note.
+- `areaTitles` and `areaNotes` hold customer-owned block text keyed by area ID.
+
+Chat can set the selected lists or edit one block through `areaEdit`.
+New text must come from the current user instruction. An existing next step can
+be retained as part of a list edit. Data queries cannot change these fields.
+Filter changes preserve the customer's material. Changing customer loads that
+customer's settings or the defaults. Evidence calculations and the PowerPoint
+request schema are unchanged.
