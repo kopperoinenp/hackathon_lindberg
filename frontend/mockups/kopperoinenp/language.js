@@ -2,6 +2,7 @@
 (function (root) {
   "use strict";
   const finnish = {
+    "Lindström assistant": "Lindström-apuri",
     " sites with the lowest scan coverage": " pienintä toimipaikan skannausosuutta",
     "For service and product breakdowns, see Explore data in the workspace. Unique wearer counts require person identifiers.":
       "Palvelu- ja tuote-erittelyt löytyvät Tutki dataa -näkymästä. Yksilöllinen käyttäjämäärä edellyttää henkilöavainta.",
