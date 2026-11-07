@@ -5,6 +5,10 @@ Earlier v1/v2 directories have been removed at the task owner's request.
 A local Node backend serves AI editing and PowerPoint export. No production storage
 or frontend framework is included.
 
+Customer reviews are saved automatically in the local backend and restored after
+reload and customer switching, including assistant dashboard edits. See
+[review storage](../../../docs/REVIEW_STORAGE.md) for storage, API and limitations.
+
 Run `pnpm preview` from the repository root. Open the printed local URL to use the API integration.
 Runtime files are plain HTML/CSS/JS.
 

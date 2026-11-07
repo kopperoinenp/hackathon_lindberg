@@ -1,13 +1,32 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { once } from "node:events";
 
 test("preview redirects to the mock and serves every relative asset", async (t) => {
+  const reviewDirectory = await mkdtemp(path.join(tmpdir(), "kam-http-review-"));
   const child = spawn(process.execPath, ["scripts/preview.mjs"], {
-    env: { ...process.env, PORT: "0", PRESENTATION_PROVIDER: "deterministic" },
+    env: {
+      ...process.env,
+      PORT: "0",
+      REVIEW_STORE_DIR: reviewDirectory,
+      PRESENTATION_PROVIDER: "deterministic",
+    },
     stdio: ["ignore", "pipe", "pipe"],
   });
-  t.after(() => child.kill());
+  t.after(async () => {
+    if (child.exitCode === null && child.signalCode === null) {
+      const exited = once(child, "exit");
+      child.kill();
+      await exited;
+    }
+    assert.equal(path.dirname(path.resolve(reviewDirectory)), path.resolve(tmpdir()));
+    assert.ok(path.basename(reviewDirectory).startsWith("kam-http-review-"));
+    await rm(reviewDirectory, { recursive: true, force: true });
+  });
   const origin = await new Promise((resolve, reject) => {
     let output = "";
     const timeout = setTimeout(() => reject(new Error("Preview did not start")), 5000);
@@ -25,6 +44,31 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
       }
     });
   });
+  const initialReview = await (await fetch(`${origin}/api/reviews/CUST001`)).json();
+  assert.equal(initialReview.revision, 0);
+  const put = await fetch(`${origin}/api/reviews/CUST001`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      revision: 0,
+      workspace: {
+        scope: { customer: "CUST001" },
+        savings: 40000,
+        dashboardLayout: { sections: ["savings", "metrics"], metrics: ["allocated"] },
+      },
+    }),
+  });
+  assert.equal(put.status, 200);
+  const restored = await (await fetch(`${origin}/api/reviews/CUST001`)).json();
+  assert.equal(restored.workspace.savings, 40000);
+  assert.deepEqual(restored.workspace.dashboardLayout.sections, ["savings", "metrics"]);
+  const conflict = await fetch(`${origin}/api/reviews/CUST001`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ revision: 0, workspace: { scope: { customer: "CUST001" } } }),
+  });
+  assert.equal(conflict.status, 409);
+  assert.equal((await (await fetch(`${origin}/api/reviews/CUST002`)).json()).workspace, null);
   const page = await fetch(origin);
   const emptyAssessment = await fetch(`${origin}/api/cooperation`, {
     method: "POST",

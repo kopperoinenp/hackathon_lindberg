@@ -39,6 +39,135 @@
     dashboardLayout: globalThis.WorkspaceModel.defaultDashboardLayout(),
     chat: [],
   };
+  const defaultReviewState = structuredClone(state);
+  let storageLoading = true,
+    storageReady = false,
+    storageBlocked = false;
+  let savedSignature = "",
+    savedRevision = 0,
+    saveTimer;
+  let saveQueue = Promise.resolve();
+  let switchingReview = false;
+  function storageStatus(fi, en) {
+    $("#review-storage-status").textContent = language === "fi" ? fi : en;
+  }
+  function scheduleReviewSave() {
+    if (storageLoading || !storageReady || storageBlocked) return;
+    clearTimeout(saveTimer);
+    if (JSON.stringify(chatWorkspace()) === savedSignature) return;
+    storageStatus("Tallennetaan…", "Saving…");
+    saveTimer = setTimeout(() => {
+      flushReviewSave().catch(() => {});
+    }, 250);
+  }
+  function flushReviewSave() {
+    clearTimeout(saveTimer);
+    if (storageBlocked) return Promise.reject(new Error("Reload the page before saving."));
+    if (storageLoading || !storageReady) return saveQueue;
+    const workspace = structuredClone(chatWorkspace());
+    const operation = saveQueue.then(async () => {
+      const signature = JSON.stringify(workspace);
+      if (signature === savedSignature) return;
+      if (storageBlocked) throw new Error("Reload the page before saving.");
+      try {
+        const response = await fetch(
+          `/api/reviews/${encodeURIComponent(workspace.scope.customer)}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ revision: savedRevision, workspace }),
+            keepalive: true,
+            signal: AbortSignal.timeout(10000),
+          },
+        );
+        const result = await response.json();
+        if (!response.ok) {
+          if (response.status === 409) storageBlocked = true;
+          throw new Error(result.error || "Save failed");
+        }
+        savedRevision = result.revision;
+        savedSignature = signature;
+        storageStatus("Tallennettu", "Saved");
+      } catch (error) {
+        storageStatus(
+          storageBlocked
+            ? "Tallennusristiriita – lataa sivu uudelleen."
+            : "Tallennus epäonnistui. Muutokset ovat vain tällä sivulla.",
+          storageBlocked
+            ? "Save conflict – reload this page."
+            : "Save failed. Changes are only on this page.",
+        );
+        throw error;
+      }
+    });
+    saveQueue = operation.catch(() => {});
+    return operation;
+  }
+  async function loadCustomerReview(customer) {
+    storageLoading = true;
+    storageReady = false;
+    state.chatRevision += 1;
+    $("main").inert = true;
+    $("#composer").inert = true;
+    storageStatus("Ladataan katsausta…", "Loading review…");
+    try {
+      const response = await fetch(`/api/reviews/${encodeURIComponent(customer)}`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(10000),
+      });
+      const record = await response.json();
+      if (!response.ok) throw new Error(record.error || "Load failed");
+      const revision = state.chatRevision;
+      Object.assign(state, structuredClone(defaultReviewState), {
+        customer,
+        chatRevision: revision,
+      });
+      if (record.workspace) {
+        Object.assign(state, record.workspace.scope);
+        for (const key of [
+          "view",
+          "metric",
+          "summaryMetric",
+          "visibleInsights",
+          "included",
+          "note",
+          "heading",
+          "titleEdits",
+          "slideOrder",
+          "cooperation",
+          "savings",
+          "managerTexts",
+          "dashboardLayout",
+        ])
+          state[key] = record.workspace[key];
+      }
+      savedRevision = record.revision;
+      savedSignature = JSON.stringify(chatWorkspace());
+      storageReady = true;
+      storageBlocked = false;
+      localStorage.setItem("lindstrom-review-customer", customer);
+      storageStatus(
+        record.workspace ? "Tallennettu katsaus ladattu" : "Uusi asiakaskohtainen katsaus",
+        record.workspace ? "Saved review loaded" : "New customer review",
+      );
+      return true;
+    } catch {
+      storageStatus(
+        "Katsausta ei voitu ladata. Tallennus estetty; lataa sivu uudelleen.",
+        "Could not load review. Saving is disabled; reload this page.",
+      );
+      return false;
+    } finally {
+      storageLoading = false;
+      $("main").inert = false;
+      $("#composer").inert = false;
+      render();
+      renderChat();
+    }
+  }
+  window.addEventListener("pagehide", () => {
+    flushReviewSave().catch(() => {});
+  });
   let statusTimer;
   const context = () => storyContext(data, state);
   const baselineName = () =>
@@ -263,6 +392,7 @@
     renderDashboardEdits();
     renderDashboardLayout();
     if (state.view === "analysis") renderAnalysis();
+    scheduleReviewSave();
   }
   function renderCustomerOverview() {
     const overview = globalThis.WorkspaceModel.customerOverview(data, state.customer);
@@ -629,6 +759,16 @@
       }
       const next = result.workspace;
       const customerChanged = state.customer !== next.scope.customer;
+      if (customerChanged) {
+        await flushReviewSave();
+        if (await loadCustomerReview(next.scope.customer))
+          status(
+            language === "fi"
+              ? "Asiakkaan tallennettu katsaus ladattu. Anna mahdolliset lisämuutokset tähän katsaukseen."
+              : "Customer review loaded. Apply further edits to this review.",
+          );
+        return;
+      }
       for (const key of [
         "customer",
         "from",
@@ -656,11 +796,8 @@
         "dashboardLayout",
       ])
         state[key] = next[key];
-      if (customerChanged) {
-        state.chat = [{ user: true, text: question }];
-        state.chatRevision += 1;
-      }
       render();
+      await flushReviewSave();
       state.chat.push({ user: false, text: result.changed.length ? t("Done") : t("No changes.") });
       if (result.changed.length) {
         status(t("Done"));
@@ -733,21 +870,23 @@
   $("#customer").innerHTML = data.customers
     .map((r) => `<option value="${r.customer_id}">${esc(r.customer_name)}</option>`)
     .join("");
-  $("#customer").addEventListener("change", (event) => {
-    state.customer = event.target.value;
-    state.cooperation = "unrated";
-    state.savings = null;
-    state.managerTexts = {};
-    state.included = [...globalThis.MeetingModel.insightIds];
-    state.site = "all";
-    state.country = "all";
-    state.continent = "all";
-    state.priority = "neutral";
-    state.visibleInsights = [...globalThis.MeetingModel.insightIds];
-    state.summaryMetric = "auto";
-    clearScope();
-    render();
-    status(t("The customer's default review is ready."));
+  $("#customer").addEventListener("change", async (event) => {
+    const customer = event.target.value;
+    $("#customer").value = state.customer;
+    if (switchingReview) return;
+    switchingReview = true;
+    $("main").inert = true;
+    $("#composer").inert = true;
+    try {
+      await flushReviewSave();
+      if (!storageBlocked && storageReady) await loadCustomerReview(customer);
+    } catch {
+      /* The persistent save status explains the error. */
+    } finally {
+      switchingReview = false;
+      $("main").inert = false;
+      $("#composer").inert = false;
+    }
   });
   for (const id of ["site", "baseline", "priority", "from", "to", "country", "continent"])
     $("#" + id).addEventListener("change", (event) => {
@@ -769,6 +908,7 @@
     if (event.target.id === "meeting-note") {
       state.note = event.target.value;
       invalidatePowerPoint();
+      scheduleReviewSave();
     }
   });
   document.addEventListener("click", (event) => {
@@ -917,4 +1057,10 @@
       applyLanguage();
     });
   applyLanguage();
+  const previousCustomer = localStorage.getItem("lindstrom-review-customer");
+  loadCustomerReview(
+    data.customers.some((row) => row.customer_id === previousCustomer)
+      ? previousCustomer
+      : state.customer,
+  );
 })();
