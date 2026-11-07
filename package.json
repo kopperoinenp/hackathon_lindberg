@@ -11,19 +11,23 @@
     "test": "node --test tests/*.test.mjs",
     "test:kam": "node --test tests/kam-workflows.test.mjs",
     "test:kam:live": "node scripts/test-kam-assistant.mjs --live --repeat=2",
-    "preview": "node scripts/preview.mjs"
+    "test:shared": "node scripts/test-shared.mjs",
+    "preview": "node scripts/preview.mjs",
+    "preview:shared": "node scripts/preview-shared.mjs"
   },
   "engines": {
     "node": ">=24"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "embedded-postgres": "18.6.0-beta.19",
     "eslint": "10.14.0",
     "globals": "17.14.0",
     "prettier": "3.9.10"
   },
   "dependencies": {
     "jszip": "3.10.1",
+    "pg": "8.23.1",
     "pptxgenjs": "4.0.1"
   }
 }

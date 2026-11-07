@@ -32,6 +32,12 @@ Returns `{provider, model, configured}`. No credentials are returned.
 
 ## POST /api/presentations
 
+In shared PostgreSQL mode, both this endpoint and `POST /api/presentations/preview`
+require the ready dashboard's `dashboardSnapshotId` for the submitted scope.
+Responses include the `dashboard` reference, which is also returned by the
+presentation viewer endpoint. See [dashboard metrics](DASHBOARD_METRICS.md) for
+version handling and conflicts.
+
 JSON request: `{scope, included, titleEdits, note, slideOrder?, language?}`.
 
 Optional `cooperation`: `unrated` (default), `green`, `yellow` or `red`.

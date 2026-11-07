@@ -2,6 +2,7 @@ import "../frontend/mockups/kopperoinenp/language.js";
 import { dataset as data } from "./dataset.mjs";
 import { demoCooperation2025 } from "./demo-cooperation.mjs";
 import { priorGoalsSlide } from "./prior-review.mjs";
+import { requestContext } from "./request-context.mjs";
 import "../frontend/mockups/kopperoinenp/model.js";
 import "../frontend/mockups/kopperoinenp/story-model.js";
 import "../frontend/mockups/kopperoinenp/analysis-model.js";
@@ -80,7 +81,9 @@ export function validateRequest(input) {
     throw new PresentationError("Invalid presentation request.");
   const scope = {};
   for (const [key, fallback] of Object.entries(defaults)) {
-    scope[key] = input.scope?.[key] ?? fallback;
+    scope[key] =
+      input.scope?.[key] ??
+      (key === "customer" ? (data.customers[0]?.customer_id ?? fallback) : fallback);
     if (typeof scope[key] !== "string" || scope[key].length > 80)
       throw new PresentationError("Invalid filters.");
   }
@@ -216,7 +219,11 @@ export function buildPresentation(input) {
   const t = globalThis.ReviewLanguage.translator(request.language);
   const f = (value, digits = 0) =>
     new Intl.NumberFormat(t("en-GB"), { maximumFractionDigits: digits }).format(value);
-  const ctx = globalThis.WorkspaceModel.buildContext(data, request.scope);
+  const prepared = requestContext.getStore()?.prepared;
+  const snapshot = prepared?.get(request.scope);
+  const ctx = snapshot
+    ? snapshot.contexts[request.scope.priority]
+    : globalThis.WorkspaceModel.buildContext(data, request.scope);
   const { metrics: m, compare: c, baseline: b, focus, customer } = ctx;
   if (!m.hasData) throw new PresentationError("No data matches the filters.");
   const period = `${request.scope.from} – ${request.scope.to}`;
@@ -235,7 +242,9 @@ export function buildPresentation(input) {
   const footer = t`Synthetic data · ${scopeName} · ${period} · Baseline: ${baseline}`;
   const difference = (delta, pct) => `${delta >= 0 ? "−" : "+"}${f(Math.abs(pct))} %`;
   const repairRate = (metrics) => (metrics?.washed ? (metrics.repairs / metrics.washed) * 100 : 0);
-  const cycle = globalThis.WorkspaceModel.serviceCycleFinding(data, request.scope);
+  const cycle = snapshot
+    ? snapshot.finding
+    : globalThis.WorkspaceModel.serviceCycleFinding(data, request.scope);
   const finding = cycle
     ? t`${cycle.site}: 90% of service cycles finished within ${f(cycle.actual, 1)} h. The median for other sites was ${f(cycle.reference, 1)} h.`
     : m.washed
@@ -356,8 +365,12 @@ export function buildPresentation(input) {
         ),
       ],
       chart: {
-        labels: globalThis.WorkspaceModel.series(ctx, "repairs").map((p) => p.month.slice(5)),
-        values: globalThis.WorkspaceModel.series(ctx, "repairs").map((p) => p.value),
+        labels: (ctx.series?.repairs ?? globalThis.WorkspaceModel.series(ctx, "repairs")).map((p) =>
+          p.month.slice(5),
+        ),
+        values: (ctx.series?.repairs ?? globalThis.WorkspaceModel.series(ctx, "repairs")).map(
+          (p) => p.value,
+        ),
         unit: "items",
       },
       source: t("Repair records"),
@@ -435,11 +448,14 @@ export function buildPresentation(input) {
     }
   const delta = (value) => f(Math.abs(value));
   const kpi = (value, label, change = null) => ({ value, label, ...change });
-  const previous = globalThis.ReviewAnalysisTools.periodComparison(data, request.scope, "yoy");
-  const earlier = previous
-    ? globalThis.WorkspaceModel.buildContext(data, { ...request.scope, ...previous.previousPeriod })
-        .metrics
-    : null;
+  const previous = snapshot
+    ? snapshot.comparisons.yoy
+    : globalThis.ReviewAnalysisTools.periodComparison(data, request.scope, "yoy");
+  const earlier = snapshot
+    ? snapshot.previous?.ctx.metrics
+    : previous &&
+      globalThis.WorkspaceModel.buildContext(data, { ...request.scope, ...previous.previousPeriod })
+        .metrics;
   const previousLabel = previous && periodLabel(previous.previousPeriod);
   const change = (now, before, better = null) => {
     if (now == null || !before || !previousLabel) return null;
@@ -464,7 +480,8 @@ export function buildPresentation(input) {
     lead: t("Key results and shared priorities for 2026."),
     kpis: [],
   });
-  const { service } = globalThis.WorkspaceModel.analyzeDetails(data, request.scope);
+  const { service } =
+    snapshot?.detail ?? globalThis.WorkspaceModel.analyzeDetails(data, request.scope);
   const { from, to, country, continent, site } = request.scope;
   const wholeYear =
     from === "2025-01" &&
@@ -650,7 +667,9 @@ export function buildPresentation(input) {
     added: [],
   };
   const upsellSlides = globalThis.UpsellModel.approved(
-    globalThis.UpsellModel.proposals(data, request.scope, request.language),
+    snapshot
+      ? snapshot.proposals[request.language]
+      : globalThis.UpsellModel.proposals(data, request.scope, request.language),
     request.approvedUpsells,
   )
     .filter((proposal) => !request.hideUsage || !/scan|skann/iu.test(JSON.stringify(proposal)))
@@ -669,6 +688,7 @@ export function buildPresentation(input) {
     }));
   return {
     request,
+    ...(prepared ? { dashboard: prepared.reference } : {}),
     customer: { name: customer.customer_name, industry: customer.industry },
     period,
     footer,
