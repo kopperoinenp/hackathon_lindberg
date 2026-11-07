@@ -2,6 +2,30 @@
 (function (root) {
   "use strict";
   const finnish = {
+    "Customer relationship": "Asiakassuhde",
+    "Internal KAM assessment. Only shown in Explore data, never on presentation slides.":
+      "KAM:in sisäinen arvio. Näkyy vain Tutki dataa -sivulla, ei esityksen dioissa.",
+    "Describe the customer relationship": "Kuvaile asiakassuhteen tilannetta",
+    "Ask the assistant to assess": "Pyydä apurin arvio",
+    "Relationship status": "Asiakassuhteen tila",
+    "Not assessed": "Ei arvioitu",
+    "Green – cooperation is going well": "Vihreä – yhteistyö sujuu hyvin",
+    "Yellow – needs attention": "Keltainen – vaatii huomiota",
+    "Red – action required": "Punainen – vaatii toimenpiteitä",
+    "NEXT OPPORTUNITIES": "UUDET MAHDOLLISUUDET",
+    "Customer-specific service opportunities": "Asiakaskohtaiset lisämyyntiehdotukset",
+    "Approve proposals for the end of the presentation. Approvals are saved for this customer. Changed source data or filters require a new approval.":
+      "Hyväksy haluamasi ehdotukset esityksen loppuun. Hyväksynnät tallennetaan tälle asiakkaalle. Muuttuneet lähtötiedot tai rajaukset vaativat uuden hyväksynnän.",
+    "Approved for this presentation": "Hyväksytty tähän esitykseen",
+    "Saved approvals outside the current evidence": "Tallennetut hyväksynnät muilla lähtötiedoilla",
+    Observation: "Havainto",
+    "Potential benefit": "Mahdollinen hyöty",
+    "Next step": "Seuraava askel",
+    "Include at the end of the presentation": "Hyväksy esityksen loppuun",
+    "No service proposals are supported by the selected data.":
+      "Valittu aineisto ei tue palveluehdotuksia.",
+    "Clear all opportunity approvals for this customer":
+      "Poista tämän asiakkaan kaikki lisämyyntihyväksynnät",
     "KAM estimates are customer-specific and do not change with filters.":
       "KAM:in arviot ovat asiakaskohtaisia eivätkä muutu rajausten mukana.",
     "Textile use by product": "Tekstiilien käyttö tuotteittain",

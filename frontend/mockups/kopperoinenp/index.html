@@ -14,6 +14,7 @@
     <script src="analysis-tools.js" defer></script>
     <script src="summary-charts.js" defer></script>
     <script src="meeting-model.js" defer></script>
+    <script src="upsell-model.js" defer></script>
     <script src="app.js" defer></script>
   </head>
   <body>
@@ -96,6 +97,11 @@
       <section id="customer-overview" aria-label="Customer overview" aria-live="polite"></section>
       <section id="summary-panel" role="tabpanel" aria-labelledby="summary-tab">
         <div id="story" aria-live="polite"></div>
+        <section
+          id="upsell-proposals"
+          class="review-priorities"
+          aria-labelledby="upsell-title"
+        ></section>
       </section>
       <section id="analysis-panel" role="tabpanel" aria-labelledby="analysis-tab" hidden>
         <div class="analysis-heading">
@@ -103,6 +109,23 @@
           <h1>Explore customer data</h1>
           <p>Filter the data to see what drives the findings.</p>
         </div>
+        <section class="review-priorities" aria-labelledby="relationship-title">
+          <h2 id="relationship-title">Customer relationship</h2>
+          <p>Internal KAM assessment. Only shown in Explore data, never on presentation slides.</p>
+          <label for="relationship-description">Describe the customer relationship</label>
+          <textarea id="relationship-description" rows="3" maxlength="2000"></textarea>
+          <button id="assess-relationship" type="button" class="text-button">
+            Ask the assistant to assess
+          </button>
+          <label for="relationship-status">Relationship status</label>
+          <select id="relationship-status">
+            <option value="unrated">Not assessed</option>
+            <option value="green">Green – cooperation is going well</option>
+            <option value="yellow">Yellow – needs attention</option>
+            <option value="red">Red – action required</option>
+          </select>
+          <p id="relationship-result" role="status"></p>
+        </section>
         <form id="filters" class="filter-grid">
           <label for="from">From<select id="from"></select></label
           ><label for="to">To<select id="to"></select></label

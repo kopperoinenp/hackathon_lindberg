@@ -18,7 +18,8 @@ scrolls to the changed section and briefly highlights it; chat lists the changes
 Slide commentary is mirrored in the matching dashboard card. The customer name
 stays factual even when the overview slide heading is customized. These edits
 also remain in the presentation request. The relationship rating can be set via
-chat and appears on the presentation slides.
+chat or in Explore data. The relationship assessment is internal to Explore data
+and is never rendered on presentation slides.
 
 The review keeps a common evidence structure across customers. Use **Manage
 contract KPIs** to add or edit up to 12 customer-specific measures with an
