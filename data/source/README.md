@@ -1,7 +1,9 @@
 # Source datasets
 
-The workbook in this directory is the original synthetic source. Its customer
-and operational figures are fictional. Keep real customer data out of this demo.
+The workbook in this directory is the original synthetic source for 2025. Its
+customer and operational figures are fictional. The fixture generator adds
+simulated 2024 site-month summaries for year-over-year comparisons. Keep real
+customer data out of this demo.
 
 ## Automatic validation
 
@@ -26,6 +28,7 @@ limits the source file to 16 MiB and serves the same snapshot to the browser.
 - Each customer needs a site. IDs must be unique, use letters, digits,
   underscores or hyphens, and start with a letter or digit. Each site needs
   one monthly record for every month. A record's customer must own its site.
+  Optional 2024 summary rows are used only for historical comparisons.
 - Required quantities are finite, nonnegative numbers. Counts must be whole
   numbers, and scan counts cannot exceed allocated items. Blank values are
   rejected for required measures.

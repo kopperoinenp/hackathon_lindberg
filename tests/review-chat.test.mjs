@@ -160,7 +160,7 @@ test("agent tools execute on the proposed scope and the final patch cannot switc
     ...scoped({ country: "Finland", from: "2025-01", to: "2025-03" }),
     view: "analysis",
   };
-  const first = { ...validatedPatch, analysisTools: ["footprint", "period"] };
+  const first = { ...validatedPatch, analysisTools: ["footprint", "yoy"] };
   let calls = 0;
   const result = await runReviewChat(input, {
     generate: async ({ input: payload, schema }) => {
@@ -171,7 +171,7 @@ test("agent tools execute on the proposed scope and the final patch cannot switc
       const [footprint, period] = context.analysisResults;
       assert.equal(footprint.scope.to, "2025-03");
       assert.ok(footprint.values.emissionsKgCo2e > 0);
-      assert.equal(period.status, "unavailable");
+      assert.deepEqual(period.values.previousPeriod, { from: "2024-01", to: "2024-03" });
       return validatedPatch;
     },
   });

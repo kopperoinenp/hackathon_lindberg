@@ -189,6 +189,97 @@
       }),
     };
   }
+  function usageFindings(data, selection) {
+    const rows = select(data, selection, data.detail ?? []);
+    const byProduct = Map.groupBy(rows, (row) => row.product);
+    const sites = new Map(data.sites.map((site) => [site.site_id, site.site_name]));
+    const findings = {};
+    const washRate = (rows) => ratio(sum(rows, "washed_pieces"), sum(rows, "allocated_pieces"));
+    const repairRate = (rows) => ratio(sum(rows, "repair_count") * 100, sum(rows, "washed_pieces"));
+    const period = (rows) => ({ from: rows[0].month, to: rows.at(-1).month });
+    const monthIndex = (month) => Number(month.slice(0, 4)) * 12 + Number(month.slice(5));
+    function keep(kind, score, finding) {
+      if (!findings[kind] || score > findings[kind].score) findings[kind] = { ...finding, score };
+    }
+    for (const [id, productRows] of byProduct) {
+      const product = data.products.find((product) => product.product_id === id).product_name;
+      const groups = [...Map.groupBy(productRows, (row) => row.site)];
+      for (const [siteId, siteRows] of groups) {
+        const site = sites.get(siteId);
+        const months = [...siteRows].sort((a, b) => a.month.localeCompare(b.month));
+        const recent = months.slice(-6);
+        if (
+          recent.length === 6 &&
+          recent.every((row, i) => monthIndex(row.month) === monthIndex(recent[0].month) + i) &&
+          recent.every((row) => row.allocated_pieces > 0)
+        ) {
+          const before = recent.slice(0, 3);
+          const after = recent.slice(3);
+          const beforeStock = sum(before, "allocated_pieces") / 3;
+          const afterStock = sum(after, "allocated_pieces") / 3;
+          const beforeWashes = sum(before, "washed_pieces") / 3;
+          const afterWashes = sum(after, "washed_pieces") / 3;
+          if (
+            beforeWashes >= 30 &&
+            Math.abs(afterStock / beforeStock - 1) <= 0.05 &&
+            after.every((row) => row.washed_pieces <= beforeWashes * 0.8)
+          )
+            keep("stock", 1 - afterWashes / beforeWashes, {
+              product,
+              site,
+              beforeWashes,
+              afterWashes,
+              beforeStock,
+              afterStock,
+              before: period(before),
+              after: period(after),
+            });
+        }
+        for (const [peerId, peerRows] of groups) {
+          if (siteId === peerId) continue;
+          const peerMonths = new Map(peerRows.map((row) => [row.month, row]));
+          const shared = months.filter(
+            (row) => row.allocated_pieces > 0 && peerMonths.get(row.month)?.allocated_pieces > 0,
+          );
+          if (shared.length < 3) continue;
+          const comparison = shared.map((row) => peerMonths.get(row.month));
+          const peer = sites.get(peerId);
+          const evidence = { product, site, peer, ...period(shared), months: shared.length };
+          const rate = washRate(shared);
+          const peerRate = washRate(comparison);
+          const lowerMonths = shared.filter(
+            (row, i) =>
+              comparison[i].washed_pieces > 0 && washRate([row]) <= washRate([comparison[i]]) * 0.8,
+          ).length;
+          if (
+            peerRate > 0 &&
+            rate <= peerRate * 0.8 &&
+            lowerMonths >= Math.max(3, Math.ceil(shared.length / 2))
+          )
+            keep("wash", 1 - rate / peerRate, { ...evidence, rate, peerRate, lowerMonths });
+          const washes = sum(shared, "washed_pieces");
+          const peerWashes = sum(comparison, "washed_pieces");
+          const repairs = repairRate(shared);
+          const peerRepairs = repairRate(comparison);
+          if (
+            washes >= 100 &&
+            peerWashes >= 100 &&
+            sum(shared, "repair_count") >= 5 &&
+            repairs >= peerRepairs * 1.25 &&
+            repairs - peerRepairs >= 1
+          )
+            keep("repair", repairs - peerRepairs, {
+              ...evidence,
+              rate: repairs,
+              peerRate: peerRepairs,
+              washes,
+              peerWashes,
+            });
+        }
+      }
+    }
+    return findings;
+  }
   function customerOverview(data, customerId) {
     const customer = data.customers.find((row) => row.customer_id === customerId);
     const rows = data.records.filter((row) => row.customer === customerId);
@@ -242,6 +333,7 @@
     customerOverview,
     select,
     analyzeDetails,
+    usageFindings,
     summarize,
     buildContext,
     series,

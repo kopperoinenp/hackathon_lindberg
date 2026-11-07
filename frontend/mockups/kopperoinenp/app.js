@@ -76,6 +76,10 @@
     chat: [],
     contractKpis: [],
     includeContractAgenda: false,
+    chatTool: "data",
+    lastQuery: null,
+    queryResult: null,
+    promptsOpen: false,
   };
   const defaultReviewState = structuredClone(state);
   let storageLoading = true,
@@ -148,8 +152,8 @@
   }
   async function loadCustomerReview(customer) {
     storageLoading = true;
-    storageReady = false;
     state.chatRevision += 1;
+    toggleChatMenu(false);
     $("#workspace").inert = true;
     $("#composer").inert = true;
     storageStatus("Ladataan katsausta…", "Loading review…");
@@ -202,8 +206,8 @@
       return true;
     } catch {
       storageStatus(
-        "Katsausta ei voitu ladata. Tallennus estetty; lataa sivu uudelleen.",
-        "Could not load review. Saving is disabled; reload this page.",
+        "Valitun asiakkaan katsausta ei voitu ladata. Kokeile toista asiakasta.",
+        "Could not load the selected review. Try another customer.",
       );
       return false;
     } finally {
@@ -326,6 +330,32 @@
   function snapshotName() {
     return context().metrics.snapshotMonth || state.to;
   }
+  function historicalComparison() {
+    return (
+      analysisTools.periodComparison(data, state, "yoy") ??
+      analysisTools.periodComparison(data, state)
+    );
+  }
+  function comparisonLabel(comparison) {
+    const { from, to } = comparison.previousPeriod;
+    return (
+      t(comparison.kind === "yoy" ? "Same period last year" : "Preceding period") +
+      " · " +
+      (from === to ? from : from + "–" + to)
+    );
+  }
+  function kpiComparison(comparison, metric) {
+    if (!comparison) return "";
+    const change = comparison.relativeChangePct[metric];
+    const value =
+      change == null
+        ? t("Previous value: 0")
+        : new Intl.NumberFormat(t("en-GB"), {
+            maximumFractionDigits: 1,
+            signDisplay: "exceptZero",
+          }).format(change) + " %";
+    return `<small>${esc(t("Historical change") + " · " + value + " · " + comparisonLabel(comparison))}</small>`;
+  }
   function scopeLabel() {
     const site = data.sites.find((row) => row.site_id === state.site);
     return [
@@ -343,15 +373,12 @@
   }
   function detailedAnalysis() {
     const detail = globalThis.WorkspaceModel.analyzeDetails(data, state);
-    const [periodResult, baselineResult, driverResult, laundryResult, actionResult] =
-      analysisTools.run(data, presentationRequest(false).scope, [
-        "period",
-        "baselines",
-        "drivers",
-        "laundry",
-        "actions",
-      ]);
-    const period = periodResult.values;
+    const [baselineResult, driverResult, laundryResult, actionResult] = analysisTools.run(
+      data,
+      presentationRequest(false).scope,
+      ["baselines", "drivers", "laundry", "actions"],
+    );
+    const period = historicalComparison();
     const number = (value, unit = "", digits = 1) =>
       value == null ? t("Unavailable") : [f(value, digits), unit].filter(Boolean).join(" ");
     const table = (headings, rows) =>
@@ -376,6 +403,7 @@
                 [t("Metric"), t("Previous period"), t("Selected period"), t("Change")],
                 [
                   [t("Washed kg"), "washedKg", "kg"],
+                  [t("Allocated textiles"), "allocatedPieces", ""],
                   [t("Water"), "waterLitres", "l"],
                   [t("Emissions"), "emissionsKgCo2e", "kg CO₂e"],
                   [t("Repairs"), "repairs", ""],
@@ -387,8 +415,8 @@
                   number(period.delta[key], key === "scanPct" ? t("percentage points") : unit),
                 ]),
               ) +
-              `<p class="quiet">${esc(period.previousPeriod.from)} – ${esc(period.previousPeriod.to)} · ${esc(t("Previous period has the same length and site filters. Scan coverage compares period-end snapshots."))}</p>`
-            : `<p>${t("The preceding period of equal length is outside the available data.")}</p>`
+              `<p class="quiet">${esc(comparisonLabel(period))} · ${esc(t("Stock and scan coverage use period-end snapshots. Both periods cover the same sites and months in scope."))}</p>`
+            : `<p>${t("No comparable historical period is available for this selection.")}</p>`
         }
       </section>
       <section class="analysis-card">
@@ -582,7 +610,9 @@
     $("#customer").value = state.customer;
     invalidatePowerPoint();
     const ctx = context();
-    const months = [...new Set(data.records.map((row) => row.month))].sort();
+    const months = [...new Set(data.records.map((row) => row.month))]
+      .filter((month) => month.startsWith(data.year + "-"))
+      .sort();
     for (const id of ["from", "to"]) {
       $("#" + id).innerHTML = months
         .map((month) => `<option value="${month}">${month}</option>`)
@@ -606,6 +636,8 @@
     $("#summary-panel").hidden = state.view !== "summary";
     $("#analysis-panel").hidden = state.view !== "analysis";
     $("#composer").hidden = profileMode === "original";
+    if ($("#composer").hidden) toggleChatMenu(false);
+    renderQueryResult();
     for (const view of ["summary", "analysis"]) {
       const tab = $("#" + view + "-tab");
       tab.setAttribute("aria-selected", String(state.view === view));
@@ -872,21 +904,68 @@
     }[state.priority];
   }
   function plan() {
-    const { focus } = context();
-    return [
-      [
-        t`Review ${focus.site_name} with the customer.`,
-        t("Check reserve stock needs and scan coverage."),
-      ],
-      [
-        t("Agree on one improvement and assign an owner."),
-        t("Confirm demand before changing allocations."),
-      ],
-      [
-        t("Review progress at the next meeting."),
-        t("Estimate potential savings once the inputs have been agreed."),
-      ],
-    ];
+    const { scope } = presentationRequest(false);
+    const [result] = analysisTools.run(data, scope, ["actions"]);
+    const { wash, stock, repair } = globalThis.WorkspaceModel.usageFindings(data, scope);
+    const proposals = [];
+    if (wash) {
+      proposals.push([
+        t("Investigate lower wash frequency") + " · " + wash.product,
+        `${wash.site}: ${f(wash.rate, 2)} · ${wash.peer}: ${f(wash.peerRate, 2)} ` +
+          t("washes per allocated item per month") +
+          ` · ${wash.from}–${wash.to} · ` +
+          t`Difference repeated in ${wash.lowerMonths} of ${wash.months} matched months.`,
+        t(
+          "Compare shift patterns, change routines and reserve stock before piloting a change to allocations. Track garment availability during the pilot.",
+        ),
+      ]);
+    }
+    if (stock) {
+      proposals.push([
+        t("Check stock against lower wash volumes") + " · " + stock.site + " · " + stock.product,
+        `${stock.before.from}–${stock.before.to} → ${stock.after.from}–${stock.after.to} · ` +
+          t("Average washes per month") +
+          ` ${f(stock.beforeWashes, 1)} → ${f(stock.afterWashes, 1)} · ` +
+          t("Average allocated items") +
+          ` ${f(stock.beforeStock, 1)} → ${f(stock.afterStock, 1)}`,
+        t(
+          "Check whether lower demand is seasonal. Agree on stock levels for quiet and peak months, then track garment availability.",
+        ),
+      ]);
+    }
+    if (repair) {
+      proposals.push([
+        t("Investigate higher repair frequency") + " · " + repair.product,
+        `${repair.site}: ${f(repair.rate, 2)} (${f(repair.washes)}) · ${repair.peer}: ${f(repair.peerRate, 2)} (${f(repair.peerWashes)}) · ` +
+          t("Repairs per 100 washes (total washes)") +
+          ` · ${repair.from}–${repair.to} · ` +
+          t`${repair.months} matched months`,
+        t(
+          "Check whether tasks, garment suitability or repair practices explain the gap. Test one change and compare repairs per 100 washes at the next review.",
+        ),
+      ]);
+    }
+    const serviceProposals = (result.values ?? []).map((action) =>
+      action.scanPct != null
+        ? [
+            t("Review textile stock and scanning together") + " · " + action.site,
+            t`Scan coverage was ${f(action.scanPct, 1)}% in ${result.snapshotMonth}.`,
+            t(
+              "Compare local stock and scanning records together before changing allocations. Repeat the coverage check after the next inventory count.",
+            ),
+          ]
+        : [
+            t("Investigate the longest service cycles together") + " · " + action.site,
+            t`At least 90% of recorded cycles finished within ${f(action.p90Hours, 1)} hours (${f(action.recordedCycles)} records, ${periodName()}).`,
+            t(
+              "Review handoffs and delays together, agree on one change, and compare cycle times at the next review.",
+            ),
+          ],
+    );
+    const allProposals = [...proposals, ...serviceProposals];
+    return allProposals.length
+      ? allProposals.slice(0, 3)
+      : [[t("There is insufficient data for a proposal in this selection.")]];
   }
   function summaryGraphics() {
     const ctx = context();
@@ -946,6 +1025,8 @@
       ? shortNames[customer.customer_name]
       : customer.customer_name;
     const cards = results();
+    const history = historicalComparison();
+    const comparable = { water: "waterLitres", emissions: "emissionsKgCo2e", repairs: "repairs" };
     const visibleOrder = order.filter((id) => state.visibleInsights.includes(id));
     const title =
       state.heading || state.titleEdits.cover
@@ -956,12 +1037,15 @@
       t`<section class="intro"><span class="section-kicker">ANNUAL REVIEW PREPARATION</span><h1>${title}</h1><p>${opening()}</p><div class="scope"><strong>${esc(scopeName())}</strong> · ${m.sites} ${t(m.sites === 1 ? "site" : "sites")} · Baseline: ${baselineName()}</div></section><section class="story-section" aria-labelledby="results-title"${visibleOrder.length ? "" : " hidden"}><div class="section-heading"><span class="section-number">01</span><h2 id="results-title">Key results for the period</h2></div><div class="results">${visibleOrder
         .map((key) => {
           const card = cards[key];
-          return t`<article class="result" data-insight="${key}"><div class="result-name">${card.name}</div><div class="result-value">${card.value}</div><span class="result-unit">${card.unit}</span>${card.visual}<h3>${card.title}</h3><p>${card.text}</p><div class="relevance"><strong>Why this matters</strong><p>${esc(globalThis.MeetingModel.relevance(key, state.priority, false, language))}</p></div><small>${card.boundary}</small></article>`;
+          return t`<article class="result" data-insight="${key}"><div class="result-name">${card.name}</div><div class="result-value">${card.value}</div><span class="result-unit">${card.unit}</span>${card.visual}<h3>${card.title}</h3><p>${card.text}</p><div class="relevance"><strong>Why this matters</strong><p>${esc(globalThis.MeetingModel.relevance(key, state.priority, false, language))}</p></div><small>${card.boundary}</small>${kpiComparison(history, comparable[key])}</article>`;
         })
         .join(
           "",
         )}</div><p class="quiet">Synthetic data. The baseline models an alternative laundry service at the same wash volume.</p>${summaryGraphics()}</section><section class="story-section" aria-labelledby="opportunity-title"${state.visibleInsights.includes("opportunity") ? "" : " hidden"}><div class="section-heading"><span class="section-number">02</span><h2 id="opportunity-title">What to investigate first</h2></div><div class="opportunity"><div><span class="section-kicker">${esc(focus.site_name)}</span><h3>Do textile allocations match demand?</h3><p>${f(focus.unscanned)} allocated textiles had no active scan in ${snapshotName()}. Start by reviewing this site with the customer.</p></div><div class="opportunity-visual">${snapshotGraphic(focus)}</div></div><p class="relevance">${esc(globalThis.MeetingModel.relevance("opportunity", state.priority, false, language))}</p>${siteBenchmark()}<details class="site-details"><summary>See other sites</summary><div class="table-wrap"><table><thead><tr><th>Site</th><th>Scanned ${snapshotName()}</th><th>Allocated textiles</th></tr></thead><tbody>${sites.map((site) => t`<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${f(site.utilization, 1)} %</td><td>${f(site.allocated)}</td></tr>`).join("")}</tbody></table></div><p class="quiet">Open a site to see its review. Ask the assistant to “show all sites” to return to the full review.</p></details></section><section class="story-section" aria-labelledby="next-title"><div class="section-heading"><span class="section-number">03</span><h2 id="next-title">Next year's priorities</h2></div><div class="next-chapter"><div><h3>One improvement<br />at a time</h3><p>Use these proposals to start a discussion and agree on next steps with the customer.</p></div><ol class="next-steps">${plan()
-        .map(([title, note]) => `<li>${esc(title)}<small>${esc(note)}</small></li>`)
+        .map(
+          ([title, ...details]) =>
+            `<li>${esc(title)}${details.map((detail) => `<small>${esc(detail)}</small>`).join("")}</li>`,
+        )
         .join(
           "",
         )}</ol></div><details class="notes-details" ${state.note ? "open" : ""}><summary>Add a note to the presentation</summary><label for="meeting-note" class="sr-only">Meeting note</label><textarea id="meeting-note" maxlength="2000" placeholder="E.g. a customer goal or an agreed next step…">${esc(state.note)}</textarea><p class="quiet">The note is saved for this customer and retained when filters change.</p></details></section>`;
@@ -1038,10 +1122,21 @@
     };
     const metrics = document.createElement("section");
     metrics.className = "dashboard-metrics";
+    const history = historicalComparison();
+    const comparable = {
+      allocated: "allocatedPieces",
+      sites: "sites",
+      scanned: "scannedPieces",
+      unscanned: "unscannedPieces",
+      washed: "washEvents",
+      water: "waterLitres",
+      emissions: "emissionsKgCo2e",
+      repairs: "repairs",
+    };
     metrics.innerHTML = t`<h2>Valitsemasi tiedot</h2><div class="dashboard-metric-grid">${state.dashboardLayout.metrics
       .map((id) => {
         const [label, value, scope] = definitions[id];
-        return `<article><span>${label}</span><strong>${value}</strong><small>${esc(scope)}</small></article>`;
+        return `<article><span>${label}</span><strong>${value}</strong><small>${esc(scope)}</small>${kpiComparison(history, comparable[id])}</article>`;
       })
       .join("")}</div><p class="quiet">${esc(scopeName())} · Synteettinen aineisto</p>`;
     const savings = $(".kam-savings") || document.createElement("section");
@@ -1079,8 +1174,50 @@
     const { metrics: m, compare: c, baseline: b, customer } = context();
     return t`<p class="quiet">${esc(customer.customer_name)} · ${esc(scopeName())} · ${periodName()}</p><p class="quiet">All customer figures are synthetic. Water and emissions are calculated estimates allocated from laundry-level data.</p><section class="method-section"><h3>Baseline: ${baselineName()}</h3><p>The baselines apply different water and emissions factors to the same washed weight. They represent illustrative laundry models.</p><div class="formula">Water difference: ${f(m.kg, 1)} kg × ${f(b.water_l_per_kg, 2)} l/kg − ${f(m.water)} l = ${f(c.waterDifference)} l<br />Emissions difference: ${f(m.kg, 1)} kg × ${f(b.process_kgco2e_per_kg + b.delivery_kgco2e_per_kg, 3)} kg CO₂e/kg − ${f(m.emissions)} kg CO₂e = ${f(c.emissionsDifference)} kg CO₂e</div><p>The scope covers water used in washing and laundry and delivery emissions. Figures in the review are rounded.</p></section><section class="method-section"><h3>Sources and calculations</h3><p>${esc(data.source)}</p><ul><li>Customers and Sites: synthetic customer and site records.</li><li>Service_Activity: washed kilograms in the period and allocations and scans for ${snapshotName()}.</li><li>Customer_Impacts: allocated_water_l, allocated_process_kgco2e and allocated_delivery_kgco2e, summed over the period.</li><li>Repairs: number of repair events in the selected period.</li><li>Baselines: factors for the selected comparison.</li></ul></section><section class="method-section"><h3>Interpretation limits</h3><ul><li>Scan coverage highlights where to investigate actual textile use.</li><li>Repair scenarios depend on assumptions about delayed purchases. Their estimated impact is shown separately from laundry emissions.</li><li>Unique wearer counts require person identifiers.</li><li>Cost savings, request resolution and regulatory claims require further evidence.</li><li>Industry focus is an editable suggestion.</li></ul></section>`;
   }
+  function queryChart(result) {
+    const peak = Math.max(...result.rows.map((row) => row.value ?? 0), 0);
+    const size = (row) => (peak > 0 && row.value !== null ? (row.value / peak) * 100 : 0);
+    if (result.kind === "facts")
+      return `<dl class="query-facts">${result.rows
+        .map(
+          (row) =>
+            `<div><dt>${esc(row.label)}</dt><dd>${esc(row.display)}</dd>${row.note ? `<small>${esc(row.note)}</small>` : ""}</div>`,
+        )
+        .join("")}</dl>`;
+    return result.kind === "single"
+      ? `<p class="query-single">${esc(result.rows[0].display)}</p>`
+      : result.kind === "columns"
+        ? `<div class="query-columns ${result.rows.length > 6 ? "dense" : ""}" role="img" aria-label="${esc(result.title)}">${result.rows
+            .map(
+              (row) =>
+                `<div class="${row.accent ? "accent" : ""}"><strong>${esc(row.display)}</strong><span><i style="height:${size(row)}%"></i></span><small>${esc(row.label)}</small></div>`,
+            )
+            .join("")}</div>`
+        : `<div class="query-bars" role="img" aria-label="${esc(result.title)}">${result.rows
+            .map(
+              (row) =>
+                `<div class="${row.accent ? "accent" : ""}"><span>${esc(row.label)}</span><div><i style="width:${size(row)}%"></i></div><strong>${esc(row.display)}</strong></div>`,
+            )
+            .join("")}</div>`;
+  }
+  function chatResult(result) {
+    return `<div class="chat-result"><strong>${esc(result.title)}</strong><small>${esc(result.subtitle)}</small>${queryChart(result)}${result.more ? `<small>${esc(result.more)}</small>` : ""}<em>${esc(result.status)} ${esc(t("Source"))}: ${esc(result.source)}</em></div>`;
+  }
+  function renderQueryResult() {
+    const box = $("#query-result");
+    const result = state.queryResult;
+    const visible = Boolean(result) && result.language === language && state.view === "summary";
+    box.hidden = !visible;
+    if (!visible) {
+      box.innerHTML = "";
+      return;
+    }
+    box.innerHTML = `<header><div><span class="section-kicker">${esc(t("Assistant search"))}</span><h2>${esc(result.title)}</h2><p>${esc(result.subtitle)}</p></div><button type="button" id="query-close" aria-label="${esc(t("Close result"))}">×</button></header><div class="query-body"><div class="query-chart">${queryChart(result)}${result.more ? `<p class="quiet">${esc(result.more)}</p>` : ""}</div>${result.highlights.length ? `<div class="query-highlights">${result.highlights.map((item) => `<article><span>${esc(item.label)}</span><strong>${esc(item.value)}</strong><small>${esc(item.name)}</small></article>`).join("")}</div>` : ""}</div><footer><em>${esc(result.status)}</em><span>${esc(t("Source"))}: ${esc(result.source)}</span></footer>`;
+  }
   function clearScope() {
     // KAM material belongs to the customer; browsing filters must not delete it.
+    state.queryResult = null;
+    state.lastQuery = null;
     state.chatRevision += 1;
   }
   function chatWorkspace() {
@@ -1099,22 +1236,34 @@
   function renderChat() {
     $("#chat").innerHTML =
       state.chat
-        .map((msg) => `<p class="message ${msg.user ? "user" : ""}">${esc(msg.text)}</p>`)
+        .map(
+          (msg) =>
+            `<div class="message ${msg.user ? "user" : ""}"><p>${esc(msg.text)}</p>${msg.view ? chatResult(msg.view) : ""}${msg.followUps?.length && msg === state.chat.at(-1) ? `<div class="chat-followups">${msg.followUps.map((text) => `<button type="button" data-chat-prompt>${esc(text)}</button>`).join("")}</div>` : ""}</div>`,
+        )
         .join("") + (state.asking ? t('<p class="message pending">Applying changes…</p>') : "");
     $("#chat").scrollTop = $("#chat").scrollHeight;
+    const hasPrompts = $("#chat-prompts").children.length > 0;
+    const started = state.chat.length > 0;
+    $("#chat-prompts").hidden = started && !state.promptsOpen;
+    $("#chat-prompts-toggle").hidden = !hasPrompts || !started;
+    $("#chat-prompts-toggle").textContent = t(
+      state.promptsOpen ? "Hide suggestions" : "Show suggestions",
+    );
     $("#question").disabled = state.asking;
     $("#ask-form button[type=submit]").disabled = state.asking;
     $("#ask-form").setAttribute("aria-busy", String(state.asking));
   }
   async function ask(question) {
-    if (state.asking) return;
+    if (state.asking || profileMode !== "saved" || storageLoading || switchingReview) return;
     const workspace = chatWorkspace(),
       snapshot = JSON.stringify(workspace),
-      revision = state.chatRevision;
+      revision = state.chatRevision,
+      chatTool = state.chatTool;
     const history = state.chat
       .slice(-6)
       .map((msg) => ({ role: msg.user ? "user" : "assistant", content: msg.text.slice(0, 1800) }));
     state.chat.push({ user: true, text: question });
+    state.promptsOpen = false;
     state.asking = true;
     $("#chat").hidden = false;
     renderChat();
@@ -1123,7 +1272,7 @@
       const response = await fetch(`/api/chat?lang=${language}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: question, history, workspace }),
+        body: JSON.stringify({ message: question, history, workspace, lastQuery: state.lastQuery }),
         signal: AbortSignal.timeout(95000),
       });
       const result = await response.json();
@@ -1177,10 +1326,29 @@
         "includeContractAgenda",
       ])
         state[key] = next[key];
+      if (result.query !== undefined) state.lastQuery = result.query;
+      else if (result.changed.some((key) => key.startsWith("scope."))) state.lastQuery = null;
+      const onDashboard =
+        Boolean(result.view) && chatTool === "dashboard" && state.view === "summary";
+      state.queryResult = onDashboard
+        ? result.view
+        : result.changed.length
+          ? null
+          : state.queryResult;
       render();
-      await flushReviewSave();
-      state.chat.push({ user: false, text: result.changed.length ? t("Done") : t("No changes.") });
-      if (result.changed.length) {
+      if (result.changed.length) await flushReviewSave();
+      state.chat.push({
+        user: false,
+        text: onDashboard
+          ? `${t("The comparison is on the dashboard.")} ${result.answer}`
+          : (result.answer ??
+            result.message ??
+            (result.changed.length ? t("Done") : t("No changes."))),
+        view: onDashboard ? null : result.view,
+        followUps: result.followUps ?? [],
+      });
+      if (onDashboard) $("#query-result").scrollIntoView({ behavior: "smooth", block: "start" });
+      if (result.changed.length && !result.view) {
         status(t("Done"));
 
         const target = $(
@@ -1210,9 +1378,83 @@
       updateChatToggle();
     }
   }
-  $("#toggle-chat").addEventListener("click", () => {
-    $("#chat").hidden = !$("#chat").hidden;
+  const chatTools = {
+    data: {
+      title: "Find and compare data",
+      hint: "Figures, quarters, sites and products",
+      prompts: [
+        "What should we raise in the meeting?",
+        "Compare water by quarter",
+        "Which products need the most repairs?",
+        "Compare emissions by country",
+        "Which sites have the most late cycles?",
+      ],
+    },
+    dashboard: {
+      title: "Change the dashboard",
+      hint: "Period, focus and visible content",
+      prompts: [
+        "Show Q2",
+        "Compare water by quarter",
+        "Focus on emissions",
+        "Restore the default dashboard",
+      ],
+    },
+  };
+  function toggleChatMenu(open) {
+    $("#chat-menu").hidden = !open;
+    $("#composer").classList.toggle("menu-open", open);
+  }
+  function renderChatMenu() {
+    $("#chat-menu").innerHTML = Object.entries(chatTools)
+      .map(
+        ([id, tool]) =>
+          `<button type="button" data-chat-tool="${id}"><strong>${esc(t(tool.title))}</strong><small>${esc(t(tool.hint))}</small></button>`,
+      )
+      .join("");
+  }
+  function openChatTool(id) {
+    if (profileMode !== "saved" || storageLoading || switchingReview) return;
+    state.chatTool = id;
+    state.promptsOpen = true;
+    $("#chat-prompts").innerHTML = chatTools[id].prompts
+      .map((text) => `<button type="button" data-chat-prompt>${esc(t(text))}</button>`)
+      .join("");
+    toggleChatMenu(false);
+    $("#chat").hidden = false;
     updateChatToggle();
+    renderChat();
+    $("#question").focus();
+  }
+  $("#toggle-chat").addEventListener("click", () => {
+    if ($("#chat").hidden) {
+      renderChatMenu();
+      toggleChatMenu($("#chat-menu").hidden);
+      return;
+    }
+    $("#chat").hidden = true;
+    updateChatToggle();
+  });
+  $("#query-result").addEventListener("click", (event) => {
+    if (!event.target.closest("#query-close")) return;
+    state.queryResult = null;
+    renderQueryResult();
+  });
+  $("#chat-menu").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-chat-tool]");
+    if (button) openChatTool(button.dataset.chatTool);
+  });
+  $("#chat-prompts-toggle").addEventListener("click", () => {
+    state.promptsOpen = !state.promptsOpen;
+    renderChat();
+  });
+  $("#chat").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-chat-prompt]");
+    if (button) ask(button.textContent);
+  });
+  $("#chat-prompts").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-chat-prompt]");
+    if (button) ask(button.textContent);
   });
   $("#reset").addEventListener("click", () => {
     Object.assign(state, {
@@ -1261,7 +1503,7 @@
     $("#composer").inert = true;
     try {
       await flushReviewSave();
-      if (!storageBlocked && storageReady) await loadCustomerReview(customer);
+      await loadCustomerReview(customer);
     } catch {
       /* The persistent save status explains the error. */
     } finally {

@@ -47,7 +47,11 @@ test("period and country filters reconcile independently to original fixture row
       .map((site) => site.site_id),
   );
   const original = data.records.filter(
-    (row) => row.customer === "CUST001" && ids.has(row.site) && row.month <= "2025-03",
+    (row) =>
+      row.customer === "CUST001" &&
+      ids.has(row.site) &&
+      row.month >= "2025-01" &&
+      row.month <= "2025-03",
   );
   close(
     ctx.metrics.water,

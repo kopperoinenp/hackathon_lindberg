@@ -3,7 +3,10 @@
   "use strict";
   function aggregate(data, customer, site = "all") {
     const records = data.records.filter(
-      (row) => row.customer === customer && (site === "all" || row.site === site),
+      (row) =>
+        row.month.startsWith((data.year ?? "2025") + "-") &&
+        row.customer === customer &&
+        (site === "all" || row.site === site),
     );
     const sum = (field) => records.reduce((total, row) => total + (row[field] || 0), 0);
     const december = records.filter((row) => row.month === "2025-12");

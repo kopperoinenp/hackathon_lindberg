@@ -50,7 +50,7 @@ test("all tools run and annual totals reconcile to independent workbook sample c
     results.laundry.values.byWashedKg.reduce((sum, row) => sum + row.washedKg, 0),
     502074.7,
   );
-  assert.equal(results.period.values, null);
+  assert.deepEqual(results.yoy.values.previousPeriod, { from: "2024-01", to: "2024-12" });
   assert.equal(results.peer.scope, null);
   near(results.peer.values.peerAverage, 0.3225);
 });
@@ -66,7 +66,11 @@ test("period comparison keeps filters, uses equal-length periods and does not ca
   );
   const q1Washed = data.records
     .filter(
-      (row) => row.customer === scope.customer && finland.has(row.site) && row.month <= "2025-03",
+      (row) =>
+        row.customer === scope.customer &&
+        finland.has(row.site) &&
+        row.month >= "2025-01" &&
+        row.month <= "2025-03",
     )
     .reduce((sum, row) => sum + row.customer_washed_kg, 0);
   near(result.values.before.washedKg, q1Washed);
@@ -80,4 +84,26 @@ test("period comparison keeps filters, uses equal-length periods and does not ca
   assert.equal(laundry.status, "unavailable");
   assert.equal(service.values.latePct, null);
   assert.equal(service.values.requests, null);
+});
+
+test("year-over-year compares matching site-months and snapshots, and rejects missing coverage", () => {
+  const quarter = { ...scope, site: "S002", from: "2025-04", to: "2025-06" };
+  const [result] = tools.run(data, quarter, ["yoy"]);
+  const historical = data.records.filter(
+    (row) => row.site === "S002" && row.month >= "2024-04" && row.month <= "2024-06",
+  );
+  assert.deepEqual(result.values.previousPeriod, { from: "2024-04", to: "2024-06" });
+  assert.equal(result.values.previousSnapshotMonth, "2024-06");
+  assert.equal(
+    result.values.before.allocatedPieces,
+    historical.find((row) => row.month === "2024-06").allocated_pieces,
+  );
+  near(
+    result.values.before.waterLitres,
+    historical.reduce((sum, row) => sum + row.allocated_water_l, 0),
+  );
+  near(result.values.delta.scanPct, result.values.after.scanPct - result.values.before.scanPct);
+  const incomplete = { ...data, records: data.records.filter((row) => row !== historical[0]) };
+  assert.equal(tools.run(incomplete, quarter, ["yoy"])[0].status, "unavailable");
+  assert.equal(tools.periodComparison(incomplete, quarter).kind, "period");
 });
