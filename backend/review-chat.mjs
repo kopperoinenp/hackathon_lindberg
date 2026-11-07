@@ -549,7 +549,7 @@ export async function runReviewChat(
     {
       instructions:
         instructions +
-        " When the manager explicitly asks to open or filter the detailed analysis view with evidence, choose one to three analysisTools from the supplied catalog, set supported=true and view=analysis, and set dataQuery=null. Use the scope fields to specify the requested scope. For direct data questions and ordinary workspace edits, set analysisTools=null. Use only one route per request.",
+        " When the manager explicitly asks to open or filter the detailed analysis view with evidence, choose one to three analysisTools from the supplied catalog, set supported=true and view=analysis, and set dataQuery=null. Use the scope fields to specify the requested scope. For direct data questions and ordinary workspace edits, set analysisTools=null. A comparison with the same months last year overrides the direct-question route: select only yoy in analysisTools, set view=analysis and dataQuery=null. Keep the current selection unless the user requests a different 2025 period. Use only one route per request.",
       input: JSON.stringify({ ...inputContext, analysisCatalog: analysis.catalog }),
       schema: analysisChatSchema,
       name: "review_workspace_analysis_request",

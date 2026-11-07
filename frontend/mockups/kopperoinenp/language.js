@@ -43,6 +43,14 @@
     "Questions for the customer review": "Kysymykset asiakaskatsaukseen",
     "There is insufficient data for a proposal in this selection.":
       "Valitulla rajauksella ei ole riittävää näyttöä kehitysehdotukselle.",
+    "Same period last year": "Sama jakso vuotta aiemmin",
+    "Historical change": "Jaksovertailu",
+    "Previous value: 0": "Vertailujakson arvo: 0",
+    "Preceding period": "Edeltävä jakso",
+    "No comparable historical period is available for this selection.":
+      "Valitulle rajaukselle ei ole vertailukelpoista aiempaa jaksoa.",
+    "Stock and scan coverage use period-end snapshots. Both periods cover the same sites and months in scope.":
+      "Tekstiilikanta ja skannauskattavuus kuvaavat jakson loppua. Molemmat jaksot kattavat samat toimipaikat ja yhtä monta kuukautta.",
     "Investigate lower wash frequency": "Selvittäkää vähäisemmän pesutiheyden syy",
     "washes per allocated item per month": "pesua allokoitua kappaletta kohti kuukaudessa",
     "Difference repeated in ": "Ero toistui ",

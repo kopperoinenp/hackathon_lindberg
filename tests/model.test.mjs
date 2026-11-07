@@ -98,10 +98,10 @@ test("fixture retains valid synthetic scope and unique monthly site keys", () =>
   assert.equal(data.status, "SYNTHETIC");
   assert.equal(data.customers.length, 3);
   assert.equal(data.sites.length, 34);
-  assert.equal(data.records.length, 408);
+  assert.equal(data.records.length, 816);
   const keys = new Set();
   for (const row of data.records) {
-    assert.match(row.month, /^2025-(0[1-9]|1[0-2])$/);
+    assert.match(row.month, /^202[45]-(0[1-9]|1[0-2])$/);
     assert.ok(data.sites.some((s) => s.site_id === row.site && s.customer_id === row.customer));
     const key = `${row.customer}/${row.site}/${row.month}`;
     assert.ok(!keys.has(key), `Duplicate ${key}`);

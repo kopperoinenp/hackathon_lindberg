@@ -326,6 +326,32 @@
   function snapshotName() {
     return context().metrics.snapshotMonth || state.to;
   }
+  function historicalComparison() {
+    return (
+      analysisTools.periodComparison(data, state, "yoy") ??
+      analysisTools.periodComparison(data, state)
+    );
+  }
+  function comparisonLabel(comparison) {
+    const { from, to } = comparison.previousPeriod;
+    return (
+      t(comparison.kind === "yoy" ? "Same period last year" : "Preceding period") +
+      " · " +
+      (from === to ? from : from + "–" + to)
+    );
+  }
+  function kpiComparison(comparison, metric) {
+    if (!comparison) return "";
+    const change = comparison.relativeChangePct[metric];
+    const value =
+      change == null
+        ? t("Previous value: 0")
+        : new Intl.NumberFormat(t("en-GB"), {
+            maximumFractionDigits: 1,
+            signDisplay: "exceptZero",
+          }).format(change) + " %";
+    return `<small>${esc(t("Historical change") + " · " + value + " · " + comparisonLabel(comparison))}</small>`;
+  }
   function scopeLabel() {
     const site = data.sites.find((row) => row.site_id === state.site);
     return [
@@ -343,15 +369,12 @@
   }
   function detailedAnalysis() {
     const detail = globalThis.WorkspaceModel.analyzeDetails(data, state);
-    const [periodResult, baselineResult, driverResult, laundryResult, actionResult] =
-      analysisTools.run(data, presentationRequest(false).scope, [
-        "period",
-        "baselines",
-        "drivers",
-        "laundry",
-        "actions",
-      ]);
-    const period = periodResult.values;
+    const [baselineResult, driverResult, laundryResult, actionResult] = analysisTools.run(
+      data,
+      presentationRequest(false).scope,
+      ["baselines", "drivers", "laundry", "actions"],
+    );
+    const period = historicalComparison();
     const number = (value, unit = "", digits = 1) =>
       value == null ? t("Unavailable") : [f(value, digits), unit].filter(Boolean).join(" ");
     const table = (headings, rows) =>
@@ -376,6 +399,7 @@
                 [t("Metric"), t("Previous period"), t("Selected period"), t("Change")],
                 [
                   [t("Washed kg"), "washedKg", "kg"],
+                  [t("Allocated textiles"), "allocatedPieces", ""],
                   [t("Water"), "waterLitres", "l"],
                   [t("Emissions"), "emissionsKgCo2e", "kg CO₂e"],
                   [t("Repairs"), "repairs", ""],
@@ -387,8 +411,8 @@
                   number(period.delta[key], key === "scanPct" ? t("percentage points") : unit),
                 ]),
               ) +
-              `<p class="quiet">${esc(period.previousPeriod.from)} – ${esc(period.previousPeriod.to)} · ${esc(t("Previous period has the same length and site filters. Scan coverage compares period-end snapshots."))}</p>`
-            : `<p>${t("The preceding period of equal length is outside the available data.")}</p>`
+              `<p class="quiet">${esc(comparisonLabel(period))} · ${esc(t("Stock and scan coverage use period-end snapshots. Both periods cover the same sites and months in scope."))}</p>`
+            : `<p>${t("No comparable historical period is available for this selection.")}</p>`
         }
       </section>
       <section class="analysis-card">
@@ -582,7 +606,9 @@
     $("#customer").value = state.customer;
     invalidatePowerPoint();
     const ctx = context();
-    const months = [...new Set(data.records.map((row) => row.month))].sort();
+    const months = [...new Set(data.records.map((row) => row.month))]
+      .filter((month) => month.startsWith(data.year + "-"))
+      .sort();
     for (const id of ["from", "to"]) {
       $("#" + id).innerHTML = months
         .map((month) => `<option value="${month}">${month}</option>`)
@@ -990,6 +1016,8 @@
       ? shortNames[customer.customer_name]
       : customer.customer_name;
     const cards = results();
+    const history = historicalComparison();
+    const comparable = { water: "waterLitres", emissions: "emissionsKgCo2e", repairs: "repairs" };
     const visibleOrder = order.filter((id) => state.visibleInsights.includes(id));
     const title =
       state.heading || state.titleEdits.cover
@@ -1000,7 +1028,7 @@
       t`<section class="intro"><span class="section-kicker">ANNUAL REVIEW PREPARATION</span><h1>${title}</h1><p>${opening()}</p><div class="scope"><strong>${esc(scopeName())}</strong> · ${m.sites} ${t(m.sites === 1 ? "site" : "sites")} · Baseline: ${baselineName()}</div></section><section class="story-section" aria-labelledby="results-title"${visibleOrder.length ? "" : " hidden"}><div class="section-heading"><span class="section-number">01</span><h2 id="results-title">Key results for the period</h2></div><div class="results">${visibleOrder
         .map((key) => {
           const card = cards[key];
-          return t`<article class="result" data-insight="${key}"><div class="result-name">${card.name}</div><div class="result-value">${card.value}</div><span class="result-unit">${card.unit}</span>${card.visual}<h3>${card.title}</h3><p>${card.text}</p><div class="relevance"><strong>Why this matters</strong><p>${esc(globalThis.MeetingModel.relevance(key, state.priority, false, language))}</p></div><small>${card.boundary}</small></article>`;
+          return t`<article class="result" data-insight="${key}"><div class="result-name">${card.name}</div><div class="result-value">${card.value}</div><span class="result-unit">${card.unit}</span>${card.visual}<h3>${card.title}</h3><p>${card.text}</p><div class="relevance"><strong>Why this matters</strong><p>${esc(globalThis.MeetingModel.relevance(key, state.priority, false, language))}</p></div><small>${card.boundary}</small>${kpiComparison(history, comparable[key])}</article>`;
         })
         .join(
           "",
@@ -1085,10 +1113,21 @@
     };
     const metrics = document.createElement("section");
     metrics.className = "dashboard-metrics";
+    const history = historicalComparison();
+    const comparable = {
+      allocated: "allocatedPieces",
+      sites: "sites",
+      scanned: "scannedPieces",
+      unscanned: "unscannedPieces",
+      washed: "washEvents",
+      water: "waterLitres",
+      emissions: "emissionsKgCo2e",
+      repairs: "repairs",
+    };
     metrics.innerHTML = t`<h2>Valitsemasi tiedot</h2><div class="dashboard-metric-grid">${state.dashboardLayout.metrics
       .map((id) => {
         const [label, value, scope] = definitions[id];
-        return `<article><span>${label}</span><strong>${value}</strong><small>${esc(scope)}</small></article>`;
+        return `<article><span>${label}</span><strong>${value}</strong><small>${esc(scope)}</small>${kpiComparison(history, comparable[id])}</article>`;
       })
       .join("")}</div><p class="quiet">${esc(scopeName())} · Synteettinen aineisto</p>`;
     const savings = $(".kam-savings") || document.createElement("section");

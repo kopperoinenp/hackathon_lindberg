@@ -51,6 +51,11 @@
       ["Service_Activity", "Customer_Impacts", "Repairs"],
       "Same customer, sites and geography. Stock is compared at each period end. Requires both periods in the dataset.",
     ],
+    yoy: [
+      "Compare the same months one year earlier",
+      ["Service_Activity", "Customer_Impacts", "Repairs"],
+      "Same customer and site-month coverage. Stock and scan coverage use period-end snapshots.",
+    ],
     drivers: [
       "Monthly and country totals, plus site contributions",
       ["Sites", "Service_Activity", "Customer_Impacts", "Repairs"],
@@ -84,22 +89,42 @@
     emissionsKgCo2e: m.emissions,
     repairs: m.repairs,
     allocatedPieces: m.allocated,
+    scannedPieces: m.scanned,
+    unscannedPieces: m.unscanned,
+    sites: m.sites,
     scanPct: m.utilization,
   });
 
-  function periodComparison(data, scope, current) {
-    const from = Number(scope.from.slice(5));
-    const to = Number(scope.to.slice(5));
-    const start = from - (to - from + 1);
-    if (start < 1) return null;
-    const month = (value) => scope.from.slice(0, 5) + String(value).padStart(2, "0");
-    const previousScope = { ...scope, from: month(start), to: month(from - 1) };
-    const previous = root.WorkspaceModel.summarize(root.WorkspaceModel.select(data, previousScope));
-    if (!previous.hasData || !current.hasData) return null;
+  const monthIndex = (month) => Number(month.slice(0, 4)) * 12 + Number(month.slice(5)) - 1;
+  const monthName = (index) =>
+    Math.floor(index / 12) + "-" + String((index % 12) + 1).padStart(2, "0");
+
+  function comparePeriods(data, scope, kind, rows) {
+    const model = root.WorkspaceModel;
+    const start = monthIndex(scope.from);
+    const end = monthIndex(scope.to);
+    const length = end - start + 1;
+    if (!rows.length || length < 1) return null;
+    const offset = kind === "yoy" ? 12 : length;
+    const from = monthName(start - offset);
+    const to = monthName(end - offset);
+    const previousRows = model.select(data, { ...scope, from, to });
+    const previousKeys = new Set(previousRows.map((row) => row.site + "/" + row.month));
+    if (
+      previousRows.length !== rows.length ||
+      rows.length !== new Set(rows.map((row) => row.site)).size * length ||
+      rows.some(
+        (row) => !previousKeys.has(row.site + "/" + monthName(monthIndex(row.month) - offset)),
+      )
+    )
+      return null;
+    const previous = model.summarize(previousRows);
+    const current = model.summarize(rows);
     const before = totals(previous);
     const after = totals(current);
     return {
-      previousPeriod: { from: previousScope.from, to: previousScope.to },
+      kind,
+      previousPeriod: { from, to },
       previousSnapshotMonth: previous.snapshotMonth,
       currentSnapshotMonth: current.snapshotMonth,
       before,
@@ -116,6 +141,10 @@
           .map((key) => [key, pct(after[key], before[key])]),
       ),
     };
+  }
+
+  function periodComparison(data, scope, kind = "period") {
+    return comparePeriods(data, scope, kind, root.WorkspaceModel.select(data, scope));
   }
 
   function baselineScenarios(data, metrics, detail) {
@@ -192,7 +221,8 @@
         wasteRoutes: getDetail().wasteRoutes,
       }),
       baselines: () => ({ washedKg: m.kg, scenarios: baselineScenarios(data, m, getDetail()) }),
-      period: () => periodComparison(data, scope, m),
+      period: () => comparePeriods(data, scope, "period", rows),
+      yoy: () => comparePeriods(data, scope, "yoy", rows),
       drivers: () => ({
         monthly: model.series(ctx, "emissions").map(({ month, value }) => ({
           month,
