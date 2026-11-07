@@ -39,6 +39,8 @@ export async function runDashboardJob(client) {
     const result = calculateDashboard(data, job.scope);
     result.metadata = {
       sites: data.sites,
+      baselines: data.baselines,
+      source: data.source,
       months: [
         ...new Set(
           data.records.filter((r) => r.month.startsWith(data.year + "-")).map((r) => r.month),

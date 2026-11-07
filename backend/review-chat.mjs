@@ -8,7 +8,13 @@ import {
 import { generateStructured, providerConfig } from "./ai-provider.mjs";
 import { dataset as data } from "./dataset.mjs";
 import { requestContext } from "./request-context.mjs";
-import { cleanQuery, dataQuerySchema, refineQuery, runDataQuery } from "./data-query.mjs";
+import {
+  cleanQuery,
+  dataQuerySchema,
+  prepareDataQuery,
+  refineQuery,
+  runDataQuery,
+} from "./data-query.mjs";
 import "../frontend/mockups/kopperoinenp/analysis-tools.js";
 const analysis = globalThis.ReviewAnalysisTools;
 import { replyLanguage, smallTalk, writeReply } from "./assistant-writer.mjs";
@@ -741,6 +747,7 @@ async function answerQuery(request, dataQuery, proposed, generate, options) {
       query: request.lastQuery,
     };
   const language = replyLanguage(request.message, proposed.workspace.language);
+  await prepareDataQuery(query, proposed.workspace, request.lastQuery);
   const { text, source, summary, view, followUps } = runDataQuery(
     query,
     { ...proposed.workspace, language },
@@ -898,7 +905,11 @@ export async function runReviewChat(
     return { ...proposed, message: describeChange(request.workspace, proposed) };
 
   const analyzedScope = proposed.workspace.scope;
-  const results = analysis.run(data, analyzedScope, analysisTools);
+  const prepared = requestContext.getStore()?.prepared;
+  const preparedTools = prepared ? (await prepared.load(analyzedScope)).tools : null;
+  const results = prepared
+    ? analysisTools.map((id) => preparedTools.find((tool) => tool.id === id))
+    : analysis.run(data, analyzedScope, analysisTools);
   const finalPatch = await generate(
     {
       instructions:

@@ -30,9 +30,25 @@ A worker interruption rolls back an unfinished job so it can be picked up again.
 Dashboard responses are limited to 200 KiB of calculated results per scope.
 The shared preview returns `410` for the former browser dataset route.
 
-The present scope covers the dashboard. The existing assistant and PowerPoint
-services still calculate from their backend data context. They do not pin the
-dashboard's selected dataset version when a new import is published during a session.
+Phase four links the assistant, preview and PowerPoint to the ready dashboard
+snapshot. The task owner approved this contract update using the existing synthetic
+data. Shared-mode clients send `dashboardSnapshotId` in presentation requests
+and inside `workspace` in assistant requests. The backend verifies the customer's
+access, scope and calculation version. A missing, stale or mismatched reference
+returns `409`. The standalone file preview continues to use its fixture.
+
+Successful responses carry `dashboard: {id, datasetVersion, calculationVersion}`.
+The preview and exported deck use the same stored facts, comparisons and service
+proposals. Dashboard-built review areas follow the same selection and may include
+explicit KAM inputs. The PowerPoint cache key includes the snapshot reference,
+which is also written to the speaker notes.
+
+When an assistant question needs a new period or site scope, the same worker
+prepares it from the active dashboard's publication, including retained published
+versions. To ask for figures for another customer, open that customer's dashboard.
+The initial bootstrap fixture can supply new scopes until the first import replaces
+it. Previously calculated bootstrap snapshots remain readable after publication.
+
 The prototype has no load test against production-sized data or cache retention policy.
 
 Run `pnpm check` for the repository checks and `pnpm test:shared` for PostgreSQL

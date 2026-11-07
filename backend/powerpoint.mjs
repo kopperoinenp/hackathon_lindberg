@@ -381,7 +381,14 @@ export async function renderPowerPoint(deck) {
       align: "right",
     });
     slide.addNotes(
-      [deck.footer, item.paragraphs.join("\n\n"), item.relevance, item.source]
+      [
+        deck.footer,
+        deck.dashboard &&
+          `Dataset: ${deck.dashboard.datasetVersion} · Metrics: ${deck.dashboard.calculationVersion} · Snapshot: ${deck.dashboard.id}`,
+        item.paragraphs.join("\n\n"),
+        item.relevance,
+        item.source,
+      ]
         .filter(Boolean)
         .join("\n"),
     );

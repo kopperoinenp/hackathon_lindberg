@@ -1,5 +1,6 @@
 import "../frontend/mockups/kopperoinenp/language.js";
 import { dataset as data } from "./dataset.mjs";
+import { requestContext } from "./request-context.mjs";
 import "../frontend/mockups/kopperoinenp/model.js";
 import "../frontend/mockups/kopperoinenp/story-model.js";
 import "../frontend/mockups/kopperoinenp/analysis-model.js";
@@ -210,7 +211,11 @@ export function buildPresentation(input) {
   const t = globalThis.ReviewLanguage.translator(request.language);
   const f = (value, digits = 0) =>
     new Intl.NumberFormat(t("en-GB"), { maximumFractionDigits: digits }).format(value);
-  const ctx = globalThis.WorkspaceModel.buildContext(data, request.scope);
+  const prepared = requestContext.getStore()?.prepared;
+  const snapshot = prepared?.get(request.scope);
+  const ctx = snapshot
+    ? snapshot.contexts[request.scope.priority]
+    : globalThis.WorkspaceModel.buildContext(data, request.scope);
   const { metrics: m, compare: c, baseline: b, focus, customer } = ctx;
   if (!m.hasData) throw new PresentationError("No data matches the filters.");
   const period = `${request.scope.from} – ${request.scope.to}`;
@@ -328,8 +333,12 @@ export function buildPresentation(input) {
         ),
       ],
       chart: {
-        labels: globalThis.WorkspaceModel.series(ctx, "repairs").map((p) => p.month.slice(5)),
-        values: globalThis.WorkspaceModel.series(ctx, "repairs").map((p) => p.value),
+        labels: (ctx.series?.repairs ?? globalThis.WorkspaceModel.series(ctx, "repairs")).map((p) =>
+          p.month.slice(5),
+        ),
+        values: (ctx.series?.repairs ?? globalThis.WorkspaceModel.series(ctx, "repairs")).map(
+          (p) => p.value,
+        ),
         unit: "items",
       },
       source: t("Repair records"),
@@ -414,7 +423,9 @@ export function buildPresentation(input) {
     from: `${earlierYear}${request.scope.from.slice(4)}`,
     to: `${earlierYear}${request.scope.to.slice(4)}`,
   };
-  const earlier = globalThis.WorkspaceModel.buildContext(data, earlierScope).metrics;
+  const earlier = snapshot
+    ? (snapshot.previous?.ctx.metrics ?? { hasData: false })
+    : globalThis.WorkspaceModel.buildContext(data, earlierScope).metrics;
   const change = (now, before, better = null) => {
     if (!earlier.hasData || !before) return null;
     const percent = Number((((now - before) / before) * 100).toFixed(1));
@@ -573,7 +584,9 @@ export function buildPresentation(input) {
     added: [],
   };
   const upsellSlides = globalThis.UpsellModel.approved(
-    globalThis.UpsellModel.proposals(data, request.scope, request.language),
+    snapshot
+      ? snapshot.proposals[request.language]
+      : globalThis.UpsellModel.proposals(data, request.scope, request.language),
     request.approvedUpsells,
   )
     .filter((proposal) => !request.hideUsage || !/scan|skann/iu.test(JSON.stringify(proposal)))
@@ -589,6 +602,7 @@ export function buildPresentation(input) {
     }));
   return {
     request,
+    ...(prepared ? { dashboard: prepared.reference } : {}),
     customer: { name: customer.customer_name, industry: customer.industry },
     period,
     footer,

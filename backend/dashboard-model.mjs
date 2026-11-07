@@ -7,7 +7,7 @@ import "../frontend/mockups/kopperoinenp/summary-charts.js";
 import "../frontend/mockups/kopperoinenp/upsell-model.js";
 import "../frontend/mockups/kopperoinenp/sales-model.js";
 
-export const dashboardCalculationVersion = "dashboard-v1";
+export const dashboardCalculationVersion = "dashboard-v2";
 const model = globalThis.WorkspaceModel;
 const tools = globalThis.ReviewAnalysisTools;
 
@@ -81,6 +81,9 @@ export function calculateDashboard(data, scope) {
       ]),
     ),
     detail: model.analyzeDetails(data, scope),
+    lateCount: model
+      .select(data, scope, data.cycleGroups ?? [])
+      .reduce((count, group) => count + group.late, 0),
     tools: tools.run(
       data,
       scope,
