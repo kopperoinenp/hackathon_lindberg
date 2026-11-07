@@ -156,3 +156,32 @@ test("unavailable detail and zero denominators remain distinct from measured zer
   assert.equal(zero.energyPerKg, null);
   assert.equal(zero.products[0].washesPerPieceMonth, null);
 });
+
+test("service cycle finding requires recurring gaps and comparable site coverage", () => {
+  const scope = { ...base, from: "2025-01", to: "2025-02" };
+  const [slow, peer, incomplete] = data.sites.filter((site) => site.customer_id === scope.customer);
+  const group = (site, month, hours) => ({
+    customer: scope.customer,
+    site: site.site_id,
+    month,
+    hours: Array(15).fill(hours),
+    late: 0,
+  });
+  const rows = [
+    group(slow, scope.from, 30),
+    group(slow, scope.to, 40),
+    group(peer, scope.from, 20),
+    group(peer, scope.to, 25),
+    group(incomplete, scope.from, 100),
+  ];
+  const fixture = { ...data, cycleGroups: rows };
+  const finding = model.serviceCycleFinding(fixture, scope);
+  assert.equal(finding.site, slow.site_name);
+  assert.equal(finding.gap, 15);
+  assert.equal(finding.count, 30);
+  assert.equal(finding.peerCount, 1);
+  assert.equal(finding.monthsAbove, 2);
+  assert.equal(model.serviceCycleFinding(fixture, { ...scope, site: slow.site_id }), null);
+  rows[1] = group(slow, scope.to, 24);
+  assert.equal(model.serviceCycleFinding(fixture, scope), null);
+});

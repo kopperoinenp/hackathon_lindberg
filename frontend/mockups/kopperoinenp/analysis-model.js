@@ -119,6 +119,52 @@
       latePct: ratio(sum(groups, "late") * 100, count),
     };
   }
+  function serviceCycleFinding(data, selection) {
+    const groups = select(data, selection, data.cycleGroups ?? []);
+    const bySite = Map.groupBy(groups, ({ site }) => site);
+    const months = [...new Set(groups.map(({ month }) => month))].sort();
+    if (months.length < 2) return null;
+    // Compare sites over the same observed months, with enough cycles to compute P90.
+    const sites = [...bySite].flatMap(([id, cycles]) => {
+      const byMonth = Map.groupBy(cycles, ({ month }) => month);
+      const monthly = months.map((month) => serviceMetrics(byMonth.get(month) ?? []));
+      const total = serviceMetrics(cycles);
+      return total.count >= 30 && monthly.every(({ count }) => count >= 5)
+        ? [{ id, monthly, total }]
+        : [];
+    });
+    if (sites.length < 2) return null;
+    const median = (values) => {
+      const sorted = values.toSorted((a, b) => a - b);
+      const middle = Math.floor(sorted.length / 2);
+      return (sorted[middle] + sorted[Math.floor((sorted.length - 1) / 2)]) / 2;
+    };
+    const candidates = sites.map((site) => {
+      const peers = sites.filter(({ id }) => id !== site.id);
+      const reference = median(peers.map(({ total }) => total.p90Hours));
+      const monthly = months.map((month, index) => ({
+        month,
+        actual: site.monthly[index].p90Hours,
+        reference: median(peers.map((peer) => peer.monthly[index].p90Hours)),
+      }));
+      return {
+        site: data.sites.find(({ site_id }) => site_id === site.id).site_name,
+        count: site.total.count,
+        actual: site.total.p90Hours,
+        reference,
+        gap: site.total.p90Hours - reference,
+        peerCount: peers.length,
+        monthsAbove: monthly.filter((point) => point.actual > point.reference).length,
+        monthly,
+      };
+    });
+    return (
+      candidates
+        .filter(({ gap, monthsAbove }) => gap > 0 && monthsAbove >= 2)
+        .sort((a, b) => b.gap - a.gap || b.monthsAbove - a.monthsAbove || b.count - a.count)[0] ??
+      null
+    );
+  }
   function analyzeDetails(data, selection) {
     const rows = select(data, selection, data.detail ?? []);
     const cycles = select(data, selection, data.cycleGroups ?? []);
@@ -333,6 +379,7 @@
     customerOverview,
     select,
     analyzeDetails,
+    serviceCycleFinding,
     usageFindings,
     summarize,
     buildContext,
