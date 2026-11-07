@@ -122,11 +122,12 @@ test("provider receives strict patch contract and fresh evidence, failures never
     { workspace: current, message: "Painota vettä", history: [] },
     {
       generate: async ({ schema, input }) => {
-        assert.equal(schema, chatSchema);
+        assert.ok(schema.required.includes("analysisTools"));
         const parsed = JSON.parse(input);
         assert.deepEqual(parsed.workspace, current);
         assert.ok(parsed.catalog.customers.length === 3);
         assert.ok(parsed.evidence.some((s) => s.id === "water"));
+        assert.ok(parsed.analysisCatalog.some((tool) => tool.id === "service"));
         return scoped({ priority: "water" });
       },
     },
@@ -149,6 +150,47 @@ test("provider receives strict patch contract and fresh evidence, failures never
       { env: { PRESENTATION_PROVIDER: "deterministic" } },
     ),
     (e) => e.status === 503,
+  );
+});
+
+test("agent tools execute on the proposed scope and the final patch cannot switch the evidence scope", async () => {
+  const current = workspace();
+  const input = { workspace: current, message: "Analysoi Suomen pesun päästöt tammi–maaliskuulta" };
+  const validatedPatch = {
+    ...scoped({ country: "Finland", from: "2025-01", to: "2025-03" }),
+    view: "analysis",
+  };
+  const first = { ...validatedPatch, analysisTools: ["footprint", "period"] };
+  let calls = 0;
+  const result = await runReviewChat(input, {
+    generate: async ({ input: payload, schema }) => {
+      if (++calls === 1) return first;
+      assert.equal(schema, chatSchema);
+      const context = JSON.parse(payload);
+      assert.equal(context.analyzedScope.country, "Finland");
+      const [footprint, period] = context.analysisResults;
+      assert.equal(footprint.scope.to, "2025-03");
+      assert.ok(footprint.values.emissionsKgCo2e > 0);
+      assert.equal(period.status, "unavailable");
+      return validatedPatch;
+    },
+  });
+  assert.equal(result.workspace.view, "analysis");
+  assert.equal(result.workspace.scope.country, "Finland");
+  assert.equal(calls, 2);
+  await assert.rejects(
+    runReviewChat(input, { generate: async () => ({ ...first, analysisTools: ["unknown"] }) }),
+    /invalid analysis tools/,
+  );
+  calls = 0;
+  await assert.rejects(
+    runReviewChat(input, {
+      generate: async () =>
+        ++calls === 1
+          ? first
+          : { ...validatedPatch, scope: { ...validatedPatch.scope, country: "Sweden" } },
+    }),
+    /changed the analyzed scope/,
   );
 });
 
