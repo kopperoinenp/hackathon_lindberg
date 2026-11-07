@@ -52,7 +52,7 @@
         throw new Error(result.error || t("Reopen the presentation from the customer review."));
       deck = result;
       document.title = t`${deck.customer.name} · Customer presentation`;
-      $("#customer-name").textContent = deck.customer.name;
+      $("#customer-name").textContent = deck.period;
       $("#save-presentation").href = deck.downloadUrl;
       $("#save-presentation").hidden = false;
       $("#loading").hidden = true;

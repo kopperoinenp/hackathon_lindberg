@@ -3137,25 +3137,6 @@ body[data-mode="prepare"] #story,
   color: var(--brand-blue);
   font-size: 18px;
 }
-#for-you dl {
-  display: grid;
-  gap: 2px;
-  margin: 8px 0;
-}
-#for-you dl > div {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0;
-  border: 0;
-  background: none;
-  font-size: 13px;
-}
-#for-you dd {
-  margin: 0;
-  font-weight: 700;
-  text-align: right;
-}
 #upsell-proposals h3 {
   margin: 12px 0 6px;
   font-size: 14px;
@@ -3280,49 +3261,6 @@ body[data-mode="prepare"] #story,
 }
 
 /* For you only: small two-line facts and one-click offers, nothing to read through. */
-#for-you[open] > summary {
-  margin-bottom: 8px;
-}
-#for-you .for-you-facts {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  margin: 0 0 8px;
-}
-#for-you .for-you-facts > div {
-  display: block;
-  min-width: 0;
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: #f2f6f9;
-}
-#for-you .for-you-facts > div:last-child:nth-child(odd) {
-  grid-column: 1 / -1;
-}
-#for-you .for-you-facts dd,
-#for-you .for-you-facts dt {
-  overflow: hidden;
-  margin: 0;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-#for-you .for-you-facts dd {
-  color: var(--brand-blue);
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.25;
-}
-#for-you .for-you-facts dt {
-  color: #4f5d68;
-  font-size: 11.5px;
-  font-weight: 400;
-  line-height: 1.3;
-}
-#for-you .kpi-checkbox {
-  margin: 0;
-  font-size: 13px;
-}
 #upsell-proposals h3 {
   margin: 10px 0 4px;
   font-size: 13px;
@@ -3347,15 +3285,11 @@ body[data-mode="prepare"] #story,
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-#for-you,
 #sales-signals,
 #upsell-proposals,
 #upsell-proposals .kpi-checkbox {
   min-width: 0;
   max-width: 100%;
-}
-#for-you {
-  overflow: hidden;
 }
 #upsell-proposals .kpi-checkbox > span {
   flex: 1 1 0;
@@ -3440,4 +3374,49 @@ body.panel-open #panel-toggle {
     padding-inline: 16px;
     padding-bottom: 24px;
   }
+}
+
+/* The customer switch sits with the presentation actions. */
+#workspace .toolbar #customer {
+  width: auto;
+  max-width: 260px;
+  min-height: 42px;
+  margin: 0;
+  padding: 0 14px;
+  border: 1px solid #cbd3da;
+  border-radius: 999px;
+  background-color: #fff;
+  color: var(--brand-blue);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Areas are stacked boxes: chosen ones filled, the ones to add below them. */
+.area-pills {
+  flex-direction: column;
+  gap: 6px;
+}
+.area-picker .area-pill {
+  display: block;
+}
+.area-pill span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--brand-blue);
+  border-radius: 8px;
+  background: #e8f1f7;
+  color: var(--brand-blue);
+  font-size: 14px;
+}
+.area-pill span::after {
+  content: "×";
+}
+.is-available .area-pill span {
+  justify-content: flex-start;
+}
+.is-available .area-pill span::before {
+  content: "+";
 }

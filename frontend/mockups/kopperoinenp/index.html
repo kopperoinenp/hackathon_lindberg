@@ -75,6 +75,7 @@
       </section>
       <div class="toolbar">
         <span id="review-storage-status" role="status" aria-live="polite"></span>
+        <select id="customer" aria-label="Customer"></select>
         <button id="open-review" class="secondary" type="button">Open presentation</button>
         <button id="download-powerpoint" class="primary" type="button">Download PowerPoint</button>
       </div>
@@ -108,17 +109,13 @@
           <span aria-hidden="true">×</span>
         </button>
         <section class="review-priorities review-content" aria-label="Customise the review">
-          <fieldset class="area-picker meeting-advice">
-            <legend>Customer</legend>
-            <select id="customer" aria-label="Customer"></select>
-          </fieldset>
           <div id="meeting-advice"></div>
           <div id="review-basics-picker"></div>
-          <details id="for-you" class="sales-signals" hidden>
-            <summary><span>For you only</span><em id="for-you-read"></em></summary>
-            <div id="sales-signals"></div>
-            <section id="upsell-proposals" aria-label="Service opportunities"></section>
-          </details>
+          <section
+            id="upsell-proposals"
+            class="area-picker"
+            aria-label="Service opportunities"
+          ></section>
           <div id="review-area-picker"></div>
           <details id="more-settings">
             <summary>More settings</summary>

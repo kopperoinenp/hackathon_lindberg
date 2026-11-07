@@ -204,3 +204,31 @@ test("a slide chart reaches the deck and a broken one is refused", () => {
     /Invalid review content/,
   );
 });
+
+test("figures show the change from the same months a year earlier", () => {
+  const deck = buildPresentation({ scope: { customer: "CUST002" }, language: "en" });
+  const find = (id) => deck.slides.find((slide) => slide.id === id);
+  const textiles = find("overview").kpis.find((row) => row.label === "Textiles in service");
+  assert.match(textiles.delta, /[↑↓→] [+−-]?[\d.,]+ % vs 2024/);
+  assert.equal(textiles.tone, "neutral");
+  const { trend } = find("water");
+  assert.match(trend.delta, /vs 2024$/);
+  assert.equal(trend.tone, trend.delta.startsWith("↓") ? "better" : "worse");
+  const stat = { value: "81.9 %", label: "scanned", delta: "↑ +3.3 pp vs 2024", tone: "better" };
+  const area = {
+    id: "adoption",
+    title: "Use",
+    headline: "",
+    points: [],
+    note: "",
+    stats: [stat, { ...stat, value: "9,207", label: "textiles" }],
+  };
+  const withArea = buildPresentation({
+    scope: { customer: "CUST002" },
+    language: "en",
+    reviewAreas: [area],
+  });
+  const slide = withArea.slides.find((row) => row.id === "area-adoption");
+  assert.equal(slide.trend.tone, "better");
+  assert.equal(slide.kpis[0].delta, stat.delta);
+});
