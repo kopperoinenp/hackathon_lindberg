@@ -19,6 +19,8 @@ const mime = {
   ".webp": "image/webp",
   ".woff2": "font/woff2",
   ".md": "text/plain; charset=utf-8",
+  ".pdf": "application/pdf",
+  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 };
 const port = Number(process.env.PORT || 4173);
 const shared = sharedPrototype();

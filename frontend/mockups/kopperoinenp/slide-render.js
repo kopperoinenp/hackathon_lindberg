@@ -84,18 +84,32 @@
     const added = (item.added ?? [])
       .map((text) => `<p class="card-added">${esc(text)}</p>`)
       .join("");
+    const context = item.boundary
+      ? `<p class="card-context"><strong>${esc(t("Context"))}</strong><span>${esc(item.boundary)}</span></p>`
+      : "";
+    const archive =
+      item.id === "prior-goals"
+        ? `<div class="card-archive"><a href="assets/apex-review-2024.pptx" download>${esc(t("2024 PowerPoint"))}</a><a href="assets/apex-review-2024.pdf" download>${esc(t("2024 report (PDF)"))}</a></div>`
+        : "";
     const bodies = {
       cover: () =>
         `${item.lead ? `<p class="card-lead">${esc(item.lead)}</p>` : ""}${tiles(item.kpis)}`,
       kpis: () => tiles(item.kpis),
+      goals: () =>
+        `<dl class="card-goals">${item.kpis
+          .map(
+            (goal) =>
+              `<div><dt>${esc(goal.label)}</dt><dd><div><span>${esc(t("Target"))}</span><strong>${esc(goal.target)}</strong></div><div class="goal-difference tone-${esc(goal.tone)}"><span aria-hidden="true">→</span><strong>${esc(goal.delta)}</strong><small>${esc(t("vs target"))}</small></div><div><span>${esc(t("Actual"))}</span><strong>${esc(goal.value)}</strong><small class="tone-${esc(goal.tone)}">${esc(t(goal.tone === "better" ? "Target met" : "Target missed"))}</small></div></dd></div>`,
+          )
+          .join("")}</dl>`,
       hero: () =>
         `<div class="card-grid"><div>${item.hero ? `<strong class="card-hero">${esc(item.hero)}</strong>` : ""}${item.lead ? `<p class="card-lead">${esc(item.lead)}</p>` : ""}${change(item.trend)}${tiles(item.kpis)}</div>${item.chart ? `<div class="card-chart">${chart(item, t)}</div>` : ""}</div>`,
       steps: () =>
-        `<ol class="card-steps">${(item.steps ?? []).map((step) => `<li>${esc(step)}</li>`).join("")}</ol>`,
+        `${item.lead ? `<div class="card-findings"><p class="card-lead">${esc(item.lead)}</p>${(item.fine ?? []).map((text) => `<p>${esc(text)}</p>`).join("")}</div><h3 class="card-steps-heading">${esc(t("Next steps"))}</h3>` : ""}<ol class="card-steps">${(item.steps ?? []).map((step) => `<li>${esc(step)}</li>`).join("")}</ol>`,
       notes: () =>
         (item.fine ?? []).map((text) => `<p class="card-fine">${esc(text)}</p>`).join(""),
     };
-    return `<article class="review-card layout-${esc(layout)}">${head}${(bodies[layout] ?? bodies.notes)()}${added}</article>`;
+    return `<article class="review-card layout-${esc(layout)}">${head}${(bodies[layout] ?? bodies.notes)()}${added}${context}${archive}</article>`;
   }
   root.SlideRender = { html };
 })(globalThis);

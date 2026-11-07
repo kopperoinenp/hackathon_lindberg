@@ -6,6 +6,7 @@ import "../frontend/mockups/kopperoinenp/analysis-model.js";
 import "../frontend/mockups/kopperoinenp/sales-model.js";
 import { applyPlan, buildPresentation, defaultPlan } from "../backend/presentation-model.mjs";
 import { generatePlan } from "../backend/ai-provider.mjs";
+import { dataset } from "../backend/dataset.mjs";
 
 const source = await readFile(
   new URL("../frontend/mockups/kopperoinenp/data.js", import.meta.url),
@@ -208,9 +209,11 @@ test("a slide chart reaches the deck and a broken one is refused", () => {
 test("figures show the change from the same months a year earlier", () => {
   const deck = buildPresentation({ scope: { customer: "CUST002" }, language: "en" });
   const find = (id) => deck.slides.find((slide) => slide.id === id);
-  const textiles = find("overview").kpis.find((row) => row.label === "Textiles in service");
-  assert.match(textiles.delta, /[↑↓→] [+−-]?[\d.,]+ % vs 2024/);
-  assert.equal(textiles.tone, "neutral");
+  for (const label of ["Textiles in service", "Washed"]) {
+    const kpi = find("overview").kpis.find((row) => row.label === label);
+    assert.match(kpi.delta, /↑ \+[\d.,]+ % vs 2024/);
+    assert.equal(kpi.tone, "better");
+  }
   const { trend } = find("water");
   assert.match(trend.delta, /vs 2024$/);
   assert.equal(trend.tone, trend.delta.startsWith("↓") ? "better" : "worse");
@@ -231,4 +234,96 @@ test("figures show the change from the same months a year earlier", () => {
   const slide = withArea.slides.find((row) => row.id === "area-adoption");
   assert.equal(slide.trend.tone, "better");
   assert.equal(slide.kpis[0].delta, stat.delta);
+});
+
+test("presentation comparisons show the matching months and require full site coverage", () => {
+  const request = {
+    scope: { customer: "CUST002", from: "2025-04", to: "2025-06" },
+    language: "en",
+  };
+  const waterTrend = () =>
+    buildPresentation(request).slides.find((slide) => slide.id === "water").trend;
+  assert.match(waterTrend().delta, /vs 2024-04–2024-06$/);
+
+  const index = dataset.records.findIndex(
+    (row) => row.customer === "CUST002" && row.month === "2024-04",
+  );
+  assert.notEqual(index, -1);
+  const [removed] = dataset.records.splice(index, 1);
+  try {
+    assert.equal(waterTrend(), null);
+  } finally {
+    dataset.records.splice(index, 0, removed);
+  }
+});
+
+test("an explicitly selected discussion topic appears without invented metrics", () => {
+  const topic = {
+    id: "experience",
+    title: "Customer experience",
+    headline: "To be agreed together",
+    points: ["Agree how customer feedback will be collected."],
+    note: "",
+  };
+  const deck = buildPresentation({ reviewAreas: [topic], language: "en" });
+  const slide = deck.slides.find(({ id }) => id === "area-experience");
+  assert.equal(slide.lead, topic.headline);
+  assert.equal(slide.hero, "");
+  assert.deepEqual(slide.paragraphs, [topic.headline, ...topic.points]);
+});
+
+test("the improvement plan links proposed actions to the scoped finding", () => {
+  const repairs = buildPresentation({ scope: { customer: "CUST002" }, language: "en" });
+  const cycles = buildPresentation({ scope: { customer: "CUST003" }, language: "en" });
+  const plan = (deck) => deck.slides.find(({ id }) => id === "plan");
+
+  assert.ok(repairs.slides.every(({ id, boundary }) => (id === "cover" ? !boundary : boundary)));
+  assert.match(plan(repairs).lead, /2\.7 repairs per 100 washes/);
+  assert.match(plan(repairs).steps[2], /same textile types/);
+  assert.match(plan(cycles).lead, /Mediora Warsaw: 90% of service cycles/);
+  assert.match(plan(cycles).steps[0], /longest cycles at Mediora Warsaw/);
+  assert.match(plan(cycles).steps[2], /before and after the trial/);
+});
+
+test("Apex opens with archived goals and shows fictional cooperation KPIs only for the full year", () => {
+  const apex = buildPresentation({ scope: { customer: "CUST002" }, language: "en" });
+  const planned = applyPlan(apex, defaultPlan(apex));
+  assert.deepEqual(
+    planned.slides.slice(0, 3).map(({ id }) => id),
+    ["cover", "prior-goals", "summary"],
+  );
+  assert.deepEqual(
+    planned.slides[1].kpis.map(({ tone }) => tone),
+    ["better", "worse", "better"],
+  );
+  assert.deepEqual(
+    planned.slides[1].kpis.map(({ target, delta }) => [target, delta]),
+    [
+      ["≤ 7.00 L/kg", "-0.9%"],
+      ["≤ 0.0800 kg CO₂e/kg", "+7.0%"],
+      ["≥ 5,500", "+1.0%"],
+    ],
+  );
+  const overview = planned.slides.find(({ id }) => id === "overview");
+  const values = Object.fromEntries(overview.kpis.map(({ label, value }) => [label, value]));
+  assert.equal(values["On-time service cycles"], "98.3 %");
+  assert.equal(values["Service costs"], "286,400 €");
+  assert.equal(values["User feedback"], "4.2 / 5");
+  assert.match(overview.boundary, /fictional full-year examples/);
+  assert.equal(
+    overview.kpis.find(({ label }) => label === "User feedback").delta,
+    "48 survey responses",
+  );
+  const quarter = buildPresentation({
+    scope: { customer: "CUST002", from: "2025-01", to: "2025-03" },
+  }).slides.find(({ id }) => id === "overview");
+  assert.deepEqual(
+    quarter.kpis.slice(-2).map(({ value }) => value),
+    ["—", "—"],
+  );
+  assert.ok(
+    !buildPresentation({ scope: { customer: "CUST003" } }).slides.some(
+      ({ id }) => id === "prior-goals",
+    ),
+  );
 });

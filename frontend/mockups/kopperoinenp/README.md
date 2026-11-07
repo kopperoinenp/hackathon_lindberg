@@ -12,6 +12,13 @@ reload and customer switching, including assistant dashboard edits. See
 Run `pnpm preview` from the repository root. Open the printed local URL to use the API integration.
 Runtime files are plain HTML/CSS/JS.
 
+The Apex Industrial Systems review opens with the archived 2024 goals after
+the cover. The linked PowerPoint and PDF use the same full-year synthetic
+snapshot across all six Apex sites. The goal thresholds are fictional.
+The current overview shows the on-time share of recorded service cycles.
+It also shows fictional annual invoice totals and survey results for the demo
+accounts. These figures appear only for whole-customer, full-year 2025 reviews.
+
 Chat edits immediately update dashboard headings, metric selections, manager
 comments, meeting goals and savings estimates. The page
 scrolls to the changed section and briefly highlights it; chat lists the changes.
