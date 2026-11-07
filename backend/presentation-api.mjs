@@ -67,6 +67,15 @@ async function readJson(request) {
     throw new PresentationError("Invalid JSON.");
   }
 }
+// The file goes to the customer, so it carries the customer's name rather than an internal code.
+function fileName({ customer, request }) {
+  const name = customer.name
+    .normalize("NFD")
+    .replace(/[^A-Za-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  const label = request.language === "fi" ? "asiakaskatsaus" : "customer-review";
+  return `${name}-${label}-${request.scope.from}-${request.scope.to}.pptx`;
+}
 export async function handlePresentationApi(request, response, url) {
   if (!url.pathname.startsWith("/api/")) return false;
   try {
@@ -228,7 +237,7 @@ export async function handlePresentationApi(request, response, url) {
           ? defaultPlan(base)
           : await generatePlan(base);
       const deck = applyPlan(base, plan);
-      const bytes = await renderPowerPoint(deck, config);
+      const bytes = await renderPowerPoint(deck);
       if (bytes.length > 5 * 1024 * 1024)
         throw new PresentationError("The presentation exceeds the file size limit.", 500);
       const id = randomUUID();
@@ -239,7 +248,7 @@ export async function handlePresentationApi(request, response, url) {
         config,
         requestKey,
         expires: Date.now() + ttl,
-        name: `${base.request.scope.customer}-customer-review-${base.request.scope.from}-${base.request.scope.to}.pptx`,
+        name: fileName(base),
       });
       json(response, 201, receipt(id, files.get(id)));
     } finally {

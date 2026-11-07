@@ -24,7 +24,7 @@ test("the workspace retains both views and folds rarely used settings away", asy
   assert.match(app, /\.view-tabs"\)\.hidden = !preparing/);
   assert.match(page, /<nav class="view-tabs"[^>]*hidden/);
   const more = page.indexOf('id="more-settings"');
-  for (const id of ["filters", "customer-profile-kpis", "reset-dashboard", "meeting-note"])
+  for (const id of ["filters", "customer-profile-kpis", "reset-dashboard"])
     assert.ok(page.indexOf(`id="${id}"`) > more, `${id} is in More settings`);
 });
 
@@ -32,9 +32,16 @@ test("the path runs from today's customers through prepare and present", async (
   const root = new URL("../frontend/mockups/kopperoinenp/", import.meta.url);
   const page = await readFile(new URL("index.html", root), "utf8");
   const app = await readFile(new URL("app.js", root), "utf8");
-  for (const id of ["customer-search", "today-list", "deck", "approve-review", "kam-notes"])
+  for (const id of ["customer-search", "today-list", "deck", "approve-review"])
     assert.match(page, new RegExp(`id="${id}"`));
-  assert.ok(page.indexOf('id="review-next-steps"') < page.indexOf('id="more-settings"'));
+  for (const id of [
+    "kam-notes",
+    "meeting-note",
+    "review-next-steps",
+    "copy-summary",
+    "review-area-gaps",
+  ])
+    assert.doesNotMatch(page, new RegExp(`id="${id}"`));
   assert.match(app, /let mode = "home"/);
   assert.match(app, /\$\("#composer"\)\.hidden = !preparing/);
 });

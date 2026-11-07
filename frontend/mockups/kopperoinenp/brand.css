@@ -2623,37 +2623,6 @@ main {
   width: 100%;
   margin: 0;
 }
-.next-steps-editor ol {
-  display: grid;
-  gap: 10px;
-  width: 100%;
-  margin: 0;
-  padding-left: 20px;
-}
-.next-steps-editor li {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1fr auto;
-  align-items: end;
-  gap: 8px;
-}
-.area-picker.next-steps-editor label {
-  display: grid;
-  gap: 4px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  font-size: 13px;
-  cursor: default;
-}
-.next-steps-editor input {
-  width: 100%;
-  min-width: 0;
-  padding: 8px;
-  border: 1px solid #b7c6d0;
-  border-radius: 6px;
-  font: inherit;
-}
 .next-steps-editor > .quiet,
 .next-steps-editor .kpi-actions {
   width: 100%;
@@ -2784,16 +2753,6 @@ main {
   border: 0;
   border-radius: 0;
   background: none;
-}
-.review-editor-heading {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-.review-editor-heading h2 {
-  margin: 4px 0 0;
-  font-size: 24px;
 }
 #workspace.editing {
   max-width: none;
@@ -2933,24 +2892,6 @@ main {
   font-weight: 700;
   cursor: pointer;
 }
-.meeting-advice h3 {
-  margin: 12px 0 4px;
-  font-size: 15px;
-}
-.meeting-advice ol {
-  display: grid;
-  gap: 8px;
-  margin: 0;
-  padding-left: 20px;
-  font-size: 14px;
-}
-.meeting-advice ol strong {
-  display: block;
-  font-weight: 600;
-}
-.meeting-advice ol small {
-  color: #4f5d68;
-}
 #more-settings {
   display: grid;
   gap: 12px;
@@ -3035,22 +2976,6 @@ main {
 .customer-option small {
   color: #4f5d68;
 }
-#after-meeting {
-  scroll-margin-top: 12px;
-}
-#after-meeting label {
-  display: block;
-}
-#after-meeting textarea {
-  display: block;
-  width: 100%;
-  min-height: 84px;
-  margin-top: 4px;
-  padding: 8px;
-  border: 1px solid #b7c6d0;
-  border-radius: 6px;
-  font: inherit;
-}
 #copy-status:empty {
   display: none;
 }
@@ -3104,18 +3029,6 @@ a#download-powerpoint[hidden] {
   display: block;
   width: 100%;
 }
-#upsell-details > summary {
-  padding: 10px 12px;
-  border: 1px solid #cbd3da;
-  border-radius: 6px;
-  background: #fff;
-  color: var(--brand-blue);
-  font-weight: 700;
-  cursor: pointer;
-}
-#upsell-details[open] > summary {
-  margin-bottom: 10px;
-}
 
 /* The chosen customer is the page heading, so the selector stays out of the way. */
 .toolbar > label[for="customer"] {
@@ -3137,14 +3050,6 @@ a#download-powerpoint[hidden] {
   cursor: pointer;
 }
 .sales-signals[open] > summary {
-  margin-bottom: 10px;
-}
-#after-meeting > summary {
-  color: var(--brand-blue);
-  font-weight: 700;
-  cursor: pointer;
-}
-#after-meeting[open] > summary {
   margin-bottom: 10px;
 }
 
@@ -3211,4 +3116,89 @@ body[data-mode="prepare"] #story,
 }
 .slide-note[hidden] {
   display: none;
+}
+
+/* The panel's sections open from one clear button style. */
+#review-editor .sales-signals {
+  padding: 0;
+  border: 0;
+  background: none;
+}
+#more-settings > summary,
+.sales-signals > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #cbd3da;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--brand-blue);
+  font-size: 15px;
+  font-weight: 700;
+  list-style: none;
+  cursor: pointer;
+}
+#more-settings > summary:hover,
+.sales-signals > summary:hover {
+  background: #f2f6f9;
+}
+#more-settings > summary::-webkit-details-marker,
+.sales-signals > summary::-webkit-details-marker {
+  display: none;
+}
+#more-settings > summary::after,
+.sales-signals > summary::after {
+  content: "▾";
+  margin-left: auto;
+}
+.sales-signals > summary em {
+  margin-left: auto;
+}
+.sales-signals > summary em + *,
+.sales-signals > summary:has(em)::after {
+  margin-left: 0;
+}
+#more-settings[open] > summary::after,
+.sales-signals[open] > summary::after {
+  transform: rotate(180deg);
+}
+.sales-signals[open] > summary {
+  margin-bottom: 10px;
+}
+
+/* For you only stays short: one usage line, a few signals and the offers to include. */
+.usage-line strong {
+  color: var(--brand-blue);
+  font-size: 18px;
+}
+#for-you dl {
+  display: grid;
+  gap: 2px;
+  margin: 8px 0;
+}
+#for-you dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 13px;
+}
+#for-you dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+}
+#upsell-proposals h3 {
+  margin: 12px 0 6px;
+  font-size: 14px;
+}
+#upsell-proposals .kpi-checkbox small {
+  display: block;
+  color: #4f5d68;
+  font-size: 12px;
+  line-height: 1.3;
 }

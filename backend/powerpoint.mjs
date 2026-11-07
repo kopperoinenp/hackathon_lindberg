@@ -1,6 +1,6 @@
 import pptxgen from "pptxgenjs";
 import { applyLindstromTemplate, templateStandard } from "./lindstrom-template.mjs";
-export async function renderPowerPoint(deck, provenance) {
+export async function renderPowerPoint(deck) {
   const t = globalThis.ReviewLanguage.translator(deck.request.language);
   const number = (value) =>
     new Intl.NumberFormat(t("en-GB"), { maximumFractionDigits: 1 }).format(value);
@@ -11,10 +11,10 @@ export async function renderPowerPoint(deck, provenance) {
     height: templateStandard.height,
   });
   pptx.layout = "LINDSTROM";
-  pptx.author = "Lindström customer review prototype";
-  pptx.subject = t("Synthetic customer annual review");
+  pptx.author = "Lindström";
+  pptx.subject = t("Customer annual review");
   pptx.title = `${deck.customer.name} · ${deck.period}`;
-  pptx.company = "Hackathon prototype";
+  pptx.company = "Lindström";
   pptx.lang = t("en-GB");
   pptx.theme = {
     headFontFace: templateStandard.headingFont,
@@ -353,7 +353,9 @@ export async function renderPowerPoint(deck, provenance) {
       align: "right",
     });
     slide.addNotes(
-      t`${deck.footer}\n${item.paragraphs.join("\n\n")}\n${item.relevance || ""}\n${item.source || ""}\nContent selection: ${provenance.provider}${provenance.model ? ` / ${provenance.model}` : ""}. Calculations and file generation are deterministic. AI selects from approved headlines and slide orders.`,
+      [deck.footer, item.paragraphs.join("\n\n"), item.relevance, item.source]
+        .filter(Boolean)
+        .join("\n"),
     );
   }
   return applyLindstromTemplate(

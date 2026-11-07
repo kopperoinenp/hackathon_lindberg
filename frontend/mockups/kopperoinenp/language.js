@@ -12,10 +12,6 @@
     "Green – cooperation is going well": "Vihreä – yhteistyö sujuu hyvin",
     "Yellow – needs attention": "Keltainen – vaatii huomiota",
     "Red – action required": "Punainen – vaatii toimenpiteitä",
-    "NEXT OPPORTUNITIES": "UUDET MAHDOLLISUUDET",
-    "Customer-specific service opportunities": "Asiakaskohtaiset lisämyyntiehdotukset",
-    "Approve proposals for the end of the presentation. Approvals are saved for this customer. Changed source data or filters require a new approval.":
-      "Hyväksy haluamasi ehdotukset esityksen loppuun. Hyväksynnät tallennetaan tälle asiakkaalle. Muuttuneet lähtötiedot tai rajaukset vaativat uuden hyväksynnän.",
     "Approved for this presentation": "Hyväksytty tähän esitykseen",
     "Saved approvals outside the current evidence": "Tallennetut hyväksynnät muilla lähtötiedoilla",
     Observation: "Havainto",
@@ -447,7 +443,7 @@
     Repair: "Korjaus",
     "CUSTOMER FOCUS": "ASIAKASKOHTAINEN PAINOTUS",
     "SHARED REVIEW": "YHTEINEN KATSAUSPOHJA",
-    "Contract KPIs and meeting agenda": "Sopimusmittarit ja palaverin agenda",
+    "Contract KPIs": "Sopimusmittarit",
     "Keep the shared review and highlight up to three KPIs agreed with this customer.":
       "Yhteinen katsaus säilyy. Nosta esiin enintään kolme tämän asiakkaan kanssa sovittua mittaria.",
     "Manage contract KPIs": "Hallitse sopimusmittareita",
@@ -681,8 +677,8 @@
       "Elintarvikeasiakkaan katsaukseen nostamme vedenkäytön ja tekstiilien huollon. Tässä näkyvät vuoden tärkeimmät havainnot.",
     "This review focuses on water use, starting with the results and ending with a proposed improvement.":
       "Tässä katsauksessa korostuu vedenkäyttö. Käydään ensin läpi vuoden tärkeimmät tulokset ja sitten yhteinen kehitysehdotus.",
-    "This review focuses on textile care and checks how allocations match demand.":
-      "Tässä katsauksessa korostuvat tekstiilien huolto ja todellinen tarve. Käydään ensin läpi vuoden tulokset ja sitten mitoituksen tarkistus.",
+    "This review focuses on textile care and on keeping garments available where they are needed.":
+      "Tässä katsauksessa korostuvat tekstiilien huolto ja vaatteiden saatavuus siellä, missä niitä tarvitaan.",
     "This review looks at repairs and continued textile use, including where more evidence is needed.":
       "Asiakkaan katsauksessa korostuvat tekstiilien huolto ja käytön jatkuvuus. Korjaustoiminnan rinnalla tarkistetaan, mistä tarvitaan vielä lisätietoa.",
     "This review focuses on laundry and delivery emissions, with the comparison scope and assumptions shown alongside the results.":
@@ -850,8 +846,8 @@
       " korjaustoiminta tekee tekstiilien huollon näkyväksi. Se tukee keskustelua käyttöiästä ilman oletusta vältetyistä hankinnoista.",
     "Repair counts show maintenance activity alongside environmental estimates and help discuss continued use.":
       "Korjaukset näyttävät konkreettista huoltotoimintaa ympäristöarvioiden rinnalla. Määrä kannattaa yhdistää keskusteluun tekstiilien jatkokäytöstä.",
-    "This site has the lowest scan coverage in the selection. Start here when checking demand and data coverage.":
-      "Tällä toimipaikalla on rajauksen pienin skannausosuus. Siksi siitä kannattaa aloittaa tarpeen ja datan kattavuuden yhteinen tarkistus.",
+    "This site has the lowest scan coverage in the selection. Start here when checking garment availability and data coverage.":
+      "Tällä toimipaikalla on rajauksen pienin skannausosuus. Siksi siitä kannattaa aloittaa saatavuuden ja datan kattavuuden yhteinen tarkistus.",
     "Invalid presentation request.": "Virheellinen esityspyyntö.",
     "Invalid filters.": "Virheellinen rajaus.",
     "Unknown customer or baseline.": "Tuntematon asiakas tai vertailumalli.",
@@ -883,25 +879,22 @@
     "Water use in the selected period": "Vedenkäyttö valitulla jaksolla",
     "Climate impact of laundry and delivery": "Pesun ja toimitusten ilmastovaikutus",
     "Repair activity in the selected period": "Tekstiilien korjaustoiminta valitulla jaksolla",
-    "Check actual textile demand": "Tarkistetaan tekstiilien todellinen tarve",
+    "Keep textiles in active use": "Pidetään tekstiilit aktiivisessa käytössä",
+    "Offer in the presentation": "Tarjoa esityksessä",
     "Use scan coverage to guide a joint review": "Skannausosuus on yhteisen selvityksen lähtökohta",
     "% of allocated textiles had an active scan in ": " % ",
     " textiles had no scan.": " tekstiiliä jää ilman skannausta.",
-    "Check reserve stock, seasonal demand and scan data coverage to understand actual use.":
-      "Selvitetään varatekstiilien ja sesongin tarve sekä skannausdatan kattavuus. Havainto ei yksin todista vajaakäyttöä.",
+    "Review together how textiles circulate, so garments are available where they are needed.":
+      "Katsotaan yhdessä, miten tekstiilit kiertävät, jotta vaatteita on saatavilla siellä, missä niitä tarvitaan.",
     Unscanned: "Ilman skannausta",
-    "Snapshot for investigation": "Tilannekuva, ei todistettu vajaakäyttö",
+    "Snapshot for investigation": "Tilannekuva yhteistä tarkastelua varten",
     "Shared priorities for 2026": "Yhteinen suunta vuodelle 2026",
-    " with the customer. Check reserve stock needs and scan coverage.":
-      " yhdessä asiakkaan kanssa. Varmistetaan varatekstiilien tarve ja skannausten kattavuus.",
-    "Agree on one improvement and assign an owner. Confirm demand before changing allocations.":
-      "Sovitaan yksi konkreettinen parannus ja sen vastuuhenkilö. Mitoitusta muutetaan vasta tarkistetun tarpeen perusteella.",
+    " with the customer. Check garment availability and scan coverage.":
+      " yhdessä asiakkaan kanssa. Varmistetaan vaatteiden saatavuus ja skannausten kattavuus.",
     "Review progress at the next meeting. Estimate potential savings once the inputs have been agreed.":
       "Palataan tuloksiin seuraavassa seurantapalaverissa. Mahdollinen säästö arvioidaan vasta hyväksytyillä lähtötiedoilla.",
     "Proposals for discussion.": "Keskusteluehdotuksia, eivät vielä sovittuja toimenpiteitä.",
     "Sources and calculations": "Lähteet ja laskenta",
-    "Customers, Sites, Service_Activity, Customer_Impacts, Repairs and Baselines.":
-      "Customers, Sites, Service_Activity, Customer_Impacts, Repairs ja Baselines.",
     "Period totals sum activity across the selected months. Allocations and scans reflect the end of ":
       "Virrat summataan valitulta jaksolta. Allokointi ja aktiiviset skannaukset ovat ",
     ". Repairs count events.":
@@ -922,12 +915,15 @@
       "AI palautti virheellisen otsikkovalinnan.",
     "The AI service returned an unknown headline choice.":
       "AI palautti tuntemattoman otsikkovalinnan.",
-    "Synthetic customer annual review": "Synteettinen vuosikatsaus",
+    "Customer annual review": "Asiakkaan vuosikatsaus",
+    "Service and repair records": "Palvelu- ja korjaustiedot",
+    "Customer environmental data and comparison model":
+      "Asiakkaan ympäristötiedot ja vertailumalli",
+    "Repair records": "Korjaustiedot",
+    "Service records": "Palvelutiedot",
+    "Lindström service and environmental data": "Lindströmin palvelu- ja ympäristötiedot",
     "CUSTOMER REVIEW": "ASIAKASKATSAUS",
     "Source: ": "Lähde: ",
-    "\nContent selection: ": "\nSisällön valinta: ",
-    ". Calculations and file generation are deterministic. AI selects from approved headlines and slide orders.":
-      ". Laskenta ja tiedoston generointi ovat deterministisiä. AI valitsee vain hyväksyttyjä otsikoita ja diojen järjestyksen.",
     "Could not reach the AI service or the request timed out.":
       "AI-palveluun ei saatu yhteyttä tai pyyntö aikakatkaistiin.",
     "AI service authentication failed.": "AI-palvelun tunnistautuminen epäonnistui.",
@@ -965,7 +961,6 @@
     "A presentation is being prepared. Try again shortly.":
       "Esitystä muodostetaan parhaillaan. Yritä hetken kuluttua.",
     "The presentation exceeds the file size limit.": "Esitystiedosto ylitti sallitun koon.",
-    "-customer-review-": "-asiakaskatsaus-",
     "Could not process the assistant request.": "Apurin pyynnön käsittely epäonnistui.",
     "Could not create the PowerPoint.": "PowerPointin muodostaminen epäonnistui.",
     "Invalid insight selection.": "Virheellinen nostovalinta.",

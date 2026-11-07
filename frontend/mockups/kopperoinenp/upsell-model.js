@@ -1,7 +1,8 @@
 /* Deterministic discovery proposals; no inferred contracts or financial benefits. */
 (function (root) {
   "use strict";
-  const kinds = ["allocation", "repair", "hygiene", "wipers"];
+  // "allocation" is retired; it stays listed so saved approvals still validate.
+  const kinds = ["allocation", "growth", "repair", "hygiene", "wipers"];
   function proposals(data, scope, language = "en") {
     const customer = data.customers.find((row) => row.customer_id === scope.customer);
     if (!customer) return [];
@@ -52,23 +53,31 @@
         evidenceKey,
       });
     }
-    if (metrics.allocated > 0 && metrics.utilization < 85) {
+    const lastYear = (month) => `${Number(month.slice(0, 4)) - 1}${month.slice(4)}`;
+    const earlierRows = root.WorkspaceModel.select(data, {
+      ...scope,
+      from: lastYear(scope.from),
+      to: lastYear(scope.to),
+    });
+    const earlier = earlierRows.length ? root.WorkspaceModel.summarize(earlierRows).washed : 0;
+    if (earlier > 0 && metrics.washed > earlier) {
+      const growth = ((metrics.washed - earlier) / earlier) * 100;
       add(
-        "allocation",
-        text("Textile allocation assessment", "Tekstiilimitoituksen kartoitus"),
+        "growth",
+        text("Additional textiles for growth", "Lisätekstiilit kasvuun"),
         text(
-          `${f(metrics.unscanned)} of ${f(metrics.allocated)} allocated textiles had no active scan in ${metrics.snapshotMonth} (${f(metrics.utilization)}% scanned).`,
-          `${f(metrics.unscanned)} / ${f(metrics.allocated)} allokoidulla tekstiilillä ei ollut aktiivista skannausta kuukaudella ${metrics.snapshotMonth} (skannausosuus ${f(metrics.utilization)} %).`,
+          `Washed volume grew ${f(growth)}% from the same months a year earlier, with ${f(metrics.allocated)} textiles in service.`,
+          `Pesumäärä kasvoi ${f(growth)} % viime vuoden samoista kuukausista, ja palvelussa on ${f(metrics.allocated)} tekstiiliä.`,
         ),
         text(
-          "Assess whether textile allocation and replenishment match demand.",
-          "Selvitetään, vastaavatko tekstiilimäärät ja täydennykset tarvetta.",
+          "Enough textiles keep garments available as operations grow.",
+          "Riittävä tekstiilimäärä pitää vaatteet saatavilla, kun toiminta kasvaa.",
         ),
         text(
-          "Review reserve stock, seasonality and scan completeness. Agree the scope and price of an assessment before changing allocations.",
-          "Tarkista varavaatteet, kausivaihtelu ja skannaustietojen kattavuus. Sovi kartoituksen laajuus ja hinta ennen määrien muuttamista.",
+          "Go through staffing and site plans together and agree where additional textiles are needed.",
+          "Käydään yhdessä läpi henkilöstö- ja toimipaikkasuunnitelmat ja sovitaan, missä lisätekstiilejä tarvitaan.",
         ),
-        [metrics.snapshotMonth, metrics.allocated, metrics.scanned],
+        [earlier, metrics.washed, metrics.allocated],
       );
     }
     if (metrics.repairs > 0) {

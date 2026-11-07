@@ -56,11 +56,10 @@ The review also stores the role the account manager is meeting and whether usage
 
 The workspace follows a meeting. It opens on one customer search, with recently opened customers below it and no figures. Opening a customer starts Prepare, where only the manager sees the role, questions, usage signal, areas and private notes. The page shows the deck itself: one card per slide, built by the same code as the file and without AI changes, so the preview and the PowerPoint match. The manager edits a slide in place or with the assistant, and approves it. Approval makes the PowerPoint available; any later edit takes the review back to approval. Internal notes, questions and signals never go into the file, because it can be sent to the customer.
 
-The steering preparation card compares a site's service cycle P90 with the median
+The service performance section compares a site's service cycle P90 with the median
 P90 of other sites in the selected customer and filters. Sites must cover the same
 observed months and have at least 30 cycles overall and five per month. A finding
 requires a positive gap overall and in at least two months. These demo thresholds
 screen for usable comparisons. They do not represent a contractual target.
-The analysis link opens the service cycle table with the same filters. Adding the
-finding to the plan uses the existing next steps editor and selects the service
-performance slide, which shows the same comparison and monthly series.
+The section shows the comparison and monthly series. The service cycle table in
+detailed data uses the same filters.

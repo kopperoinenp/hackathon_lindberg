@@ -706,7 +706,6 @@
     $("#composer").hidden = !preparing;
     renderQueryResult();
     renderDataImport();
-    renderSteeringFinding(preparing && !analyzing);
     for (const view of ["summary", "analysis"]) {
       const tab = $("#" + view + "-tab");
       tab.setAttribute("aria-selected", String(state.view === view));
@@ -754,46 +753,6 @@
       : `Investigate long service cycles at ${site} and agree a pilot to track its effect on P90.`;
     return { title, headline, comparison, recurrence, boundary, action, finding };
   }
-  function renderSteeringFinding(visible) {
-    const card = $("#steering-finding");
-    const evidence = visible ? steeringEvidence() : null;
-    card.hidden = !evidence;
-    if (!evidence) return;
-    const { title, headline, comparison, recurrence, boundary, action } = evidence;
-    const added = state.nextSteps.some((step) => step.title === action.slice(0, stepLimits.title));
-    card.innerHTML = `<h2 id="steering-title">${esc(title)}</h2>
-      <h3>${esc(headline)}</h3><p>${esc(comparison)}</p><p>${esc(recurrence)}</p>
-      <p class="quiet">${esc(boundary)} · Service_Cycles</p><p>${esc(action)}</p>
-      <div class="kpi-actions">
-        <button type="button" class="secondary" data-steering-analysis>${t("Open analysis")}</button>
-        <button type="button" class="secondary" data-steering-plan ${added || state.nextSteps.length >= 5 ? "disabled" : ""}>${t(added ? "Added to plan" : "Add to plan")}</button>
-      </div>`;
-  }
-  $("#steering-finding").addEventListener("click", (event) => {
-    if (event.target.closest("[data-steering-analysis]")) {
-      state.view = "analysis";
-      render();
-      $("#service-cycles").focus();
-    }
-    if (event.target.closest("[data-steering-plan]")) {
-      const evidence = steeringEvidence();
-      if (!evidence || state.nextSteps.length >= 5) return;
-      state.nextSteps.push({
-        title: evidence.action.slice(0, stepLimits.title),
-        owner: "",
-        due: "",
-      });
-      state.evidenceAreas = areaOrder(new Set([...customerAreas(), "performance"]));
-      state.chatRevision += 1;
-      render();
-      const editor = $("#review-next-steps");
-      editor.closest("details").open = true;
-      editor
-        .querySelectorAll('[data-step-field="owner"]')
-        .item(state.nextSteps.length - 1)
-        ?.focus();
-    }
-  });
   let assessingRelationship = false;
   function renderRelationship() {
     $("#relationship-description").value = state.cooperationDescription;
@@ -858,8 +817,16 @@
     const proposals = globalThis.UpsellModel.proposals(data, state, language);
     const accepted = globalThis.UpsellModel.approved(proposals, state.approvedUpsells);
     const stale = state.approvedUpsells.length - accepted.length;
-    $("#upsell-proposals").innerHTML =
-      `<span class="section-kicker">${esc(t("NEXT OPPORTUNITIES"))}</span><h2 id="upsell-title">${esc(t("Customer-specific service opportunities"))}</h2><p>${esc(t("Approve proposals for the end of the presentation. Approvals are saved for this customer. Changed source data or filters require a new approval."))}</p><p role="status">${esc(t("Approved for this presentation"))}: ${accepted.length}${stale ? ` · ${esc(t("Saved approvals outside the current evidence"))}: ${stale}` : ""}</p><div class="upsell-grid">${proposals.map((proposal) => `<article class="upsell-card"><h3>${esc(proposal.title)}</h3><p><strong>${esc(t("Observation"))}:</strong> ${esc(proposal.observation)}</p><p><strong>${esc(t("Sites"))}:</strong> ${esc(proposal.siteSummary)}</p><p><strong>${esc(t("Potential benefit"))}:</strong> ${esc(proposal.benefit)}</p><p><strong>${esc(t("Next step"))}:</strong> ${esc(proposal.nextStep)}</p><p class="quiet">${esc(proposal.boundary)}</p><details><summary>${esc(t("Source"))}</summary><p class="quiet">${esc(proposal.source)}</p><p>${esc(proposal.sites)}</p></details><label class="kpi-checkbox"><input type="checkbox" data-upsell-id="${esc(proposal.id)}" aria-label="${esc(t("Include at the end of the presentation"))}: ${esc(proposal.title)}" ${accepted.some((item) => item.id === proposal.id) ? "checked" : ""} ${state.asking || state.generating ? "disabled" : ""}/><span>${esc(t("Include at the end of the presentation"))}</span></label></article>`).join("")}</div>${!proposals.length ? `<p>${esc(t("No service proposals are supported by the selected data."))}</p>` : ""}${state.approvedUpsells.length ? `<button type="button" id="clear-upsell-approvals" class="text-button">${esc(t("Clear all opportunity approvals for this customer"))}</button>` : ""}`;
+    const disabled = state.asking || state.generating ? "disabled" : "";
+    const rows = proposals
+      .map(
+        (proposal) =>
+          `<label class="kpi-checkbox"><input type="checkbox" data-upsell-id="${esc(proposal.id)}" ${accepted.some((item) => item.id === proposal.id) ? "checked" : ""} ${disabled} /><span><strong>${esc(proposal.title)}</strong><small>${esc(proposal.benefit)}</small></span></label>`,
+      )
+      .join("");
+    $("#upsell-proposals").innerHTML = proposals.length
+      ? `<h3>${esc(t("Offer in the presentation"))}</h3>${rows}${stale ? `<button type="button" id="clear-upsell-approvals" class="text-button">${esc(t("Clear all opportunity approvals for this customer"))}</button>` : ""}`
+      : "";
   }
   $("#upsell-proposals").addEventListener("change", (event) => {
     const id = event.target.dataset.upsellId;
@@ -1346,7 +1313,9 @@
           : t(
               "This review focuses on water use, starting with the results and ending with a proposed improvement.",
             ),
-      efficiency: t("This review focuses on textile care and checks how allocations match demand."),
+      efficiency: t(
+        "This review focuses on textile care and on keeping garments available where they are needed.",
+      ),
       circularity: t(
         "This review looks at repairs and continued textile use, including where more evidence is needed.",
       ),
@@ -2160,7 +2129,7 @@
       .join("");
     return `<div class="evidence-blocks-wrap"><div class="evidence-blocks">${blocks}</div><p class="quiet">${t("All figures are based on synthetic demo data.")}</p></div>`;
   }
-  // Section 03 shows only next steps the KAM has written; suggestions stay in Explore data.
+  // Next steps come from saved reviews and the chat; the panel has no step editor.
   const stepLimits = { title: 160, owner: 80, due: 40 };
   const agreedSteps = () => state.nextSteps.filter((step) => step.title.trim());
   function stepText(step) {
@@ -2229,22 +2198,6 @@
       intro.textContent = steps.length
         ? t("Next steps agreed for the coming period, each with an owner and a timeline.")
         : t("Next steps will be agreed together in this meeting.");
-  }
-  function nextStepsEditorHtml() {
-    const suggestions = plan().filter((item) => item.length > 1);
-    const preview = suggestions
-      .map(
-        ([title, ...details]) =>
-          `<p><strong>${esc(title)}</strong><br />${esc(details.join(" "))}</p>`,
-      )
-      .join("");
-    const rows = state.nextSteps
-      .map(
-        (step, index) =>
-          `<li><label>${t("Action")}<input data-step="${index}" data-step-field="title" maxlength="${stepLimits.title}" value="${esc(step.title)}" /></label><label>${t("Owner")}<input data-step="${index}" data-step-field="owner" maxlength="${stepLimits.owner}" value="${esc(step.owner)}" /></label><label>${t("Timeline")}<input data-step="${index}" data-step-field="due" maxlength="${stepLimits.due}" value="${esc(step.due)}" placeholder="${t("E.g. Q2 2026")}" /></label><button type="button" class="text-button" data-step-remove="${index}">${t("Remove")}</button></li>`,
-      )
-      .join("");
-    return `<fieldset class="area-picker next-steps-editor"><legend>${t("Agreed next steps")}</legend><p class="quiet">${t("Only the steps written here are shown to the customer. Keep to one to three.")}</p><ol>${rows}</ol>${preview ? `<details><summary>${t("Data-based suggestions")}</summary>${preview}</details>` : ""}<div class="kpi-actions">${state.nextSteps.length < 5 ? `<button type="button" class="secondary" data-step-add>${t("Add step")}</button>` : ""}${state.nextSteps.length || !suggestions.length ? "" : `<button type="button" class="text-button" data-step-suggest>${t("Start from suggestions")}</button>`}</div></fieldset>`;
   }
   // KAM controls for the customer-facing review live in the review settings panel.
   const openPanels = new Set();
@@ -2332,18 +2285,18 @@
           `<option value="${id}" ${state.audience === id ? "selected" : ""}>${esc(audience[language === "fi" ? "fi" : "en"])}</option>`,
       )
       .join("");
-    const questions = sales
-      .conversation(state.audience, signals, language)
-      .map(({ ask, why }) => `<li><strong>${esc(ask)}</strong><small>${esc(why)}</small></li>`)
-      .join("");
     $("#meeting-advice").innerHTML =
-      `<fieldset class="area-picker meeting-advice"><legend>${t("Who are you meeting?")}</legend><select id="audience" aria-label="${t("Who are you meeting?")}"><option value="">${t("Choose a role")}</option>${roles}</select>${advice ? `<p>${esc(advice.points[0])}</p>` : ""}${state.audience ? `<h3>${t("Ask in the meeting")}</h3><ol>${questions}</ol>` : ""}</fieldset>`;
+      `<fieldset class="area-picker meeting-advice"><legend>${t("Who are you meeting?")}</legend><select id="audience" aria-label="${t("Who are you meeting?")}"><option value="">${t("Choose a role")}</option>${roles}</select>${advice ? `<p>${esc(advice.points[0])}</p>` : ""}</fieldset>`;
     const rows = (signals?.signals ?? [])
       .map((signal) => `<div><dt>${esc(signal.label)}</dt><dd>${esc(signal.value)}</dd></div>`)
       .join("");
-    $("#sales-signals").innerHTML = signals
-      ? `<details class="sales-signals" data-panel="sales" ${panelOpen("sales")}><summary><span>${t("For you only")}</span><em class="sales-read read-${signals.usage.read}">${t(reads[signals.usage.read])}</em></summary><div class="sales-usage"><div><span>${t("Textiles in active use")}</span><strong>${esc(signals.usage.value)}</strong><small>${esc(signals.usage.trend)} · ${esc(signals.usage.period)}</small></div></div><p>${esc(signals.usage.advice)}</p><button type="button" class="secondary" data-usage-toggle>${t(state.hideUsage ? "Show usage to the customer" : "Hide usage from the customer")}</button><p class="quiet">${t(state.hideUsage ? "Usage figures are hidden from the review and presentation." : "Usage figures are visible to the customer.")}</p><dl>${rows}</dl><p class="quiet">${t("This is the share of textiles scanned, the closest figure to capacity use in the data. The thresholds are demo assumptions to agree with Lindström.")}</p></details>`
-      : "";
+    $("#for-you").hidden = !signals;
+    if (!signals) return;
+    const read = $("#for-you-read");
+    read.className = `sales-read read-${signals.usage.read}`;
+    read.textContent = t(reads[signals.usage.read]);
+    $("#sales-signals").innerHTML =
+      `<p class="usage-line"><strong>${esc(signals.usage.value)}</strong> ${t("Textiles in active use")} · ${esc(signals.usage.trend)}</p><p>${esc(signals.usage.advice.split(/(?<=\.)\s/)[0])}</p><dl>${rows}</dl><label class="kpi-checkbox"><input type="checkbox" data-usage-toggle ${state.hideUsage ? "checked" : ""} /><span>${t("Hide usage from the customer")}</span></label>`;
   }
   function selectionScope() {
     const { customer, from, to, country, continent, site } = state;
@@ -2374,14 +2327,6 @@
   });
   function renderReviewContent() {
     renderMeetingAdvice();
-    const meetingNotes = $("#kam-notes");
-    if (meetingNotes !== document.activeElement) meetingNotes.value = state.meetingNotes;
-    const editor = $("#review-next-steps");
-    if (
-      !editor.contains(document.activeElement) ||
-      editor.querySelectorAll("li").length !== state.nextSteps.length
-    )
-      editor.innerHTML = nextStepsEditorHtml();
     $("#review-basics-picker").innerHTML = basicsPickerHtml();
     const chosen = customerAreas();
     const priorities = priorityAreas();
@@ -2398,21 +2343,6 @@
         .join(
           "",
         )}</details><button type="button" class="text-button" data-area-reset>${t("Use suggested areas")}</button></fieldset>`;
-    const evidence = context().metrics.hasData ? areaEvidence() : {};
-    const kpis = customerKpis();
-    const gaps = chosen.filter(
-      (id) => evidence[id]?.missing && !kpis.some((kpi) => kpi.area === id && kpi.actual),
-    );
-    $("#review-area-gaps").innerHTML = gaps.length
-      ? `<div class="area-gaps"><strong>${t("Needs a figure before it can appear:")}</strong><ul>${gaps
-          .map(
-            (id) =>
-              `<li><span>${t(evidenceAreas.find(([area]) => area === id)[1])}</span> ${esc(evidence[id].hint)}</li>`,
-          )
-          .join("")}</ul></div>`
-      : "";
-    const note = $("#meeting-note");
-    if (document.activeElement !== note) note.value = state.note;
   }
   function renderStory() {
     const { metrics: m, focus, sites, order, customer } = context();
@@ -2453,11 +2383,7 @@
           ([title, ...details]) =>
             `<li>${esc(title)}${details.map((detail) => `<small>${esc(detail)}</small>`).join("")}</li>`,
         )
-        .join(
-          "",
-        )}</ol></div><details class="notes-details" ${state.note ? "open" : ""}><summary>Add a note to the presentation</summary><label for="meeting-note" class="sr-only">Meeting note</label><textarea id="meeting-note" maxlength="2000" placeholder="E.g. a customer goal or an agreed next step…">${esc(state.note)}</textarea><p class="quiet">The note stays in this tab until you change the customer, site or baseline.</p></details></section>`;
-    // The note editor is in More settings; the review shows the note in its opening.
-    $("#story .notes-details")?.remove();
+        .join("")}</ol></div></section>`;
     renderNextSteps();
     renderOpportunityForCustomer();
     if (state.hideUsage) $("#opportunity-title")?.closest("section")?.remove();
@@ -2565,38 +2491,6 @@
     state.chatRevision += 1;
     render();
     $(`[data-basics-preset="${button.dataset.basicsPreset}"]`)?.focus();
-  });
-  document.addEventListener("input", (event) => {
-    const field = event.target.dataset?.stepField;
-    if (!field) return;
-    state.nextSteps[Number(event.target.dataset.step)][field] = event.target.value.slice(
-      0,
-      stepLimits[field],
-    );
-    invalidatePowerPoint();
-    scheduleReviewSave();
-  });
-  document.addEventListener("change", (event) => {
-    if (event.target.dataset?.stepField) render();
-  });
-  document.addEventListener("click", (event) => {
-    const button = event.target.closest("[data-step-add], [data-step-remove], [data-step-suggest]");
-    if (!button) return;
-    if (button.dataset.stepRemove !== undefined)
-      state.nextSteps.splice(Number(button.dataset.stepRemove), 1);
-    else if (button.dataset.stepSuggest !== undefined)
-      state.nextSteps = plan()
-        .filter((item) => item.length > 1)
-        .map(([title]) => ({ title: title.slice(0, stepLimits.title), owner: "", due: "" }));
-    else state.nextSteps.push({ title: "", owner: "", due: "" });
-    state.chatRevision += 1;
-    render();
-    const inputs = $("#review-next-steps").querySelectorAll('[data-step-field="title"]');
-    (button.dataset.stepAdd !== undefined ? inputs[inputs.length - 1] : inputs[0])?.focus();
-  });
-  // Show the finished note in the review once the KAM leaves the field.
-  document.addEventListener("change", (event) => {
-    if (event.target.id === "meeting-note") render();
   });
   document.addEventListener("change", (event) => {
     const area = event.target.dataset?.areaToggle;
@@ -3155,17 +3049,6 @@
       if (field.value.trim()) ask(field.value.trim());
       field.value = "";
     });
-  document.addEventListener("input", (event) => {
-    if (event.target.id === "kam-notes") {
-      state.meetingNotes = event.target.value;
-      scheduleReviewSave();
-    }
-    if (event.target.id === "meeting-note") {
-      state.note = event.target.value;
-      invalidatePowerPoint();
-      scheduleReviewSave();
-    }
-  });
   document.addEventListener("click", (event) => {
     const button = event.target.closest("button");
     if (!button) return;
@@ -3189,24 +3072,6 @@
     searchIndex = 0;
     renderToday();
     $("#customer-search").focus();
-  });
-  $("#copy-summary").addEventListener("click", async () => {
-    const steps = agreedSteps();
-    if (!steps.length) {
-      $("#copy-status").textContent = t("Add an agreed next step first.");
-      return;
-    }
-    const { customer } = context();
-    const summary = [
-      `${customer.customer_name} · ${t("Agreed next steps")}`,
-      ...steps.map((step) => `• ${stepText(step)}`),
-    ].join("\n");
-    try {
-      await navigator.clipboard.writeText(summary);
-      $("#copy-status").textContent = t("Summary copied.");
-    } catch {
-      $("#copy-status").textContent = summary;
-    }
   });
   $("#open-evidence").addEventListener("click", () => {
     $("#evidence-content").innerHTML = evidenceHtml();
