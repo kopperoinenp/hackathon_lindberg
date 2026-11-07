@@ -26,6 +26,18 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
     });
   });
   const page = await fetch(origin);
+  const emptyAssessment = await fetch(`${origin}/api/cooperation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ description: "" }),
+  });
+  assert.equal(emptyAssessment.status, 400);
+  const foreignAssessment = await fetch(`${origin}/api/cooperation`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: "https://example.org" },
+    body: JSON.stringify({ description: "Test" }),
+  });
+  assert.equal(foreignAssessment.status, 403);
   assert.equal(page.status, 200);
   assert.ok(page.url.endsWith("/kopperoinenp/index.html"));
   const html = await page.text();

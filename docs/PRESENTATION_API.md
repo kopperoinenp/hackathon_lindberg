@@ -34,6 +34,13 @@ Returns `{provider, model, configured}`. No credentials are returned.
 
 JSON request: `{scope, included, titleEdits, note, slideOrder?, language?}`.
 
+Optional `cooperation`: `unrated` (default), `green`, `yellow` or `red`.
+This is the KAM's assessment of collaboration, not a calculation from the
+synthetic data. Its labeled traffic light is displayed on every preview/PPTX
+slide. Changing it invalidates an existing download. Customer changes reset it
+to `unrated`; AI planning cannot override the assessment. Existing callers may
+omit the field.
+
 `scope` fields: customer, from, to, country, continent, site, baseline, priority.
 Defaults are CUST001, 2025-01, 2025-12, all, all, all, B_LOCAL, neutral.
 Only known customers/sites, Finland/Sweden/Poland, Europe, 2025 months and known

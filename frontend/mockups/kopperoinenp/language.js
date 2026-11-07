@@ -2,6 +2,8 @@
 (function (root) {
   "use strict";
   const finnish = {
+    "Customer overview": "Asiakkaan perustiedot",
+    "Reset dashboard": "Palauta oletusnäkymä",
     "Lindström assistant": "Lindström-apuri",
     " sites with the lowest scan coverage": " pienintä toimipaikan skannausosuutta",
     "For service and product breakdowns, see Explore data in the workspace. Unique wearer counts require person identifiers.":
@@ -458,8 +460,141 @@
     sites: "toimipaikkaa",
     items: "kpl",
   };
+  const english = {
+    "ASIAKKAAN PERUSTIEDOT": "CUSTOMER OVERVIEW",
+    "Asiakkaan perustiedot": "Customer overview",
+    Elintarviketeollisuus: "Food and beverage",
+    Teollisuus: "Manufacturing",
+    Terveydenhuolto: "Healthcare",
+    "Kotimaa ": "Home country ",
+    "Viimeisin aineisto: ": "Latest data: ",
+    "Ei tietoa": "Unavailable",
+    "asiakkaalle kohdistettua tekstiiliä": "allocated textiles",
+    " (osittainen tieto)": " (partial data)",
+    toimipaikkaa: "sites",
+    "maata · ": "countries · ",
+    "Kaikki sijainnit ja tekstiilimäärät": "All locations and textile counts",
+    " kpl": " items",
+    "Koko asiakkuus, riippumatta katsauksen rajauksesta. Tekstiilimäärä kuvaa viimeisimmän aineistokuukauden kohdistettua kantaa, ei pesumääriä tai reaaliaikaista varastoa. Synteettinen aineisto.":
+      "Whole customer, across all filters. Allocations reflect the latest month in the synthetic dataset.",
+    "Säästetty raha · KAM:in arvio": "Estimated savings · Account manager",
+    "KAM:in antama arvio. Summaa ei ole laskettu tai todennettu tämän aineiston perusteella.":
+      "Estimate supplied by the account manager.",
+    "Ei arvioitu": "Not assessed",
+    "Vihreä – yhteistyö sujuu hyvin": "Green – cooperation is going well",
+    "Keltainen – vaatii huomiota": "Yellow – needs attention",
+    "Punainen – vaatii toimenpiteitä": "Red – action needed",
+    "Yhteistyön tila": "Relationship status",
+    "Kuvaa asiakassuhteen tilanne": "Describe the customer relationship",
+    "Mikä sujuu hyvin? Onko avoimia ongelmia, palautetta tai sovittuja jatkotoimia?":
+      "What is going well? Are there open issues, feedback or agreed next steps?",
+    "Arvioidaan…": "Assessing…",
+    "Pyydä apurin väriarvio": "Ask the assistant to assess",
+    "Yhteistyön väri · voit vaihtaa käsin": "Relationship rating · editable",
+    "Apurin ehdotus kuvauksestasi. Voit korjata väriä käsin.":
+      "Suggested by the assistant from your description. You can change the rating.",
+    "KAM:in käsin valitsema väri.": "Rating selected by the account manager.",
+    "Kirjoita kuvaus ja pyydä arvio, tai valitse väri itse.":
+      "Describe the relationship for an assessment, or select a rating.",
+    " Väri näkyy esikatselussa ja PowerPointin jokaisella dialla.":
+      " The rating appears in the preview and on each PowerPoint slide.",
+    "KAM:in näkökulma": "Account manager's perspective",
+    "Palaverin tavoite · KAM": "Meeting goal · Account manager",
+    "Tekstiilejä asiakkaalla": "Allocated textiles",
+    "Tilanne ": "Snapshot ",
+    Toimipaikkoja: "Sites",
+    "Valittu rajaus": "Current filters",
+    "Skannattuja tekstiilejä": "Scanned textiles",
+    "Ilman skannausta": "Unscanned",
+    " · ei todiste vajaakäytöstä": " · scan coverage indicator",
+    "Pestyjä tekstiilejä": "Textiles washed",
+    " · tapahtumamäärä": " · event count",
+    Vedenkäyttö: "Water use",
+    " · laskennallinen arvio": " · calculated estimate",
+    "Pesun ja toimitusten päästöt": "Laundry and delivery emissions",
+    Korjaukset: "Repairs",
+    "Valitsemasi tiedot": "Selected metrics",
+    "Synteettinen aineisto": "Synthetic data",
+    Säästöarvio: "Savings estimate",
+    "Säästöarviota ei ole annettu. Kerro apurille summa euroina.":
+      "Enter a savings estimate in euros through the assistant.",
+    "Väri päivitetty KAM:in keskusteluohjeen perusteella.":
+      "Rating updated from the account manager's instruction.",
+    "Kuvaus muuttui. Pyydä uusi arvio päivittääksesi värin.":
+      "The description changed. Request a new assessment to update the rating.",
+    "KAM vahvisti värin manuaalisesti.": "The account manager confirmed the rating manually.",
+    "Yhteistyön tila päivitetty. Avaa esitys uudelleen päivittääksesi diat.":
+      "Relationship rating updated. Reopen the presentation to update the slides.",
+    "Kirjoita ensin kuvaus asiakassuhteesta.":
+      "Enter a description of the customer relationship first.",
+    "Arviointi epäonnistui.": "The assessment failed.",
+    "Apurin väriarvio päivitetty. Voit muuttaa sitä käsin.":
+      "The assistant updated the rating. You can change it manually.",
+    "Arviointi aikakatkaistiin. Nykyinen väri säilytettiin.":
+      "The assessment timed out. The current rating was retained.",
+    "Arviointi epäonnistui. Nykyinen väri säilytettiin. ":
+      "The assessment failed. The current rating was retained. ",
+    "Oletusnäkymä palautettu.": "Default dashboard restored.",
+    "Yhteistyö: ": "Relationship: ",
+    " · KAM:in arvio": " · Account manager's assessment",
+    "Säästetty raha: ": "Estimated savings: ",
+    " € · KAM:in antama arvio, ei aineistosta laskettu tai todennettu säästö.":
+      " EUR · Estimate supplied by the account manager.",
+    "KAM:in lisäys: ": "Account manager's comment: ",
+    "Tuntematon yhteistyön tila.": "Unknown relationship rating.",
+    "Virheellinen KAM:in säästöarvio.": "Invalid account manager savings estimate.",
+    "Virheellinen KAM:in diateksti.": "Invalid account manager slide text.",
+    "Apuri on varattu. Yritä hetken kuluttua.": "The assistant is busy. Try again shortly.",
+    "Kirjoita asiakassuhteen kuvaus (enintään 2000 merkkiä).":
+      "Enter a relationship description of up to 2,000 characters.",
+    "Apuri palautti virheellisen arvion. Nykyinen tila säilytettiin.":
+      "The assistant returned an invalid assessment. The current rating was retained.",
+    "Säästöarvion täytyy tulla KAM:in viestistä.":
+      "The savings estimate must come from the account manager's message.",
+    "Anna säästöarvio euroina, esimerkiksi 40 000 euroa.":
+      "Enter a savings estimate in euros, for example EUR 40,000.",
+    "Tuntematon dian muutos.": "Unknown slide edit.",
+    "Dian tekstin täytyy tulla KAM:in viestistä.":
+      "Slide text must come from the account manager's message.",
+    "Virheellinen dashboardin rakenne.": "Invalid dashboard layout.",
+    '\n      <div class="customer-overview-heading"><div><span class="section-kicker">ASIAKKAAN PERUSTIEDOT</span>\n      <h2>':
+      '\n      <div class="customer-overview-heading"><div><span class="section-kicker">CUSTOMER OVERVIEW</span>\n      <h2>',
+    " · Kotimaa ": " · Home country ",
+    '</p></div>\n      <span class="customer-snapshot">Viimeisin aineisto: ':
+      '</p></div>\n      <span class="customer-snapshot">Latest data: ',
+    "</strong><span>asiakkaalle kohdistettua tekstiiliä": "</strong><span>allocated textiles",
+    "</strong><span>toimipaikkaa</span></div>\n      <div><strong>":
+      "</strong><span>sites</span></div>\n      <div><strong>",
+    "</strong><span>maata · ": "</strong><span>countries · ",
+    '</span></div></div>\n      <details class="customer-locations"><summary>Kaikki sijainnit ja tekstiilimäärät (':
+      '</span></div></div>\n      <details class="customer-locations"><summary>All locations and textile counts (',
+    '</ul></details>\n      <p class="quiet">Koko asiakkuus, riippumatta katsauksen rajauksesta. Tekstiilimäärä kuvaa viimeisimmän aineistokuukauden kohdistettua kantaa, ei pesumääriä tai reaaliaikaista varastoa. Synteettinen aineisto.</p>':
+      '</ul></details>\n      <p class="quiet">Whole customer, across all filters. Allocations reflect the latest month in the synthetic dataset.</p>',
+    '<article class="kam-savings"><span>Säästetty raha · KAM:in arvio</span><strong>':
+      '<article class="kam-savings"><span>Estimated savings · Account manager</span><strong>',
+    " €</strong><small>KAM:in antama arvio. Summaa ei ole laskettu tai todennettu tämän aineiston perusteella.</small></article>":
+      " €</strong><small>Estimate supplied by the account manager.</small></article>",
+    '<div class="cooperation-control"><h3>Yhteistyön tila</h3><label for="cooperation-description">Kuvaa asiakassuhteen tilanne</label><textarea id="cooperation-description" rows="4" maxlength="2000" placeholder="Mikä sujuu hyvin? Onko avoimia ongelmia, palautetta tai sovittuja jatkotoimia?">':
+      '<div class="cooperation-control"><h3>Relationship status</h3><label for="cooperation-description">Describe the customer relationship</label><textarea id="cooperation-description" rows="4" maxlength="2000" placeholder="What is going well? Are there open issues, feedback or agreed next steps?">',
+    '</button><label for="cooperation">Yhteistyön väri · voit vaihtaa käsin</label><select id="cooperation">':
+      '</button><label for="cooperation">Relationship rating · editable</label><select id="cooperation">',
+    " Väri näkyy esikatselussa ja PowerPointin jokaisella dialla.</small></div>":
+      " The rating appears in the preview and on each PowerPoint slide.</small></div>",
+    '<div class="kam-dashboard-note"><strong>KAM:in näkökulma</strong><p>':
+      '<div class="kam-dashboard-note"><strong>Account manager\'s perspective</strong><p>',
+    '<div class="kam-dashboard-note"><strong>Palaverin tavoite · KAM</strong><p>':
+      '<div class="kam-dashboard-note"><strong>Meeting goal · Account manager</strong><p>',
+    '<h2>Valitsemasi tiedot</h2><div class="dashboard-metric-grid">':
+      '<h2>Selected metrics</h2><div class="dashboard-metric-grid">',
+    " · Synteettinen aineisto</p>": " · Synthetic data</p>",
+    "<h2>Säästöarvio</h2><p>Säästöarviota ei ole annettu. Kerro apurille summa euroina.</p>":
+      "<h2>Savings estimate</h2><p>Enter a savings estimate in euros through the assistant.</p>",
+    '"></i><span>Yhteistyö: ': '"></i><span>Relationship: ',
+    " · KAM:in arvio</span></div>": " · Account manager's assessment</span></div>",
+  };
   function translate(language, text) {
-    return language === "fi" && Object.hasOwn(finnish, text) ? finnish[text] : text;
+    const messages = language === "fi" ? finnish : english;
+    return Object.hasOwn(messages, text) ? messages[text] : text;
   }
   function translator(language) {
     return (text, ...values) =>

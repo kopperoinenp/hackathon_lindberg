@@ -66,6 +66,7 @@
     </header>
     <main>
       <div class="toolbar">
+        <button id="reset-dashboard" class="text-button" type="button">Reset dashboard</button>
         <label for="customer">Customer<select id="customer"></select></label
         ><button id="open-review" class="primary">
           Open presentation <span aria-hidden="true">↗</span>
@@ -82,6 +83,7 @@
           </svg>
         </a>
       </div>
+      <section id="customer-overview" aria-label="Customer overview" aria-live="polite"></section>
       <section id="summary-panel" role="tabpanel" aria-labelledby="summary-tab">
         <div id="story" aria-live="polite"></div>
       </section>

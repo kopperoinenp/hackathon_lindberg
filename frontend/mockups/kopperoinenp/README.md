@@ -8,6 +8,20 @@ or frontend framework is included.
 Run `pnpm preview` from the repository root. Open the printed local URL to use the API integration.
 Runtime files are plain HTML/CSS/JS.
 
+Chat edits immediately update dashboard headings, metric selections, manager
+comments, meeting goals, savings estimates and relationship status. The page
+scrolls to the changed section and briefly highlights it; chat lists the changes.
+Slide commentary is mirrored in the matching dashboard card. The customer name
+stays factual even when the overview slide heading is customized. These edits
+also remain in the presentation request; no PowerPoint download is needed to see them.
+
+The dashboard starts with whole-customer basic information: industry, home country,
+all sites/countries and allocated textile stock from the customer's latest month.
+Expand the locations list for each site's stock. This overview is independent of
+review filters. The snapshot date and synthetic status are explicit; this is not
+live inventory. Missing site data is unknown and the total is marked partial,
+rather than carrying forward older stock or summing multiple months.
+
 The top menu switches two panels in the same page:
 
 - **Asiakaskatsaus:** automatically ordered visual findings, a site investigation,
