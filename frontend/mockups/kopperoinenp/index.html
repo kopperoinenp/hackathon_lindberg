@@ -104,6 +104,7 @@
       <p id="profile-mode-help" class="profile-mode-help">
         Edits are saved to this customer’s review.
       </p>
+      <section id="query-result" aria-live="polite" hidden></section>
       <section id="customer-overview" aria-label="Customer overview" aria-live="polite"></section>
       <section id="summary-panel" role="tabpanel" aria-labelledby="summary-tab">
         <section
@@ -215,6 +216,7 @@
         ><span>Customer workspace · Synthetic data</span>
       </footer>
     </main>
+    <nav id="chat-menu" class="chat-menu" aria-label="Assistant tools" hidden></nav>
     <section id="composer" class="conversation chat-dock" aria-label="Edit review" hidden>
       <div class="chat-dock-heading">
         <span>Lindström assistant</span
@@ -223,6 +225,8 @@
         </button>
       </div>
       <div id="chat" aria-live="polite" hidden></div>
+      <div id="chat-prompts" aria-label="Suggested requests"></div>
+      <button id="chat-prompts-toggle" class="text-button" type="button" hidden></button>
       <form id="ask-form">
         <label for="question" class="sr-only">Describe the change you want</label
         ><input

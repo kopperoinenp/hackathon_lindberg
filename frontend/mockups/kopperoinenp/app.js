@@ -74,6 +74,10 @@
     managerTexts: {},
     dashboardLayout: globalThis.WorkspaceModel.defaultDashboardLayout(),
     chat: [],
+    chatTool: "data",
+    lastQuery: null,
+    queryResult: null,
+    promptsOpen: false,
   };
   const defaultReviewState = structuredClone(state);
   let storageLoading = true,
@@ -145,6 +149,7 @@
   async function loadCustomerReview(customer) {
     storageLoading = true;
     state.chatRevision += 1;
+    toggleChatMenu(false);
     $("#workspace").inert = true;
     $("#composer").inert = true;
     storageStatus("Ladataan katsausta…", "Loading review…");
@@ -601,6 +606,8 @@
     $("#summary-panel").hidden = state.view !== "summary";
     $("#analysis-panel").hidden = state.view !== "analysis";
     $("#composer").hidden = state.view !== "summary";
+    if ($("#composer").hidden) toggleChatMenu(false);
+    renderQueryResult();
     for (const view of ["summary", "analysis"]) {
       const tab = $("#" + view + "-tab");
       tab.setAttribute("aria-selected", String(state.view === view));
@@ -1119,7 +1126,49 @@
     const { metrics: m, compare: c, baseline: b, customer } = context();
     return t`<p class="quiet">${esc(customer.customer_name)} · ${esc(scopeName())} · ${periodName()}</p><p class="quiet">All customer figures are synthetic. Water and emissions are calculated estimates allocated from laundry-level data.</p><section class="method-section"><h3>Baseline: ${baselineName()}</h3><p>The baselines apply different water and emissions factors to the same washed weight. They represent illustrative laundry models.</p><div class="formula">Water difference: ${f(m.kg, 1)} kg × ${f(b.water_l_per_kg, 2)} l/kg − ${f(m.water)} l = ${f(c.waterDifference)} l<br />Emissions difference: ${f(m.kg, 1)} kg × ${f(b.process_kgco2e_per_kg + b.delivery_kgco2e_per_kg, 3)} kg CO₂e/kg − ${f(m.emissions)} kg CO₂e = ${f(c.emissionsDifference)} kg CO₂e</div><p>The scope covers water used in washing and laundry and delivery emissions. Figures in the review are rounded.</p></section><section class="method-section"><h3>Sources and calculations</h3><p>${esc(data.source)}</p><ul><li>Customers and Sites: synthetic customer and site records.</li><li>Service_Activity: washed kilograms in the period and allocations and scans for ${snapshotName()}.</li><li>Customer_Impacts: allocated_water_l, allocated_process_kgco2e and allocated_delivery_kgco2e, summed over the period.</li><li>Repairs: number of repair events in the selected period.</li><li>Baselines: factors for the selected comparison.</li></ul></section><section class="method-section"><h3>Interpretation limits</h3><ul><li>Scan coverage highlights where to investigate actual textile use.</li><li>Repair scenarios depend on assumptions about delayed purchases. Their estimated impact is shown separately from laundry emissions.</li><li>Unique wearer counts require person identifiers.</li><li>Cost savings, request resolution and regulatory claims require further evidence.</li><li>Industry focus is an editable suggestion.</li></ul></section>`;
   }
+  function queryChart(result) {
+    const peak = Math.max(...result.rows.map((row) => row.value ?? 0), 0);
+    const size = (row) => (peak > 0 && row.value !== null ? (row.value / peak) * 100 : 0);
+    if (result.kind === "facts")
+      return `<dl class="query-facts">${result.rows
+        .map(
+          (row) =>
+            `<div><dt>${esc(row.label)}</dt><dd>${esc(row.display)}</dd>${row.note ? `<small>${esc(row.note)}</small>` : ""}</div>`,
+        )
+        .join("")}</dl>`;
+    return result.kind === "single"
+      ? `<p class="query-single">${esc(result.rows[0].display)}</p>`
+      : result.kind === "columns"
+        ? `<div class="query-columns ${result.rows.length > 6 ? "dense" : ""}" role="img" aria-label="${esc(result.title)}">${result.rows
+            .map(
+              (row) =>
+                `<div class="${row.accent ? "accent" : ""}"><strong>${esc(row.display)}</strong><span><i style="height:${size(row)}%"></i></span><small>${esc(row.label)}</small></div>`,
+            )
+            .join("")}</div>`
+        : `<div class="query-bars" role="img" aria-label="${esc(result.title)}">${result.rows
+            .map(
+              (row) =>
+                `<div class="${row.accent ? "accent" : ""}"><span>${esc(row.label)}</span><div><i style="width:${size(row)}%"></i></div><strong>${esc(row.display)}</strong></div>`,
+            )
+            .join("")}</div>`;
+  }
+  function chatResult(result) {
+    return `<div class="chat-result"><strong>${esc(result.title)}</strong><small>${esc(result.subtitle)}</small>${queryChart(result)}${result.more ? `<small>${esc(result.more)}</small>` : ""}<em>${esc(result.status)} ${esc(t("Source"))}: ${esc(result.source)}</em></div>`;
+  }
+  function renderQueryResult() {
+    const box = $("#query-result");
+    const result = state.queryResult;
+    const visible = Boolean(result) && result.language === language && state.view === "summary";
+    box.hidden = !visible;
+    if (!visible) {
+      box.innerHTML = "";
+      return;
+    }
+    box.innerHTML = `<header><div><span class="section-kicker">${esc(t("Assistant search"))}</span><h2>${esc(result.title)}</h2><p>${esc(result.subtitle)}</p></div><button type="button" id="query-close" aria-label="${esc(t("Close result"))}">×</button></header><div class="query-body"><div class="query-chart">${queryChart(result)}${result.more ? `<p class="quiet">${esc(result.more)}</p>` : ""}</div>${result.highlights.length ? `<div class="query-highlights">${result.highlights.map((item) => `<article><span>${esc(item.label)}</span><strong>${esc(item.value)}</strong><small>${esc(item.name)}</small></article>`).join("")}</div>` : ""}</div><footer><em>${esc(result.status)}</em><span>${esc(t("Source"))}: ${esc(result.source)}</span></footer>`;
+  }
   function clearScope() {
+    state.queryResult = null;
+    state.lastQuery = null;
     state.note = "";
     state.savings = null;
     state.managerTexts = {};
@@ -1143,22 +1192,34 @@
   function renderChat() {
     $("#chat").innerHTML =
       state.chat
-        .map((msg) => `<p class="message ${msg.user ? "user" : ""}">${esc(msg.text)}</p>`)
+        .map(
+          (msg) =>
+            `<div class="message ${msg.user ? "user" : ""}"><p>${esc(msg.text)}</p>${msg.view ? chatResult(msg.view) : ""}${msg.followUps?.length && msg === state.chat.at(-1) ? `<div class="chat-followups">${msg.followUps.map((text) => `<button type="button" data-chat-prompt>${esc(text)}</button>`).join("")}</div>` : ""}</div>`,
+        )
         .join("") + (state.asking ? t('<p class="message pending">Applying changes…</p>') : "");
     $("#chat").scrollTop = $("#chat").scrollHeight;
+    const hasPrompts = $("#chat-prompts").children.length > 0;
+    const started = state.chat.length > 0;
+    $("#chat-prompts").hidden = started && !state.promptsOpen;
+    $("#chat-prompts-toggle").hidden = !hasPrompts || !started;
+    $("#chat-prompts-toggle").textContent = t(
+      state.promptsOpen ? "Hide suggestions" : "Show suggestions",
+    );
     $("#question").disabled = state.asking;
     $("#ask-form button[type=submit]").disabled = state.asking;
     $("#ask-form").setAttribute("aria-busy", String(state.asking));
   }
   async function ask(question) {
-    if (state.asking) return;
+    if (state.asking || profileMode !== "saved" || storageLoading || switchingReview) return;
     const workspace = chatWorkspace(),
       snapshot = JSON.stringify(workspace),
-      revision = state.chatRevision;
+      revision = state.chatRevision,
+      chatTool = state.chatTool;
     const history = state.chat
       .slice(-6)
       .map((msg) => ({ role: msg.user ? "user" : "assistant", content: msg.text.slice(0, 1800) }));
     state.chat.push({ user: true, text: question });
+    state.promptsOpen = false;
     state.asking = true;
     $("#chat").hidden = false;
     renderChat();
@@ -1167,7 +1228,7 @@
       const response = await fetch(`/api/chat?lang=${language}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: question, history, workspace }),
+        body: JSON.stringify({ message: question, history, workspace, lastQuery: state.lastQuery }),
         signal: AbortSignal.timeout(95000),
       });
       const result = await response.json();
@@ -1219,10 +1280,29 @@
         "dashboardLayout",
       ])
         state[key] = next[key];
+      if (result.query !== undefined) state.lastQuery = result.query;
+      else if (result.changed.some((key) => key.startsWith("scope."))) state.lastQuery = null;
+      const onDashboard =
+        Boolean(result.view) && chatTool === "dashboard" && state.view === "summary";
+      state.queryResult = onDashboard
+        ? result.view
+        : result.changed.length
+          ? null
+          : state.queryResult;
       render();
-      await flushReviewSave();
-      state.chat.push({ user: false, text: result.changed.length ? t("Done") : t("No changes.") });
-      if (result.changed.length) {
+      if (result.changed.length) await flushReviewSave();
+      state.chat.push({
+        user: false,
+        text: onDashboard
+          ? `${t("The comparison is on the dashboard.")} ${result.answer}`
+          : (result.answer ??
+            result.message ??
+            (result.changed.length ? t("Done") : t("No changes."))),
+        view: onDashboard ? null : result.view,
+        followUps: result.followUps ?? [],
+      });
+      if (onDashboard) $("#query-result").scrollIntoView({ behavior: "smooth", block: "start" });
+      if (result.changed.length && !result.view) {
         status(t("Done"));
 
         const target = $(
@@ -1252,9 +1332,83 @@
       updateChatToggle();
     }
   }
-  $("#toggle-chat").addEventListener("click", () => {
-    $("#chat").hidden = !$("#chat").hidden;
+  const chatTools = {
+    data: {
+      title: "Find and compare data",
+      hint: "Figures, quarters, sites and products",
+      prompts: [
+        "What should we raise in the meeting?",
+        "Compare water by quarter",
+        "Which products need the most repairs?",
+        "Compare emissions by country",
+        "Which sites have the most late cycles?",
+      ],
+    },
+    dashboard: {
+      title: "Change the dashboard",
+      hint: "Period, focus and visible content",
+      prompts: [
+        "Show Q2",
+        "Compare water by quarter",
+        "Focus on emissions",
+        "Restore the default dashboard",
+      ],
+    },
+  };
+  function toggleChatMenu(open) {
+    $("#chat-menu").hidden = !open;
+    $("#composer").classList.toggle("menu-open", open);
+  }
+  function renderChatMenu() {
+    $("#chat-menu").innerHTML = Object.entries(chatTools)
+      .map(
+        ([id, tool]) =>
+          `<button type="button" data-chat-tool="${id}"><strong>${esc(t(tool.title))}</strong><small>${esc(t(tool.hint))}</small></button>`,
+      )
+      .join("");
+  }
+  function openChatTool(id) {
+    if (profileMode !== "saved" || storageLoading || switchingReview) return;
+    state.chatTool = id;
+    state.promptsOpen = true;
+    $("#chat-prompts").innerHTML = chatTools[id].prompts
+      .map((text) => `<button type="button" data-chat-prompt>${esc(t(text))}</button>`)
+      .join("");
+    toggleChatMenu(false);
+    $("#chat").hidden = false;
     updateChatToggle();
+    renderChat();
+    $("#question").focus();
+  }
+  $("#toggle-chat").addEventListener("click", () => {
+    if ($("#chat").hidden) {
+      renderChatMenu();
+      toggleChatMenu($("#chat-menu").hidden);
+      return;
+    }
+    $("#chat").hidden = true;
+    updateChatToggle();
+  });
+  $("#query-result").addEventListener("click", (event) => {
+    if (!event.target.closest("#query-close")) return;
+    state.queryResult = null;
+    renderQueryResult();
+  });
+  $("#chat-menu").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-chat-tool]");
+    if (button) openChatTool(button.dataset.chatTool);
+  });
+  $("#chat-prompts-toggle").addEventListener("click", () => {
+    state.promptsOpen = !state.promptsOpen;
+    renderChat();
+  });
+  $("#chat").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-chat-prompt]");
+    if (button) ask(button.textContent);
+  });
+  $("#chat-prompts").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-chat-prompt]");
+    if (button) ask(button.textContent);
   });
   $("#reset").addEventListener("click", () => {
     Object.assign(state, {
