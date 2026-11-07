@@ -60,7 +60,7 @@
     const sites = indexed(data.sites, "site_id", "sites");
     const baselines = indexed(data.baselines, "baseline_id", "baselines");
     const products = indexed(data.products ?? [], "product_id", "products");
-    requireValid(customers.has("CUST001"), "The default customer is missing.", "customers");
+    requireValid(customers.size > 0, "No customers are available.", "customers");
     for (const [key, row] of customers) {
       requireValid(
         text(row.customer_name) && text(row.industry) && countries.includes(row.hq_country),

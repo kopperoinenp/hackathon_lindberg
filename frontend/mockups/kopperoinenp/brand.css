@@ -3212,3 +3212,13 @@ body[data-mode="prepare"] #story,
 .slide-note[hidden] {
   display: none;
 }
+.prototype-profile {
+  display: grid;
+  gap: 3px;
+  max-width: 320px;
+  font-size: 12px;
+}
+.prototype-profile select {
+  max-width: 100%;
+  padding: 5px;
+}

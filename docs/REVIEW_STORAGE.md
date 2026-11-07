@@ -1,5 +1,10 @@
 # Customer review persistence
 
+The optional [PostgreSQL prototype](POSTGRES_PROTOTYPE.md) stores shared customer
+datasets and per-profile reviews in PostgreSQL. It uses selectable demo profiles,
+not authentication. `pnpm preview:shared` enables it; the file-store behavior below
+remains the default for `pnpm preview`. Existing local files are preserved.
+
 The local single-user backend saves one current review per customer under
 `.local/reviews/`, ignored by Git. `REVIEW_STORE_DIR` overrides the directory for
 tests/deployment. Data is independent of the synthetic source fixture and survives

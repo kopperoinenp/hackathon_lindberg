@@ -16,6 +16,7 @@ import { dataset } from "./dataset.mjs";
 import { analyzeImport } from "./import-analysis.mjs";
 import { importFormats, importLimit, readImportFile } from "./import-file.mjs";
 import { fileURLToPath } from "node:url";
+import { requestContext } from "./request-context.mjs";
 let reviewStore;
 const files = new Map();
 const ttl = 10 * 60 * 1000;
@@ -70,6 +71,15 @@ async function readJson(request) {
 export async function handlePresentationApi(request, response, url) {
   if (!url.pathname.startsWith("/api/")) return false;
   try {
+    const context = requestContext.getStore();
+    const owner = context ? `${context.user.tenant_id}/${context.user.id}` : "local";
+    const assertAccess = (customer, write = false) => {
+      if (
+        context &&
+        (!context.permissions.has(customer) || (write && !context.permissions.get(customer)))
+      )
+        throw new PresentationError("No access to this customer.", 403);
+    };
     const origin = request.headers.origin;
     const host = request.headers.host;
     if (
@@ -85,6 +95,7 @@ export async function handlePresentationApi(request, response, url) {
     if (importMatch) {
       if (request.method !== "POST") throw new PresentationError("Method not allowed.", 405);
       const [, customer] = importMatch;
+      assertAccess(customer, true);
       const selected = dataset?.customers.find((row) => row.customer_id === customer);
       if (!selected) throw new PresentationError("Unknown customer.", 404);
       const format = url.searchParams.get("format");
@@ -118,13 +129,16 @@ export async function handlePresentationApi(request, response, url) {
     }
     const reviewMatch = url.pathname.match(/^\/api\/reviews\/([A-Za-z0-9_-]+)$/);
     if (reviewMatch) {
-      reviewStore ??= createReviewStore(
-        process.env.REVIEW_STORE_DIR ||
-          fileURLToPath(new URL("../.local/reviews/", import.meta.url)),
-      );
-      if (request.method === "GET") json(response, 200, await reviewStore.read(reviewMatch[1]));
+      assertAccess(reviewMatch[1], request.method !== "GET");
+      if (!context)
+        reviewStore ??= createReviewStore(
+          process.env.REVIEW_STORE_DIR ||
+            fileURLToPath(new URL("../.local/reviews/", import.meta.url)),
+        );
+      const activeStore = context?.reviews ?? reviewStore;
+      if (request.method === "GET") json(response, 200, await activeStore.read(reviewMatch[1]));
       else if (request.method === "PUT")
-        json(response, 200, await reviewStore.save(reviewMatch[1], await readJson(request)));
+        json(response, 200, await activeStore.save(reviewMatch[1], await readJson(request)));
       else throw new PresentationError("Method not allowed.", 405);
       return true;
     }
@@ -133,6 +147,8 @@ export async function handlePresentationApi(request, response, url) {
       return true;
     }
     if (url.pathname === "/api/cooperation" && request.method === "POST") {
+      if (context && ![...context.permissions.values()].some(Boolean))
+        throw new PresentationError("This prototype profile is read-only.", 403);
       if (chatBusy) throw new PresentationError("Apuri on varattu. Yritä hetken kuluttua.", 429);
       chatBusy = true;
       try {
@@ -143,6 +159,8 @@ export async function handlePresentationApi(request, response, url) {
       return true;
     }
     if (url.pathname === "/api/chat" && request.method === "POST") {
+      if (context && ![...context.permissions.values()].some(Boolean))
+        throw new PresentationError("This prototype profile is read-only.", 403);
       if (chatBusy)
         throw new PresentationError(
           "The assistant is handling another request. Try again shortly.",
@@ -161,6 +179,8 @@ export async function handlePresentationApi(request, response, url) {
       const file = files.get(match[1]);
       if (!file)
         throw new PresentationError("The presentation has expired. Generate it again.", 404);
+      if (file.owner !== owner) throw new PresentationError("No access to this presentation.", 403);
+      assertAccess(file.deck.request.scope.customer);
       if (!match[2]) {
         json(response, 200, {
           customer: file.deck.customer,
@@ -184,6 +204,7 @@ export async function handlePresentationApi(request, response, url) {
     }
     if (url.pathname === "/api/presentations/preview" && request.method === "POST") {
       const base = buildPresentation(await readJson(request));
+      assertAccess(base.request.scope.customer);
       const deck = applyPlan(base, defaultPlan(base));
       json(response, 200, { slides: deck.slides, footer: deck.footer });
       return true;
@@ -196,6 +217,7 @@ export async function handlePresentationApi(request, response, url) {
     try {
       const input = await readJson(request);
       const base = buildPresentation(input);
+      assertAccess(base.request.scope.customer);
       const config = providerConfig();
       const normalized = {
         ...base.request,
@@ -207,6 +229,7 @@ export async function handlePresentationApi(request, response, url) {
         .update(
           JSON.stringify({
             request: normalized,
+            owner,
             locked: input.locked === true,
             provider: config.provider,
             model: config.model,
@@ -234,6 +257,7 @@ export async function handlePresentationApi(request, response, url) {
       const id = randomUUID();
       if (files.size >= 8) files.delete(files.keys().next().value);
       files.set(id, {
+        owner,
         bytes,
         deck,
         config,

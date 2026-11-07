@@ -22,6 +22,141 @@
       });
   }
   updateLanguage();
+  let sharedSession,
+    workspaceReady = false;
+  let importCustomer,
+    importLanguage,
+    importTimer,
+    importBusy = false;
+  function renderImportPanel(visible) {
+    if (!sharedSession?.enabled) return;
+    if (!$("#fixture-import-panel")) {
+      $("#customer-overview").insertAdjacentHTML(
+        "beforebegin",
+        `<section id="fixture-import-panel" class="review-priorities"><h2>${esc(t("Shared customer data"))}</h2><p>${esc(t("Import the project's synthetic data through the background pipeline. Your own review is preserved."))}</p><button id="fixture-import-start" type="button" class="secondary">${esc(t("Import demo data"))}</button> <button id="fixture-import-reload" type="button" class="text-button" hidden>${esc(t("Load published data"))}</button><p id="fixture-import-status" role="status"></p></section>`,
+      );
+      $("#fixture-import-start").addEventListener("click", async () => {
+        const customer = state.customer;
+        importBusy = true;
+        $("#fixture-import-start").disabled = true;
+        try {
+          const response = await fetch(`/api/v1/customers/${customer}/imports`, {
+            method: "POST",
+            signal: AbortSignal.timeout(10000),
+          });
+          if (!response.ok) throw new Error(t("Could not import demo data."));
+          await refreshImportPanel(customer);
+        } catch (error) {
+          $("#fixture-import-status").textContent = error.message;
+        } finally {
+          importBusy = false;
+          $("#fixture-import-start").disabled = sharedSession.readOnly;
+        }
+      });
+      $("#fixture-import-reload").addEventListener("click", async () => {
+        try {
+          await flushReviewSave();
+          sessionStorage.setItem(
+            "lindstrom-import-resume",
+            `${sharedSession.user.id}:${state.customer}`,
+          );
+          location.reload();
+        } catch {
+          $("#fixture-import-status").textContent = t("Save your review before reloading.");
+        }
+      });
+    }
+    $("#fixture-import-panel").hidden = !visible;
+    $("#fixture-import-panel h2").textContent = t("Shared customer data");
+    $("#fixture-import-panel p").textContent = t(
+      "Import the project's synthetic data through the background pipeline. Your own review is preserved.",
+    );
+    $("#fixture-import-start").textContent = t("Import demo data");
+    $("#fixture-import-reload").textContent = t("Load published data");
+    $("#fixture-import-start").disabled = sharedSession.readOnly || importBusy;
+    if (importCustomer !== state.customer || importLanguage !== language) {
+      importCustomer = state.customer;
+      importLanguage = language;
+      clearTimeout(importTimer);
+      $("#fixture-import-status").textContent = t("Checking import status…");
+      $("#fixture-import-reload").hidden = true;
+      void refreshImportPanel(state.customer);
+    }
+  }
+  async function refreshImportPanel(customer) {
+    clearTimeout(importTimer);
+    try {
+      const response = await fetch(`/api/v1/customers/${customer}/imports`, {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!response.ok) throw new Error(t("Could not load import status."));
+      const result = await response.json();
+      if (state.customer !== customer) return;
+      const job = result.jobs[0];
+      const labels = {
+        queued: "Queued for background processing",
+        ready: "Published – checks passed",
+        failed: "Import failed – previous data preserved",
+        superseded: "A newer version has already been published",
+      };
+      const text = job
+        ? t(labels[job.status])
+        : t("No pipeline import yet. The initial demo dataset is in use.");
+      $("#fixture-import-status").textContent = [
+        text,
+        job?.updated_at
+          ? new Date(job.updated_at).toLocaleString(language === "fi" ? "fi-FI" : "en-GB")
+          : "",
+        job?.error?.message,
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      $("#fixture-import-reload").hidden = !result.activeVersion;
+      if (job?.status === "queued")
+        importTimer = setTimeout(() => void refreshImportPanel(customer), 1500);
+    } catch (error) {
+      if (state.customer === customer) $("#fixture-import-status").textContent = error.message;
+    }
+  }
+  try {
+    const response = await fetch("/api/demo/session", { signal: AbortSignal.timeout(10000) });
+    if (!response.ok) throw new Error("Shared database unavailable");
+    sharedSession = await response.json();
+    if (sharedSession.enabled) {
+      $(".header-options").insertAdjacentHTML(
+        "afterbegin",
+        `<label class="prototype-profile">${esc(t("Prototype profile (no sign-in)"))}<select id="prototype-profile" disabled>${sharedSession.profiles.map((profile) => `<option value="${esc(profile.id)}" ${profile.id === sharedSession.user.id ? "selected" : ""}>${esc(profile.display_name)}</option>`).join("")}</select><small>${esc(t(sharedSession.readOnly ? "Read-only profile – changes are not saved." : "PostgreSQL · shared data, personal reviews"))}</small><span id="prototype-error" role="status"></span></label>`,
+      );
+      $("#prototype-profile").addEventListener("change", async (event) => {
+        const select = event.target;
+        select.disabled = true;
+        try {
+          if (workspaceReady) await flushReviewSave();
+          const response = await fetch("/api/demo/user", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ user: select.value }),
+          });
+          if (!response.ok) throw new Error(t("Could not change prototype profile."));
+          sessionStorage.removeItem("lindstrom-review-customer");
+          location.reload();
+        } catch (error) {
+          select.value = sharedSession.user.id;
+          select.disabled = false;
+          $("#prototype-error").textContent = error.message;
+        }
+      });
+      if (!sharedSession.customerCount) {
+        $("#dataset-title").textContent = t("No customers assigned to this profile.");
+        $("#prototype-profile").disabled = false;
+        return;
+      }
+    }
+  } catch {
+    $("#dataset-title").textContent = t("Shared database unavailable");
+    $("#dataset-issue").textContent = t("Restart the shared prototype and reload this page.");
+    return;
+  }
   let source;
   try {
     const response = await fetch("data.js", { signal: AbortSignal.timeout(10000) });
@@ -47,7 +182,7 @@
   const f = (number, digits = 0) =>
     new Intl.NumberFormat(t("en-GB"), { maximumFractionDigits: digits }).format(number);
   const state = {
-    customer: "CUST001",
+    customer: data.customers[0].customer_id,
     from: "2025-01",
     to: "2025-12",
     country: "all",
@@ -121,6 +256,7 @@
     $("#review-storage-status").textContent = language === "fi" ? fi : en;
   }
   function scheduleReviewSave() {
+    if (sharedSession?.readOnly) return;
     if (storageLoading || !storageReady || storageBlocked) return;
     clearTimeout(saveTimer);
     if (reviewSignature(chatWorkspace()) === savedSignature) return;
@@ -130,6 +266,7 @@
     }, 250);
   }
   function flushReviewSave() {
+    if (sharedSession?.readOnly) return saveQueue;
     clearTimeout(saveTimer);
     if (storageBlocked) return Promise.reject(new Error("Reload the page before saving."));
     if (storageLoading || !storageReady) return saveQueue;
@@ -723,6 +860,7 @@
     renderUpsells();
     renderDashboardEdits();
     renderDashboardLayout();
+    renderImportPanel(analyzing);
     if (state.view === "analysis") renderAnalysis();
     $("#composer").inert = switchingReview || storageLoading || !storageReady;
     if (mode === "home") renderToday();
@@ -2848,11 +2986,12 @@
     $("#chat-prompts-toggle").textContent = t(
       state.promptsOpen ? "Hide suggestions" : "Show suggestions",
     );
-    $("#question").disabled = state.asking;
-    $("#ask-form button[type=submit]").disabled = state.asking;
+    $("#question").disabled = state.asking || sharedSession?.readOnly;
+    $("#ask-form button[type=submit]").disabled = state.asking || sharedSession?.readOnly;
     $("#ask-form").setAttribute("aria-busy", String(state.asking));
   }
   async function ask(question) {
+    if (sharedSession?.readOnly) return;
     if (state.asking || storageLoading || switchingReview || !storageReady) return;
     const workspace = chatWorkspace(),
       snapshot = JSON.stringify(workspace),
@@ -3413,12 +3552,26 @@
   }
   bindLanguageControls(applyLanguage);
   applyLanguage();
+  workspaceReady = true;
+  if ($("#prototype-profile")) $("#prototype-profile").disabled = false;
   const previousCustomer =
     sessionStorage.getItem("lindstrom-review-customer") ||
     localStorage.getItem("lindstrom-review-customer");
+  const resumeImport = sessionStorage.getItem("lindstrom-import-resume");
+  sessionStorage.removeItem("lindstrom-import-resume");
   loadCustomerReview(
     data.customers.some((row) => row.customer_id === previousCustomer)
       ? previousCustomer
       : state.customer,
-  ).then(() => $("#customer-search").focus());
+  ).then((loaded) => {
+    if (
+      loaded &&
+      sharedSession?.enabled &&
+      resumeImport === `${sharedSession.user.id}:${state.customer}`
+    ) {
+      state.view = "analysis";
+      setMode("prepare");
+      render();
+    } else $("#customer-search").focus();
+  });
 })();

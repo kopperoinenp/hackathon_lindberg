@@ -1,12 +1,14 @@
 // Loopback-only workspace and presentation API. Provider secrets stay server-side.
 import { createServer } from "node:http";
 import { watch, existsSync } from "node:fs";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, realpath } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { requestContext } from "../backend/request-context.mjs";
 
 const envFile = fileURLToPath(new URL("../.env", import.meta.url));
 if (existsSync(envFile)) process.loadEnvFile(envFile);
+const { sharedPrototype } = await import("../backend/shared-prototype.mjs");
 const { datasetSource } = await import("../backend/dataset.mjs");
 const { handlePresentationApi } = await import("../backend/presentation-api.mjs");
 
@@ -20,6 +22,12 @@ const mime = {
   ".md": "text/plain; charset=utf-8",
 };
 const port = Number(process.env.PORT || 4173);
+const shared = sharedPrototype();
+const dataPath = path.join(root, "kopperoinenp", "data.js");
+const samePath = (a, b) =>
+  process.platform === "win32" ? a.toLowerCase() === b.toLowerCase() : a === b;
+const datasetPath = (url) =>
+  samePath(path.resolve(root, `.${decodeURIComponent(url.pathname)}`), dataPath);
 const clients = new Set();
 let reloadTimer;
 watch(root, { recursive: true }, (_event, filename) => {
@@ -33,9 +41,13 @@ watch(root, { recursive: true }, (_event, filename) => {
     for (const client of clients) client.write("data: reload\n\n");
   }, 350);
 });
-const server = createServer(async (request, response) => {
+async function handleRequest(request, response, url) {
   try {
-    const url = new URL(request.url, "http://127.0.0.1");
+    if (!shared && url.pathname === "/api/demo/session") {
+      response.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+      response.end(JSON.stringify({ enabled: false }));
+      return;
+    }
     if (await handlePresentationApi(request, response, url)) return;
     if (url.pathname === "/__preview_events") {
       response.writeHead(200, {
@@ -53,13 +65,19 @@ const server = createServer(async (request, response) => {
       response.end();
       return;
     }
-    if (url.pathname === "/kopperoinenp/data.js") {
-      response.writeHead(datasetSource ? 200 : 503, {
+    if (datasetPath(url)) {
+      const activeData = requestContext.getStore()?.data;
+      const source = shared
+        ? activeData
+          ? `globalThis.REVIEW_DATA = ${JSON.stringify(activeData)};`
+          : ""
+        : datasetSource;
+      response.writeHead(source ? 200 : 503, {
         "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
       });
-      response.end(datasetSource);
+      response.end(source);
       return;
     }
     const pathname = decodeURIComponent(
@@ -70,6 +88,17 @@ const server = createServer(async (request, response) => {
     if (relative.startsWith("..") || path.isAbsolute(relative) || !(await stat(file)).isFile()) {
       response.writeHead(404);
       response.end("Not found");
+      return;
+    }
+    if (pathname.includes(":") || !Object.hasOwn(mime, path.extname(file).toLowerCase())) {
+      response.writeHead(404);
+      response.end("Not found");
+      return;
+    }
+    // Reject filesystem aliases which bypass the canonical data route (including Windows aliases).
+    if (shared && samePath(await realpath(file), await realpath(dataPath))) {
+      response.writeHead(403);
+      response.end("Use the scoped dataset route");
       return;
     }
     let content = await readFile(file);
@@ -89,6 +118,18 @@ const server = createServer(async (request, response) => {
   } catch {
     response.writeHead(404);
     response.end("Not found");
+  }
+}
+const server = createServer(async (request, response) => {
+  try {
+    const url = new URL(request.url, "http://127.0.0.1");
+    const isData = datasetPath(url);
+    if (shared && (url.pathname.startsWith("/api/") || isData))
+      await shared.run(request, response, url, handleRequest);
+    else await handleRequest(request, response, url);
+  } catch {
+    if (!response.headersSent) response.writeHead(400);
+    response.end("Invalid request");
   }
 });
 server.listen(port, "127.0.0.1", () =>

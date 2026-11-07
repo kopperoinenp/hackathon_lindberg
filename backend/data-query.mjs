@@ -228,9 +228,9 @@ export function cleanQuery(value) {
   const allowed = {
     compareBy: queryComparisons,
     measure: ["auto", "total", "rate"],
-    customer: customerIds,
+    customer: data?.customers.map((row) => row.customer_id) ?? [],
     country: countries,
-    site: siteIds,
+    site: data?.sites.map((row) => row.site_id) ?? [],
     quarter: Object.keys(quarters),
     from: monthIds,
     to: monthIds,
