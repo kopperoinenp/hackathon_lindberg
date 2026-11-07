@@ -39,6 +39,46 @@
     dashboardLayout: globalThis.WorkspaceModel.defaultDashboardLayout(),
     chat: [],
   };
+  const contractKpis = new Map();
+  const includedAgendas = new Set();
+  const kpiForm = $("#contract-kpi-form");
+  const evidenceAreas = [
+    ["scorecard", "Customer success scorecard", "Review the overall picture with the customer."],
+    ["experience", "Customer experience", "CSAT, NPS or feedback supplied by the customer."],
+    [
+      "performance",
+      "Service performance",
+      "Contract SLA, delivery reliability, requests or garment availability.",
+    ],
+    ["adoption", "Service adoption", "Active sites and textile scans from the workspace."],
+    ["operations", "Operational value", "Repair events and textile use from the workspace."],
+    [
+      "financial",
+      "Financial value",
+      "Cost, savings or avoided cost supported by customer records.",
+    ],
+    [
+      "sustainability",
+      "Sustainability value",
+      "Laundry and delivery emissions, water and circularity.",
+    ],
+    ["improvement", "Improvement", "Open actions, recurring issues and progress."],
+    [
+      "future",
+      "Relationship and future",
+      "Customer priorities, opportunities and agreed next actions.",
+    ],
+  ];
+  const peers = [
+    ["Elis", 0.4],
+    ["Cintas", 0.2],
+    ["Salesianer", 0.31],
+    ["Johnson Service Group", 0.38],
+  ];
+  const lindstromIntensity = 0.28;
+  const peerAverage = peers.reduce((sum, [, intensity]) => sum + intensity, 0) / peers.length;
+  let editedKpi = -1;
+  let formCustomer;
   let statusTimer;
   const context = () => storyContext(data, state);
   const baselineName = () =>
@@ -259,11 +299,130 @@
     $("#summary-panel").before($("#customer-overview"));
     $("#customer-overview").hidden = false;
     renderCustomerOverview();
+    renderReviewEvidence();
     renderStory();
     renderDashboardEdits();
     renderDashboardLayout();
     if (state.view === "analysis") renderAnalysis();
   }
+  function customerKpis() {
+    return contractKpis.get(state.customer) ?? [];
+  }
+  function kpiDescription(kpi) {
+    return [
+      t("Actual") + ": " + (kpi.actual || t("Unavailable")),
+      kpi.target && t("Target") + ": " + kpi.target,
+      kpi.source || t("KAM input without source"),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  function resetKpiForm() {
+    editedKpi = -1;
+    kpiForm.reset();
+    $("#cancel-contract-kpi").hidden = true;
+  }
+  function renderReviewEvidence() {
+    if (formCustomer !== state.customer) {
+      formCustomer = state.customer;
+      resetKpiForm();
+    }
+    const area = kpiForm.elements.area;
+    const selectedArea = area.value;
+    area.innerHTML = evidenceAreas
+      .map(([id, label]) => `<option value="${id}">${t(label)}</option>`)
+      .join("");
+    if (selectedArea) area.value = selectedArea;
+    $("#review-evidence-areas").innerHTML = evidenceAreas
+      .map(([, label, evidence]) => `<li><strong>${t(label)}</strong> · ${t(evidence)}</li>`)
+      .join("");
+    const kpis = customerKpis();
+    const agenda = kpis.filter((kpi) => kpi.priority);
+    $("#contract-agenda").innerHTML = agenda.length
+      ? `<ul class="contract-kpi-list">${agenda
+          .map((kpi) => `<li><strong>${esc(kpi.label)}</strong> · ${esc(kpiDescription(kpi))}</li>`)
+          .join("")}</ul>`
+      : `<p class="quiet">${t("No contract KPIs are highlighted for this customer.")}</p>`;
+    $("#contract-kpi-list").innerHTML = kpis
+      .map((kpi, index) => {
+        const label = evidenceAreas.find(([id]) => id === kpi.area)[1];
+        return `<li><strong>${esc(kpi.label)}</strong> · ${t(label)}<br />${esc(kpiDescription(kpi))}<div class="kpi-actions"><button type="button" class="text-button" data-edit-kpi="${index}">${t("Edit KPI")}</button><button type="button" class="text-button" data-remove-kpi="${index}">${t("Remove KPI")}</button></div></li>`;
+      })
+      .join("");
+    const includeAgenda = $("#include-contract-agenda");
+    includeAgenda.disabled = agenda.length === 0;
+    includeAgenda.checked = agenda.length > 0 && includedAgendas.has(state.customer);
+
+    const difference = f((1 - lindstromIntensity / peerAverage) * 100);
+    $("#industry-benchmark-summary").textContent =
+      `${difference} % · ${t("Lower emissions intensity than the four-peer average (illustrative)")}`;
+    const benchmarkRows = [
+      ...peers,
+      [t("Four-peer average"), peerAverage],
+      ["Lindström Group", lindstromIntensity],
+    ];
+    $("#industry-benchmark").innerHTML =
+      `<table><thead><tr><th scope="col">${t("Company")}</th><th scope="col">${t("kg emissions / € turnover")}</th></tr></thead><tbody>${benchmarkRows.map(([name, intensity]) => `<tr><th scope="row">${name}</th><td>${f(intensity, 4)}</td></tr>`).join("")}</tbody></table><p class="quiet">${t("Source: supplied project figures. The average is unweighted and excludes Lindström. This company comparison is separate from the customer's laundry and delivery estimates.")}</p>`;
+  }
+  kpiForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const fields = new FormData(kpiForm);
+    const kpi = Object.fromEntries(fields);
+    for (const field of ["label", "actual", "target", "source"]) kpi[field] = kpi[field].trim();
+    if (!kpi.label) {
+      status(t("Enter a KPI name."));
+      kpiForm.elements.label.focus();
+      return;
+    }
+    kpi.priority = fields.has("priority");
+    const kpis = customerKpis();
+    if (editedKpi < 0 && kpis.length >= 12) {
+      status(t("This customer can have up to 12 contract KPIs."));
+      return;
+    }
+    if (
+      kpi.priority &&
+      kpis.filter((item, index) => item.priority && index !== editedKpi).length >= 3
+    ) {
+      status(t("Highlight up to three KPIs. Unmark another KPI first."));
+      return;
+    }
+    kpis[editedKpi < 0 ? kpis.length : editedKpi] = kpi;
+    contractKpis.set(state.customer, kpis);
+    resetKpiForm();
+    renderReviewEvidence();
+    invalidatePowerPoint();
+    status(t("Contract KPI saved."));
+  });
+  $("#cancel-contract-kpi").addEventListener("click", () => {
+    resetKpiForm();
+    kpiForm.elements.label.focus();
+  });
+  $("#contract-kpi-list").addEventListener("click", (event) => {
+    const button = event.target.closest("button");
+    if (!button) return;
+    const kpis = customerKpis();
+    if (button.dataset.editKpi !== undefined) {
+      editedKpi = Number(button.dataset.editKpi);
+      const kpi = kpis[editedKpi];
+      for (const field of ["label", "area", "actual", "target", "source"])
+        kpiForm.elements[field].value = kpi[field];
+      kpiForm.elements.priority.checked = kpi.priority;
+      $("#cancel-contract-kpi").hidden = false;
+    } else {
+      kpis.splice(Number(button.dataset.removeKpi), 1);
+      resetKpiForm();
+      renderReviewEvidence();
+      invalidatePowerPoint();
+      status(t("Contract KPI removed."));
+    }
+    kpiForm.elements.label.focus();
+  });
+  $("#include-contract-agenda").addEventListener("change", (event) => {
+    if (event.target.checked) includedAgendas.add(state.customer);
+    else includedAgendas.delete(state.customer);
+    invalidatePowerPoint();
+  });
   function renderCustomerOverview() {
     const overview = globalThis.WorkspaceModel.customerOverview(data, state.customer);
     const industry =
@@ -578,7 +737,7 @@
   }
   function chatWorkspace() {
     return {
-      ...presentationRequest(),
+      ...presentationRequest(false),
       view: state.view,
       metric: state.metric,
       summaryMetric: state.summaryMetric,
@@ -812,17 +971,27 @@
     link.setAttribute("aria-disabled", "true");
     link.title = t("Generate the presentation first");
   }
-  function presentationRequest() {
+  function presentationRequest(includeAgenda = true) {
     const scope = Object.fromEntries(
       ["customer", "from", "to", "country", "continent", "site", "baseline", "priority"].map(
         (key) => [key, state[key]],
       ),
     );
+    const agenda =
+      includeAgenda && includedAgendas.has(state.customer)
+        ? customerKpis().filter((kpi) => kpi.priority)
+        : [];
+    const agendaNote = agenda.length
+      ? [
+          t("Contract KPIs for discussion"),
+          ...agenda.map((kpi) => `• ${kpi.label} · ${kpiDescription(kpi)}`),
+        ].join("\n")
+      : "";
     return {
       scope,
       included: state.included,
       titleEdits: state.titleEdits,
-      note: state.note,
+      note: [state.note, agendaNote].filter(Boolean).join("\n\n"),
       cooperation: state.cooperation,
       savings: state.savings,
       managerTexts: state.managerTexts,
@@ -832,6 +1001,11 @@
   }
   $("#open-review").addEventListener("click", async () => {
     if (state.generating) return;
+    const payload = presentationRequest();
+    if (payload.note.length > 2000) {
+      status(t("Shorten the presentation note or exclude the KPI agenda."));
+      return;
+    }
     invalidatePowerPoint();
     const viewer = window.open(`/kopperoinenp/presentation.html?lang=${language}`, "_blank");
     if (!viewer) {
@@ -839,7 +1013,7 @@
       return;
     }
     viewer.opener = null;
-    const request = JSON.stringify(presentationRequest());
+    const request = JSON.stringify(payload);
     const button = $("#open-review");
     state.generating = true;
     button.disabled = true;

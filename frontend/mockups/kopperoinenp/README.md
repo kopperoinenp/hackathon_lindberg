@@ -16,6 +16,21 @@ stays factual even when the overview slide heading is customized. These edits
 also remain in the presentation request. The relationship rating can be set via
 chat and appears on the presentation slides.
 
+The review keeps a common evidence structure across customers. Use **Manage
+contract KPIs** to add or edit up to 12 customer-specific measures with an
+optional actual, target and source or reporting period. Highlight up to three
+for the meeting agenda. Entries are scoped to the selected customer and kept
+in the current page session. Enable **Include highlighted KPIs in the
+presentation** to append the current agenda to the existing presentation
+note. Measures are entered by the KAM, and missing actuals show as unavailable.
+
+The shared evidence checklist covers the nine review areas. The separate
+emissions-intensity comparison uses project-supplied company figures. The
+unweighted four-peer mean is 0.3225 kg emissions per euro of turnover versus
+0.28 for Lindström, about 13% lower. The reporting year and emissions scopes
+are unverified. The comparison is separate from synthetic customer impact
+and is displayed in the dashboard's evidence section.
+
 The dashboard starts with whole-customer basic information: industry, home country,
 all sites/countries and allocated textile stock from the customer's latest month.
 Expand the locations list for each site's stock. This overview is independent of

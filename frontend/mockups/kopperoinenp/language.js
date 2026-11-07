@@ -2,6 +2,75 @@
 (function (root) {
   "use strict";
   const finnish = {
+    "CUSTOMER FOCUS": "ASIAKASKOHTAINEN PAINOTUS",
+    "SHARED REVIEW": "YHTEINEN KATSAUSPOHJA",
+    "Contract KPIs and meeting agenda": "Sopimusmittarit ja palaverin agenda",
+    "Keep the shared review and highlight up to three KPIs agreed with this customer.":
+      "Yhteinen katsaus säilyy. Nosta esiin enintään kolme tämän asiakkaan kanssa sovittua mittaria.",
+    "Manage contract KPIs": "Hallitse sopimusmittareita",
+    "KPI name": "Mittarin nimi",
+    "Evidence area": "Mittarin aihealue",
+    "Actual and unit": "Toteuma ja yksikkö",
+    "Target and unit": "Tavoite ja yksikkö",
+    "Source or reporting period": "Lähde tai raportointijakso",
+    "Highlight on the meeting agenda": "Nosta palaverin agendalle",
+    "Save KPI": "Tallenna mittari",
+    "Cancel edit": "Peru muokkaus",
+    "Include highlighted KPIs in the presentation": "Lisää agendalle nostetut mittarit esitykseen",
+    "Evidence and industry context": "Näyttö ja toimialavertailu",
+    "Evidence to review with the customer": "Asiakkaan kanssa käsiteltävä näyttö",
+    "Illustrative peer comparison. Reporting year and emissions scopes are unverified.":
+      "Suuntaa antava verrokkivertailu. Raportointivuotta ja päästörajausta ei ole vahvistettu.",
+    "Customer success scorecard": "Asiakkuuden onnistumisen mittaristo",
+    "Review the overall picture with the customer.": "Käy kokonaiskuva läpi asiakkaan kanssa.",
+    "Customer experience": "Asiakaskokemus",
+    "CSAT, NPS or feedback supplied by the customer.":
+      "Asiakkaan toimittama CSAT, NPS tai palaute.",
+    "Service performance": "Palvelun suorituskyky",
+    "Contract SLA, delivery reliability, requests or garment availability.":
+      "Sopimuksen palvelutaso, toimitusvarmuus, palvelupyynnöt tai vaatteiden saatavuus.",
+    "Service adoption": "Palvelun käyttö",
+    "Active sites and textile scans from the workspace.":
+      "Työpöydän tiedot toimipaikoista ja tekstiilien skannauksista.",
+    "Operational value": "Operatiivinen arvo",
+    "Repair events and textile use from the workspace.":
+      "Työpöydän tiedot korjaustapahtumista ja tekstiilien käytöstä.",
+    "Financial value": "Taloudellinen arvo",
+    "Cost, savings or avoided cost supported by customer records.":
+      "Asiakkaan aineistoon perustuvat kustannukset, säästöt tai vältetyt kustannukset.",
+    "Sustainability value": "Vastuullisuusarvo",
+    "Laundry and delivery emissions, water and circularity.":
+      "Pesun ja toimitusten päästöt, vedenkäyttö ja kiertotalous.",
+    Improvement: "Kehittäminen",
+    "Open actions, recurring issues and progress.":
+      "Avoimet toimet, toistuvat ongelmat ja edistyminen.",
+    "Relationship and future": "Yhteistyön tulevaisuus",
+    "Customer priorities, opportunities and agreed next actions.":
+      "Asiakkaan painopisteet, mahdollisuudet ja sovitut jatkotoimet.",
+    Actual: "Toteuma",
+    Target: "Tavoite",
+    "KAM input without source": "KAM:in syöte ilman lähdettä",
+    "No contract KPIs are highlighted for this customer.":
+      "Asiakkaan agendalle ei ole nostettu sopimusmittareita.",
+    "Edit KPI": "Muokkaa mittaria",
+    "Remove KPI": "Poista mittari",
+    "Lower emissions intensity than the four-peer average (illustrative)":
+      "Pienempi päästöintensiteetti kuin neljän verrokin keskiarvo (suuntaa antava)",
+    "Four-peer average": "Neljän verrokin keskiarvo",
+    Company: "Yritys",
+    "kg emissions / € turnover": "kg päästöjä / € liikevaihtoa",
+    "Source: supplied project figures. The average is unweighted and excludes Lindström. This company comparison is separate from the customer's laundry and delivery estimates.":
+      "Lähde: projektiin annetut luvut. Keskiarvo on painottamaton ja laskettu ilman Lindströmiä. Yritysvertailu on erillinen asiakkaan pesun ja toimitusten päästöarvioista.",
+    "Enter a KPI name.": "Anna mittarin nimi.",
+    "This customer can have up to 12 contract KPIs.":
+      "Asiakkaalla voi olla enintään 12 sopimusmittaria.",
+    "Highlight up to three KPIs. Unmark another KPI first.":
+      "Agendalle mahtuu kolme mittaria. Poista ensin toinen nosto.",
+    "Contract KPI saved.": "Sopimusmittari tallennettu.",
+    "Contract KPI removed.": "Sopimusmittari poistettu.",
+    "Contract KPIs for discussion": "Käsiteltävät sopimusmittarit",
+    "Shorten the presentation note or exclude the KPI agenda.":
+      "Lyhennä esityksen muistiinpanoa tai jätä mittariagenda pois.",
     "Customer overview": "Asiakkaan perustiedot",
     "Reset dashboard": "Palauta oletusnäkymä",
     "Lindström assistant": "Lindström-apuri",
