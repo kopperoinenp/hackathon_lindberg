@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Lindström — Customer workspace</title>
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="slides.css" />
     <link rel="stylesheet" href="brand.css" />
     <script src="language.js" defer></script>
     <script src="dataset.js" defer></script>
@@ -15,6 +16,8 @@
     <script src="summary-charts.js" defer></script>
     <script src="meeting-model.js" defer></script>
     <script src="upsell-model.js" defer></script>
+    <script src="sales-model.js" defer></script>
+    <script src="slide-render.js" defer></script>
     <script src="app.js" defer></script>
   </head>
   <body>
@@ -74,26 +77,40 @@
       </section>
     </main>
     <main id="workspace" hidden>
+      <section id="today" aria-labelledby="today-title" hidden>
+        <h1 id="today-title" tabindex="-1">Choose a customer</h1>
+        <input
+          id="customer-search"
+          type="search"
+          role="combobox"
+          aria-labelledby="today-title"
+          aria-controls="today-list"
+          aria-expanded="true"
+          aria-autocomplete="list"
+          autocomplete="off"
+          placeholder="Search by name or industry"
+        />
+        <p id="customer-load-status" role="status"></p>
+        <p id="today-label" class="quiet"></p>
+        <div id="today-list" role="listbox" aria-labelledby="today-title"></div>
+      </section>
       <div class="toolbar">
         <span id="review-storage-status" role="status" aria-live="polite"></span>
-        <button id="reset-dashboard" class="text-button" type="button">Reset dashboard</button>
+        <button id="back-today" class="text-button" type="button">Change customer</button>
         <label for="customer">Customer<select id="customer"></select></label
-        ><button id="open-review" class="primary">
-          Open presentation <span aria-hidden="true">↗</span>
+        ><button id="approve-review" class="primary" type="button">
+          Approve and create PowerPoint
         </button>
-        <a
-          id="download-powerpoint"
-          class="download-icon"
-          aria-label="Download PowerPoint"
-          aria-disabled="true"
-          title="Generate the presentation first"
+        <span id="approved-status" hidden>Approved</span>
+        <a id="download-powerpoint" class="primary" aria-disabled="true" hidden
+          >Download PowerPoint</a
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M12 3v12m-5-5 5 5 5-5M5 16v5h14v-5" />
-          </svg>
-        </a>
+        <button id="open-review" class="secondary" hidden>
+          Open slideshow <span aria-hidden="true">↗</span>
+        </button>
       </div>
       <section id="query-result" aria-live="polite" hidden></section>
+      <section id="deck" aria-label="Slides" aria-live="polite"></section>
       <section id="customer-overview" aria-label="Customer overview" aria-live="polite"></section>
       <section id="summary-panel" role="tabpanel" aria-labelledby="summary-tab">
         <details id="data-import-reports" class="review-priorities" hidden>
@@ -101,11 +118,6 @@
           <div id="data-import-result"></div>
         </details>
         <div id="story" aria-live="polite"></div>
-        <section
-          id="upsell-proposals"
-          class="review-priorities"
-          aria-labelledby="upsell-title"
-        ></section>
       </section>
       <section id="analysis-panel" role="tabpanel" aria-labelledby="analysis-tab" hidden>
         <div class="analysis-heading">
@@ -113,129 +125,10 @@
           <h1>Explore customer data</h1>
           <p>Filter the data to see what drives the findings.</p>
         </div>
-        <section class="review-priorities" aria-labelledby="relationship-title">
-          <h2 id="relationship-title">Customer relationship</h2>
-          <p>Internal KAM assessment. Only shown in Explore data, never on presentation slides.</p>
-          <label for="relationship-description">Describe the customer relationship</label>
-          <textarea id="relationship-description" rows="3" maxlength="2000"></textarea>
-          <button id="assess-relationship" type="button" class="text-button">
-            Ask the assistant to assess
-          </button>
-          <label for="relationship-status">Relationship status</label>
-          <select id="relationship-status">
-            <option value="unrated">Not assessed</option>
-            <option value="green">Green – cooperation is going well</option>
-            <option value="yellow">Yellow – needs attention</option>
-            <option value="red">Red – action required</option>
-          </select>
-          <p id="relationship-result" role="status"></p>
-        </section>
-        <form id="filters" class="filter-grid">
-          <label for="from">From<select id="from"></select></label
-          ><label for="to">To<select id="to"></select></label
-          ><label for="continent"
-            >Continent<select id="continent">
-              <option value="all">All continents</option>
-              <option value="Europe">Europe</option>
-            </select></label
-          ><label for="country">Country<select id="country"></select></label
-          ><label for="site">Site<select id="site"></select></label
-          ><label for="baseline"
-            >Baseline<select id="baseline">
-              <option value="B_LOCAL">Local outsourced laundry</option>
-              <option value="B_HOME">Home laundering</option>
-              <option value="B_INHOUSE">In-house laundry</option>
-            </select></label
-          ><label for="priority"
-            >Review focus<select id="priority">
-              <option value="neutral">No specific focus</option>
-              <option value="water">Water</option>
-              <option value="emissions">Emissions</option>
-              <option value="efficiency">Textile use</option>
-              <option value="circularity">Repairs</option>
-            </select></label
-          ><button type="button" id="reset" class="secondary">Reset filters</button>
-        </form>
         <p class="quiet">
           Filters also apply to the customer review and presentation. The dataset contains 2025
           monthly data from Finland, Sweden and Poland. All sites are in Europe.
         </p>
-        <section class="review-priorities review-content" aria-labelledby="review-content-title">
-          <span class="section-kicker">CUSTOMER REVIEW CONTENT</span>
-          <h2 id="review-content-title">What the customer sees</h2>
-          <p class="quiet">
-            These choices update the Customer review, the view shown to the customer.
-          </p>
-          <div id="review-basics-picker"></div>
-          <div id="review-area-picker"></div>
-          <div id="review-area-gaps"></div>
-          <div id="review-next-steps"></div>
-          <p class="quiet">
-            Status colours are shown once thresholds have been agreed with the customer.
-          </p>
-          <label for="meeting-note" class="review-note-label"
-            >Note for the review and presentation</label
-          >
-          <textarea
-            id="meeting-note"
-            maxlength="2000"
-            placeholder="E.g. a customer goal or an agreed next step…"
-          ></textarea>
-          <p class="quiet">
-            Shown in the review opening until the customer, site or baseline changes.
-          </p>
-          <button type="button" class="secondary" data-view="summary">Show customer review</button>
-        </section>
-        <section
-          id="customer-profile-kpis"
-          class="review-priorities"
-          aria-labelledby="review-priorities-title"
-        >
-          <span class="section-kicker">CUSTOMER FOCUS</span>
-          <h2 id="review-priorities-title">Contract KPIs and meeting agenda</h2>
-          <p class="quiet">
-            Keep the shared review and highlight up to three KPIs agreed with this customer.
-          </p>
-          <div id="contract-agenda" aria-live="polite"></div>
-          <details id="manage-contract-kpis">
-            <summary>Manage contract KPIs</summary>
-            <form id="contract-kpi-form" class="contract-kpi-form">
-              <label for="contract-kpi-name"
-                >KPI name<input id="contract-kpi-name" name="label" maxlength="80" required
-              /></label>
-              <label for="contract-kpi-area"
-                >Evidence area<select id="contract-kpi-area" name="area"></select
-              ></label>
-              <label for="contract-kpi-actual"
-                >Actual and unit<input id="contract-kpi-actual" name="actual" maxlength="40"
-              /></label>
-              <label for="contract-kpi-target"
-                >Target and unit<input id="contract-kpi-target" name="target" maxlength="40"
-              /></label>
-              <label for="contract-kpi-source"
-                >Source or reporting period<input
-                  id="contract-kpi-source"
-                  name="source"
-                  maxlength="100"
-              /></label>
-              <label class="kpi-checkbox"
-                ><input type="checkbox" name="priority" /> Highlight on the meeting agenda</label
-              >
-              <div class="kpi-actions">
-                <button type="submit" class="secondary">Save KPI</button>
-                <button type="button" id="cancel-contract-kpi" class="text-button" hidden>
-                  Cancel edit
-                </button>
-              </div>
-            </form>
-            <ul id="contract-kpi-list" class="contract-kpi-list"></ul>
-          </details>
-          <label class="kpi-checkbox"
-            ><input id="include-contract-agenda" type="checkbox" /><span
-              >Include highlighted KPIs in the presentation</span
-            ></label
-          >
-        </section>
         <section class="review-priorities" aria-labelledby="review-evidence-title">
           <span class="section-kicker">SHARED REVIEW</span>
           <h2 id="review-evidence-title">Evidence and industry context</h2>
@@ -253,6 +146,151 @@
         </section>
         <div id="analysis-content" aria-live="polite"></div>
       </section>
+      <aside id="review-editor" aria-label="Review settings" hidden>
+        <section class="review-priorities review-content" aria-labelledby="review-content-title">
+          <div class="review-editor-heading">
+            <div>
+              <span class="section-kicker">MEETING PREP</span>
+              <h2 id="review-content-title">Prepare the meeting</h2>
+            </div>
+          </div>
+          <p class="quiet">Only you see this panel. Changes update the review right away.</p>
+          <div id="meeting-advice"></div>
+          <div id="sales-signals"></div>
+          <details id="upsell-details">
+            <summary>Service opportunities</summary>
+            <section
+              id="upsell-proposals"
+              class="review-priorities"
+              aria-labelledby="upsell-title"
+            ></section>
+          </details>
+          <div id="review-area-picker"></div>
+          <div id="review-area-gaps"></div>
+          <details id="after-meeting">
+            <summary>After the meeting</summary>
+            <label for="kam-notes"
+              >Your meeting notes<textarea
+                id="kam-notes"
+                maxlength="2000"
+                placeholder="What did the customer say?"
+              ></textarea>
+            </label>
+            <div id="review-next-steps"></div>
+            <button id="copy-summary" class="secondary" type="button">Copy summary</button>
+            <p id="copy-status" class="quiet" role="status"></p>
+          </details>
+          <details id="more-settings">
+            <summary>More settings</summary>
+            <div id="review-basics-picker"></div>
+            <label for="meeting-note" class="review-note-label"
+              >Note for the review and presentation</label
+            >
+            <textarea
+              id="meeting-note"
+              maxlength="2000"
+              placeholder="E.g. a customer goal or an agreed next step…"
+            ></textarea>
+            <p class="quiet">
+              Shown in the review opening until the customer, site or baseline changes.
+            </p>
+            <form id="filters" class="filter-grid">
+              <label for="from">From<select id="from"></select></label
+              ><label for="to">To<select id="to"></select></label
+              ><label for="continent"
+                >Continent<select id="continent">
+                  <option value="all">All continents</option>
+                  <option value="Europe">Europe</option>
+                </select></label
+              ><label for="country">Country<select id="country"></select></label
+              ><label for="site">Site<select id="site"></select></label
+              ><label for="baseline"
+                >Baseline<select id="baseline">
+                  <option value="B_LOCAL">Local outsourced laundry</option>
+                  <option value="B_HOME">Home laundering</option>
+                  <option value="B_INHOUSE">In-house laundry</option>
+                </select></label
+              ><label for="priority"
+                >Review focus<select id="priority">
+                  <option value="neutral">No specific focus</option>
+                  <option value="water">Water</option>
+                  <option value="emissions">Emissions</option>
+                  <option value="efficiency">Textile use</option>
+                  <option value="circularity">Repairs</option>
+                </select></label
+              ><button type="button" id="reset" class="secondary">Reset filters</button>
+            </form>
+            <section
+              id="customer-profile-kpis"
+              class="review-priorities"
+              aria-labelledby="review-priorities-title"
+            >
+              <span class="section-kicker">CUSTOMER FOCUS</span>
+              <h2 id="review-priorities-title">Contract KPIs and meeting agenda</h2>
+              <p class="quiet">
+                Keep the shared review and highlight up to three KPIs agreed with this customer.
+              </p>
+              <div id="contract-agenda" aria-live="polite"></div>
+              <details id="manage-contract-kpis">
+                <summary>Manage contract KPIs</summary>
+                <form id="contract-kpi-form" class="contract-kpi-form">
+                  <label for="contract-kpi-name"
+                    >KPI name<input id="contract-kpi-name" name="label" maxlength="80" required
+                  /></label>
+                  <label for="contract-kpi-area"
+                    >Evidence area<select id="contract-kpi-area" name="area"></select
+                  ></label>
+                  <label for="contract-kpi-actual"
+                    >Actual and unit<input id="contract-kpi-actual" name="actual" maxlength="40"
+                  /></label>
+                  <label for="contract-kpi-target"
+                    >Target and unit<input id="contract-kpi-target" name="target" maxlength="40"
+                  /></label>
+                  <label for="contract-kpi-source"
+                    >Source or reporting period<input
+                      id="contract-kpi-source"
+                      name="source"
+                      maxlength="100"
+                  /></label>
+                  <label class="kpi-checkbox"
+                    ><input type="checkbox" name="priority" /> Highlight on agenda
+                  </label>
+                  <div class="kpi-actions">
+                    <button type="submit" class="secondary">Save KPI</button>
+                    <button type="button" id="cancel-contract-kpi" class="text-button" hidden>
+                      Cancel edit
+                    </button>
+                  </div>
+                </form>
+                <ul id="contract-kpi-list" class="contract-kpi-list"></ul>
+              </details>
+              <label class="kpi-checkbox"
+                ><input id="include-contract-agenda" type="checkbox" /><span
+                  >Include highlighted KPIs in the presentation</span
+                ></label
+              >
+            </section>
+            <section class="review-priorities" aria-labelledby="relationship-title">
+              <h2 id="relationship-title">Customer relationship</h2>
+              <p>Internal KAM assessment. Only you see it, never on presentation slides.</p>
+              <label for="relationship-description">Describe the customer relationship</label>
+              <textarea id="relationship-description" rows="3" maxlength="2000"></textarea>
+              <button id="assess-relationship" type="button" class="text-button">
+                Ask the assistant to assess
+              </button>
+              <label for="relationship-status">Relationship status</label>
+              <select id="relationship-status">
+                <option value="unrated">Not assessed</option>
+                <option value="green">Green – cooperation is going well</option>
+                <option value="yellow">Yellow – needs attention</option>
+                <option value="red">Red – action required</option>
+              </select>
+              <p id="relationship-result" role="status"></p>
+            </section>
+            <button id="reset-dashboard" class="text-button" type="button">Reset dashboard</button>
+          </details>
+        </section>
+      </aside>
       <footer>
         <button id="open-evidence" class="text-button">Sources and methods</button
         ><span>Customer workspace · Synthetic data</span>

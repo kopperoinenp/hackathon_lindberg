@@ -32,6 +32,37 @@ const defaults = {
   baseline: "B_LOCAL",
   priority: "neutral",
 };
+function validAreaStats(stats) {
+  return (
+    Array.isArray(stats) &&
+    stats.length <= 3 &&
+    stats.every(
+      (stat) =>
+        typeof stat?.value === "string" &&
+        stat.value.length <= 40 &&
+        typeof stat.label === "string" &&
+        stat.label.length <= 80,
+    )
+  );
+}
+function validAreaChart(chart) {
+  if (chart == null) return true;
+  const text = (value) => typeof value === "string" && value.length <= 80;
+  const numbers = (list) =>
+    Array.isArray(list) &&
+    list.length <= 24 &&
+    list.every((value) => value === null || Number.isFinite(value));
+  return (
+    chart.type === "line" &&
+    text(chart.name) &&
+    Array.isArray(chart.labels) &&
+    chart.labels.length <= 24 &&
+    chart.labels.every(text) &&
+    numbers(chart.values) &&
+    (chart.reference == null || numbers(chart.reference)) &&
+    (chart.referenceName == null || text(chart.referenceName))
+  );
+}
 export function validateRequest(input) {
   if (!data)
     throw new PresentationError("Analysis is unavailable until a valid dataset is loaded.", 503);
@@ -121,10 +152,41 @@ export function validateRequest(input) {
   const approvedUpsells = input.approvedUpsells ?? [];
   if (!globalThis.UpsellModel.validApprovals(approvedUpsells, scope.customer))
     throw new PresentationError("Invalid customer opportunity approvals.");
+  const reviewAreas = input.reviewAreas ?? [];
+  const shortText = (value, limit) => typeof value === "string" && value.length <= limit;
+  if (
+    !Array.isArray(reviewAreas) ||
+    reviewAreas.length > 9 ||
+    reviewAreas.some(
+      (area) =>
+        !/^[a-z]+$/.test(area?.id ?? "") ||
+        !shortText(area.title, 160) ||
+        !shortText(area.headline, 400) ||
+        !shortText(area.note, 2000) ||
+        !validAreaChart(area.chart) ||
+        !validAreaStats(area.stats ?? []) ||
+        !Array.isArray(area.points) ||
+        area.points.length > 4 ||
+        area.points.some((point) => !shortText(point, 160)),
+    )
+  )
+    throw new PresentationError("Invalid review content.");
   return {
     scope,
+    reviewAreas: reviewAreas.map(
+      ({ id, title, headline, points, note, chart = null, stats = [] }) => ({
+        id,
+        title,
+        headline,
+        points: [...points],
+        note,
+        chart,
+        stats: stats.map(({ value, label }) => ({ value, label })),
+      }),
+    ),
     approvedUpsells: approvedUpsells.map((approval) => ({ ...approval })),
     included,
+    hideUsage: input.hideUsage === true,
     note,
     titleEdits,
     slideOrder: [...slideOrder],
@@ -185,7 +247,7 @@ export function buildPresentation(input) {
       paragraphs: [
         t`Textile counts and scan coverage reflect ${m.snapshotMonth}. Washed weight and repairs cover the full period. Scan coverage helps identify where to investigate actual use.`,
         t(
-          "For service and product breakdowns, see Explore data in the workspace. Unique wearer counts require person identifiers.",
+          "For service and product breakdowns, ask your account manager. Unique wearer counts require person identifiers.",
         ),
       ],
       source: "Sites, Service_Activity, Repairs",
@@ -330,14 +392,92 @@ export function buildPresentation(input) {
       ],
     },
   };
+  if (request.hideUsage)
+    for (const slide of Object.values(slides)) {
+      const usage = /scan|skann/iu;
+      slide.paragraphs = slide.paragraphs?.filter((text) => !usage.test(text));
+      slide.facts = slide.facts?.filter((fact) => !usage.test(fact.label));
+    }
+  const delta = (value) => f(Math.abs(value));
+  const kpi = (value, label) => ({ value, label });
+  Object.assign(slides.cover, {
+    layout: "cover",
+    kicker: t("Customer review"),
+    lead: t("Key results and shared priorities for 2026."),
+    kpis: [
+      kpi(f(m.sites), t(m.sites === 1 ? "site" : "sites")),
+      kpi(f(m.allocated), t("textiles in service")),
+      kpi(f(m.repairs), t("repairs")),
+    ],
+  });
+  Object.assign(slides.overview, {
+    layout: "kpis",
+    kicker: t("The service in numbers"),
+    kpis: [
+      kpi(f(m.sites), t("Sites")),
+      kpi(f(m.allocated), t("Textiles in service")),
+      kpi(`${f(m.kg / 1000)} t`, t("Washed")),
+      kpi(f(m.repairs), t("Repairs")),
+    ],
+  });
+  Object.assign(slides.water, {
+    layout: "hero",
+    kicker: t("Environment"),
+    hero: slides.water.value,
+    lead:
+      c.waterDifference >= 0
+        ? t`${delta(c.waterDifference / 1000)} m³ less water than the comparison`
+        : t`${delta(c.waterDifference / 1000)} m³ more water than the comparison`,
+  });
+  Object.assign(slides.emissions, {
+    layout: "hero",
+    kicker: t("Environment"),
+    hero: slides.emissions.value,
+    lead:
+      c.emissionsDifference >= 0
+        ? t`${f(Math.abs(c.emissionsDifference) / 1000, 1)} t CO₂e less than the comparison`
+        : t`${f(Math.abs(c.emissionsDifference) / 1000, 1)} t CO₂e more than the comparison`,
+  });
+  Object.assign(slides.repairs, {
+    layout: "hero",
+    kicker: t("Textile care"),
+    hero: slides.repairs.value,
+    lead: t("repairs kept textiles in use"),
+  });
+  slides.water.chart.type = "compare";
+  slides.emissions.chart.type = "compare";
+  slides.repairs.chart.type = "columns";
+  Object.assign(slides.opportunity, {
+    layout: "hero",
+    kicker: t("Where to start"),
+    hero: `${f(focus.utilization, 1)} %`,
+    lead: focus.site_name,
+  });
+  slides.opportunity.chart.type = "donut";
+  Object.assign(slides.plan, {
+    layout: "steps",
+    kicker: t("Next steps"),
+    steps: slides.plan.paragraphs.slice(0, 3).map((text) => text.split(/(?<=\.)\s/)[0]),
+  });
+  Object.assign(slides.sources, {
+    layout: "notes",
+    kicker: t("About the figures"),
+    fine: [t("Source: ") + data.source, slides.limits.paragraphs[0]],
+  });
+  for (const slide of Object.values(slides)) slide.added = [];
+  if (request.note) slides.plan.added.push(request.note);
   if (request.note) slides.plan.paragraphs.push(t`Account manager's note: ${request.note}`);
   if (request.savings !== null) {
     const estimate = t`Säästetty raha: ${f(request.savings)} € · KAM:in antama arvio, ei aineistosta laskettu tai todennettu säästö.`;
     slides.cover.paragraphs.unshift(estimate);
     slides.plan.paragraphs.push(estimate);
+    slides.cover.added.push(estimate);
   }
   for (const [id, text] of Object.entries(request.managerTexts))
-    if (text.trim()) slides[id].paragraphs.push(t`KAM:in lisäys: ${text}`);
+    if (text.trim()) {
+      slides[id].paragraphs.push(text.trim());
+      slides[id].added.push(text.trim());
+    }
   for (const id of insightIds)
     slides[id].relevance = globalThis.MeetingModel.relevance(
       id,
@@ -346,34 +486,70 @@ export function buildPresentation(input) {
       request.language,
     );
   const order = orderedSlides(
-    globalThis.MeetingModel.slideIds(ctx.order, request.included),
+    globalThis.MeetingModel.slideIds(
+      ctx.order,
+      request.included.filter((id) => !(request.hideUsage && id === "opportunity")),
+    ).filter((id) => id !== "limits"),
     request.slideOrder,
   );
+  const usage = /scan|skann/iu;
+  const visible = (text) => text && !(request.hideUsage && usage.test(text));
+  const areaSlides = request.reviewAreas.map((area) => {
+    const stats = area.stats.filter((stat) => visible(`${stat.value} ${stat.label}`));
+    return {
+      id: `area-${area.id}`,
+      kind: "area",
+      layout: "hero",
+      kicker: t("Customer priority"),
+      title: area.title,
+      hero: stats[0]?.value ?? "",
+      lead: stats[0]?.label ?? area.headline,
+      kpis: stats.slice(1, 3).map(({ value, label }) => kpi(value, label)),
+      chart: area.chart,
+      added: area.note ? [area.note] : [],
+      paragraphs: [area.headline, ...area.points, area.note].filter(visible),
+      source: t("Customer review"),
+    };
+  });
   return {
     request,
     customer: { name: customer.customer_name, industry: customer.industry },
     period,
     footer,
     slides: [
-      ...order.map((id) => ({ ...slides[id] })),
+      ...withReviewAreas(
+        order.map((id) => ({ ...slides[id] })),
+        areaSlides,
+      ),
       ...globalThis.UpsellModel.approved(
         globalThis.UpsellModel.proposals(data, request.scope, request.language),
         request.approvedUpsells,
-      ).map((proposal) => ({
-        id: `upsell-${proposal.id}`,
-        kind: "text",
-        title: proposal.title,
-        paragraphs: [
-          proposal.observation,
-          proposal.siteSummary,
-          proposal.benefit,
-          proposal.nextStep,
-          proposal.boundary,
-        ],
-        source: proposal.source,
-      })),
+      )
+        .filter((proposal) => !request.hideUsage || !/scan|skann/iu.test(JSON.stringify(proposal)))
+        .map((proposal) => ({
+          id: `upsell-${proposal.id}`,
+          kind: "text",
+          layout: "notes",
+          kicker: t("Service opportunity"),
+          fine: [proposal.observation, proposal.benefit, proposal.nextStep, proposal.boundary],
+          title: proposal.title,
+          paragraphs: [
+            proposal.observation,
+            proposal.siteSummary,
+            proposal.benefit,
+            proposal.nextStep,
+            proposal.boundary,
+          ],
+          source: proposal.source,
+        })),
     ],
   };
+}
+// Chosen review areas sit between the evidence and the plan, whatever the slide order.
+function withReviewAreas(slides, areas) {
+  const at = slides.findIndex((slide) => slide.id === "plan");
+  const place = at < 0 ? slides.length : at;
+  return [...slides.slice(0, place), ...areas, ...slides.slice(place)];
 }
 function orderedSlides(defaultIds, override = []) {
   return [
@@ -422,20 +598,22 @@ export function applyPlan(deck, plan) {
     ...(allowed.includes("opportunity") ? ["opportunity"] : []),
     "plan",
     "sources",
-    "limits",
   ];
   return {
     ...deck,
     slides: [
-      ...orderedSlides(ids, deck.request.slideOrder).map((id) => {
-        const slide = byId.get(id);
-        return {
-          ...slide,
-          title:
-            deck.request.titleEdits[id] ||
-            (choices.has(id) ? slide.headlineOptions[choices.get(id)] : slide.title),
-        };
-      }),
+      ...withReviewAreas(
+        orderedSlides(ids, deck.request.slideOrder).map((id) => {
+          const slide = byId.get(id);
+          return {
+            ...slide,
+            title:
+              deck.request.titleEdits[id] ||
+              (choices.has(id) ? slide.headlineOptions[choices.get(id)] : slide.title),
+          };
+        }),
+        deck.slides.filter((slide) => slide.id.startsWith("area-")),
+      ),
       ...deck.slides.filter((slide) => slide.id.startsWith("upsell-")),
     ],
   };

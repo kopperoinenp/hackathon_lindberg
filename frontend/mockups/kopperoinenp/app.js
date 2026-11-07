@@ -43,7 +43,6 @@
   }
   $("#dataset-status").hidden = true;
   $("#workspace").hidden = false;
-  $(".view-tabs").hidden = false;
   const countryName = (country) => t(globalThis.WorkspaceModel.countryNames[country]);
   const f = (number, digits = 0) =>
     new Intl.NumberFormat(t("en-GB"), { maximumFractionDigits: digits }).format(number);
@@ -79,6 +78,11 @@
     evidenceAreas: null,
     // Customer basics shown before the figures; null means the full set.
     customerBasics: null,
+    // Private notes from the meeting; never shown to the customer.
+    meetingNotes: "",
+    // Who the account manager is meeting, and usage figures kept out of the customer view.
+    audience: "",
+    hideUsage: false,
     // Next steps written by the KAM for section 03: {title, owner, due}.
     nextSteps: [],
     areaTitles: {},
@@ -101,6 +105,15 @@
     saveTimer;
   let saveQueue = Promise.resolve();
   let switchingReview = false;
+  // home = today's customers, prepare = the manager's view, present = what the customer sees.
+  let mode = "home";
+  let presentationJob = null;
+  let deckTimer;
+  let deckRequest = "";
+  let deckSlides = [];
+  let deckFooter = "";
+  let approvedRequest = null;
+  let searchIndex = 0;
   let storageMessage;
   const reviewSignature = (workspace) => JSON.stringify({ ...workspace, view: undefined });
   function storageStatus(fi, en) {
@@ -161,6 +174,7 @@
   }
   async function loadCustomerReview(customer) {
     storageLoading = true;
+    $("#customer-load-status").textContent = "";
     state.chatRevision += 1;
     toggleChatMenu(false);
     $("#workspace").inert = true;
@@ -173,6 +187,8 @@
       });
       const record = await response.json();
       if (!response.ok) throw new Error(record.error || "Load failed");
+      if (record.workspace && record.workspace.scope.customer !== customer)
+        throw new Error("Review belongs to another customer.");
       const revision = state.chatRevision;
       openAreas.clear();
       $("#data-import-form").reset();
@@ -201,6 +217,9 @@
           "contractKpis",
           "includeContractAgenda",
           "approvedUpsells",
+          "audience",
+          "hideUsage",
+          "meetingNotes",
         ])
           state[key] = record.workspace[key];
         // Evidence blocks, customer basics and next steps, when the backend stores them.
@@ -223,6 +242,7 @@
         "Valitun asiakkaan katsausta ei voitu ladata. Kokeile toista asiakasta.",
         "Could not load the selected review. Try another customer.",
       );
+      $("#customer-load-status").textContent = $("#review-storage-status").textContent;
       return false;
     } finally {
       storageLoading = false;
@@ -304,7 +324,7 @@
     ["standard", "Standard", "Regular review", ["scope", "year"]],
     ["full", "Full", "First review or new contacts", basicsSections.map(([id]) => id)],
   ];
-  const customerBasics = () => state.customerBasics ?? basicsPresets[2][3];
+  const customerBasics = () => state.customerBasics ?? basicsPresets[0][3];
   function applyBasicsSelection() {
     const chosen = customerBasics();
     const overview = $("#customer-overview");
@@ -645,11 +665,6 @@
         )}</select></div><div class="trend-chart" style="grid-template-columns:repeat(${points.length}, minmax(0,1fr))" role="img" aria-label="${t(def.label)}: ${points.map((point) => `${point.month} ${f(point.value / def.divisor, 1)} ${def.unit}`).join(", ")}">${points.map((point) => `<div class="trend-column"><span>${f(point.value / def.divisor)}</span><div class="trend-track"><i style="height:${(point.value / max) * 100}%"></i></div><small>${point.month.slice(5)}</small></div>`).join("")}</div><p class="quiet">${t(def.label)} (${def.unit}) · Synthetic ${state.metric === "repairs" ? t("event count") : t("allocated estimate")}. Monthly totals reflect service volume.</p></section><section class="analysis-card"><h2>Breakdown by country</h2>${countries.map((point) => `<div class="country-row"><div><span>${countryName(point.country)}</span><strong>${f(point.value / def.divisor, 1)} ${def.unit}</strong></div><div class="bar-track"><div class="bar-fill" style="width:${(point.value / countryMax) * 100}%"></div></div></div>`).join("")}<p class="quiet">${t(def.label)} for the selected period. Country totals reflect service volume.</p></section></div><section class="analysis-card"><h2>Sites and textile use</h2><p class="quiet">Snapshot for ${snapshotName()}. Scan coverage flags where to investigate. Water and repairs cover the full period.</p><div class="table-wrap"><table><thead><tr><th>Site</th><th>Country</th><th>Scanned</th><th>Allocated</th><th>Water, m³</th><th>Repairs</th></tr></thead><tbody>${ctx.sites.map((site) => t`<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${countryName(site.country)}</td><td>${site.utilization == null ? t("Unavailable") : f(site.utilization, 1) + " %"}</td><td>${f(site.allocated)}</td><td>${f(site.water / 1000)}</td><td>${f(site.repairs)}</td></tr>`).join("")}</tbody></table></div></section>${detailedAnalysis()}`;
   }
   function render() {
-    const customerOverview = $("#customer-overview");
-    if (customerOverview) {
-      customerOverview.hidden = false;
-      $("#summary-panel").before(customerOverview);
-    }
     $("#customer").value = state.customer;
     invalidatePowerPoint();
     const ctx = context();
@@ -676,9 +691,19 @@
         .join("");
     for (const id of ["site", "baseline", "priority", "country", "continent"])
       $("#" + id).value = state[id];
-    $("#summary-panel").hidden = state.view !== "summary";
-    $("#analysis-panel").hidden = state.view !== "analysis";
-    $("#composer").hidden = false;
+    const preparing = mode === "prepare";
+    const analyzing = preparing && state.view === "analysis";
+    $(".view-tabs").hidden = !preparing;
+    $("#summary-panel").hidden = !preparing || analyzing;
+    $("#analysis-panel").hidden = !analyzing;
+    $("#deck").hidden = !preparing || analyzing;
+    document.body.dataset.mode = mode;
+    $("#today").hidden = mode !== "home";
+    $(".toolbar").hidden = !preparing;
+    $("#review-editor").hidden = !preparing;
+    $("#workspace").classList.toggle("editing", preparing);
+    if (!preparing) toggleChatMenu(false);
+    $("#composer").hidden = !preparing;
     renderQueryResult();
     renderDataImport();
     for (const view of ["summary", "analysis"]) {
@@ -688,7 +713,7 @@
     }
     $("#open-review").disabled = !ctx.metrics.hasData || state.generating || !state.included.length;
     $("#summary-panel").before($("#customer-overview"));
-    $("#customer-overview").hidden = false;
+    $("#customer-overview").hidden = !analyzing;
     renderCustomerOverview();
     renderReviewEvidence();
     renderRelationship();
@@ -699,7 +724,9 @@
     renderDashboardLayout();
     if (state.view === "analysis") renderAnalysis();
     $("#composer").inert = switchingReview || storageLoading || !storageReady;
+    if (mode === "home") renderToday();
     scheduleReviewSave();
+    scheduleDeck();
   }
   let assessingRelationship = false;
   function renderRelationship() {
@@ -1148,14 +1175,18 @@
       ),
     ].join("")}</dl></section>`;
   }
-  function renderCustomerOverview() {
-    const overview = globalThis.WorkspaceModel.customerOverview(data, state.customer);
-    const industry =
+  function industryName(industry) {
+    return (
       {
         "Food & Beverage": t("Elintarviketeollisuus"),
         Manufacturing: t("Teollisuus"),
         Healthcare: t("Terveydenhuolto"),
-      }[overview.customer.industry] || overview.customer.industry;
+      }[industry] || industry
+    );
+  }
+  function renderCustomerOverview() {
+    const overview = globalThis.WorkspaceModel.customerOverview(data, state.customer);
+    const industry = industryName(overview.customer.industry);
     $("#customer-overview").innerHTML = t`
       <div class="customer-overview-heading"><div><span class="section-kicker">ASIAKKAAN PERUSTIEDOT</span>
       <h2>${esc(overview.customer.customer_name)}</h2>
@@ -1365,15 +1396,30 @@
     return t`<div class="site-benchmark"><div><h3>${shown.length === 1 ? t("Scan coverage at the selected site") : shown.length + t(" sites with the lowest scan coverage")}</h3><p class="quiet">${snapshotName()} · Starting point for a joint review.</p></div><div class="site-ranking">${shown.map((site) => `<div><span>${esc(site.site_name)}</span><div><i style="width:${Math.min(site.utilization, 100)}%"></i></div><strong>${f(site.utilization, 1)} %</strong></div>`).join("")}</div></div>`;
   }
   function defaultAreas() {
-    const topics = (context().customer.priority_topics || "").split("|");
-    const wanted = new Set(["scorecard", "future", ...topics.map((topic) => topicAreas[topic])]);
-    return evidenceAreas.map(([id]) => id).filter((id) => wanted.has(id));
+    return priorityAreas().map(({ id }) => id);
+  }
+  // The few areas that matter most: who the manager is meeting, then what the customer cares about.
+  function priorityAreas() {
+    const audience = globalThis.SalesModel.audiences[state.audience];
+    const found = new Map();
+    const add = (id, reason) => {
+      if (id && !found.has(id) && !(state.hideUsage && id === "adoption")) found.set(id, reason);
+    };
+    if (audience)
+      for (const id of audience.areas) add(id, audience[language === "fi" ? "fi" : "en"]);
+    else add("scorecard", t("Overall picture"));
+    for (const topic of (context().customer.priority_topics || "").split("|"))
+      add(topicAreas[topic], `${t("Customer priority")}: ${t(topic)}`);
+    if (!audience) add("future", t("Next steps"));
+    return [...found].slice(0, 4).map(([id, reason]) => ({ id, reason }));
   }
   function customerAreas() {
-    return state.evidenceAreas ?? defaultAreas();
+    const areas = state.evidenceAreas ?? defaultAreas();
+    return state.hideUsage ? areas.filter((id) => id !== "adoption") : areas;
   }
   function areaOrder(ids) {
-    return evidenceAreas.map(([id]) => id).filter((id) => ids.has(id));
+    const rank = [...priorityAreas().map(({ id }) => id), ...evidenceAreas.map(([id]) => id)];
+    return [...new Set(rank)].filter((id) => ids.has(id));
   }
   const areaFamilies = {
     scorecard: "summary",
@@ -1620,7 +1666,7 @@
           .reduce((total, route) => total + (route.share ?? 0), 0) * 100
       : null;
     const lower = c.emissionsDifference >= 0;
-    // Customer-facing text stays neutral; the KAM hint is shown only in Explore data.
+    // Customer-facing text stays neutral; the KAM hint is shown only in the review settings.
     const noData = (hint) => ({
       headline: t("To be agreed together"),
       text: t("Measures for this area will be agreed with you and followed in future reviews."),
@@ -1762,6 +1808,214 @@
       },
     };
   }
+  // What the manager approves is what the file contains: each chosen area becomes a slide.
+  function reviewAreas() {
+    if (!context().metrics.hasData) return [];
+    const evidence = areaEvidence();
+    const monthly = monthlyEvidence();
+    const previous = previousYear();
+    const kpis = customerKpis();
+    const plain = (value) =>
+      String(value)
+        .replace(/<[^>]*>/g, "")
+        .trim();
+    return customerAreas()
+      .filter((id) => id !== "scorecard")
+      .filter((id) => !evidence[id]?.missing || kpis.some((kpi) => kpi.area === id && kpi.actual))
+      .map((id) => {
+        const block = evidence[id] ?? {};
+        const kpi = kpis.find((item) => item.area === id && item.actual);
+        const stats = (block.stats ?? []).slice(0, 3).map(([value, label]) => ({
+          value: plain(value).slice(0, 40),
+          label: plain(label).slice(0, 80),
+        }));
+        return {
+          id,
+          title: (state.areaTitles[id] || t(evidenceAreas.find(([area]) => area === id)[1])).slice(
+            0,
+            160,
+          ),
+          headline: plain(
+            block.missing && kpi ? `${kpi.label}: ${kpi.actual}` : (block.headline ?? ""),
+          ).slice(0, 400),
+          points: (block.stats ?? [])
+            .slice(0, 4)
+            .map(([value, label]) => plain(`${value} ${label}`).slice(0, 160)),
+          stats:
+            block.missing && kpi
+              ? [{ value: kpi.actual.slice(0, 40), label: kpi.label.slice(0, 80) }]
+              : stats,
+          note: (state.areaNotes[id] ?? "").slice(0, 2000),
+          chart: areaChart(id, monthly, previous),
+        };
+      });
+  }
+  // The same monthly series the review draws, as data the slide and PowerPoint can both use.
+  function areaChart(id, monthly, previous) {
+    const names = {
+      performance: "On time, % per month",
+      adoption: "Scanned, % per month",
+      operations: "Repairs per month",
+      sustainability: "Lindström, t CO₂e per month",
+    };
+    if (!names[id] || !monthly[id]?.length) return null;
+    const round = (value) => (value == null ? null : Math.round(value * 10) / 10);
+    const points = monthly[id];
+    const baseline = id === "sustainability";
+    const reference = baseline
+      ? points.map((point) => round(point.reference))
+      : previous?.monthly[id]?.map((point) => round(point.value));
+    const usable = reference?.length === points.length && reference.some((value) => value != null);
+    return {
+      type: "line",
+      name: t(names[id]),
+      labels: points.map((point) => (point.month ?? point.label ?? "").slice(-2)),
+      values: points.map((point) => round(point.value)),
+      reference: usable ? reference : null,
+      referenceName: usable ? (baseline ? baselineName() : previous.label) : null,
+    };
+  }
+  function scheduleDeck() {
+    clearTimeout(deckTimer);
+    if (mode !== "prepare") return;
+    deckTimer = setTimeout(refreshDeck, 150);
+  }
+  async function refreshDeck() {
+    if (!context().metrics.hasData) {
+      deckRequest = "";
+      $("#deck").innerHTML = `<p class="quiet">${t("No data matches the filters.")}</p>`;
+      return;
+    }
+    const request = JSON.stringify(presentationRequest());
+    if (request === deckRequest) return;
+    deckRequest = request;
+    try {
+      const response = await fetch(`/api/presentations/preview?lang=${language}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: request,
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      if (request !== deckRequest) return;
+      deckSlides = result.slides;
+      deckFooter = result.footer;
+      renderDeck();
+    } catch (error) {
+      if (request === deckRequest) {
+        deckRequest = "";
+        status(error.message || t("Could not create the presentation. Try again."));
+      }
+    }
+  }
+  const fixedSlides = ["cover", "sources", "limits"];
+  function slideKind(id) {
+    if (id.startsWith("area-")) return "area";
+    if (id.startsWith("upsell-")) return "upsell";
+    return "main";
+  }
+  function slideNote(id) {
+    return slideKind(id) === "area"
+      ? (state.areaNotes[id.slice(5)] ?? "")
+      : (state.managerTexts[id] ?? "");
+  }
+  function renderDeck() {
+    const { insightIds } = globalThis.MeetingModel;
+    const main = deckSlides.filter((slide) => slideKind(slide.id) === "main").map(({ id }) => id);
+    const removable = (id) =>
+      slideKind(id) !== "main" || (insightIds.includes(id) && state.included.length > 1);
+    const movable = (id) => slideKind(id) === "main" && !fixedSlides.includes(id);
+    const hidden = insightIds.filter((id) => !state.included.includes(id));
+    const open = new Set(
+      [...document.querySelectorAll(".slide-note:not([hidden])")].map(
+        (note) => note.dataset.slideNote,
+      ),
+    );
+    $("#deck").innerHTML =
+      deckSlides
+        .map((slide) => {
+          const { id } = slide;
+          const position = main.indexOf(id);
+          const titled = slideKind(id) !== "upsell";
+          const noted = slideKind(id) !== "upsell";
+          return `<div class="deck-item" data-slide="${esc(id)}">${globalThis.SlideRender.html(slide, deckFooter, t, { editableTitle: titled })}<div class="deck-actions">${noted ? `<button type="button" data-slide-action="note">${t("Add text")}</button>` : ""}<button type="button" data-slide-action="ask">${t("Ask the assistant")}</button>${movable(id) && movable(main[position - 1] ?? "cover") ? `<button type="button" data-slide-action="up" aria-label="${t("Move up")}">↑</button>` : ""}${movable(id) && movable(main[position + 1] ?? "limits") ? `<button type="button" data-slide-action="down" aria-label="${t("Move down")}">↓</button>` : ""}${removable(id) ? `<button type="button" data-slide-action="remove">${t("Remove slide")}</button>` : ""}</div>${noted ? `<textarea class="slide-note" data-slide-note="${esc(id)}" maxlength="2000" aria-label="${t("Add text")}" ${open.has(id) ? "" : "hidden"}>${esc(slideNote(id))}</textarea>` : ""}</div>`;
+        })
+        .join("") +
+      (hidden.length
+        ? `<p class="deck-hidden">${t("Removed slides")}: ${hidden.map((id) => `<button type="button" class="text-button" data-slide-restore="${id}">${t("Restore")} ${esc(t(id))}</button>`).join(" ")}</p>`
+        : "");
+  }
+  function slideChanged() {
+    state.chatRevision += 1;
+    render();
+  }
+  function commitTitle(element) {
+    const id = element.dataset.slideTitle;
+    const title = element.textContent.trim();
+    if (!title || title === deckSlides.find((slide) => slide.id === id)?.title) return;
+    if (slideKind(id) === "area") state.areaTitles[id.slice(5)] = title.slice(0, 150);
+    else state.titleEdits[id] = title.slice(0, 150);
+    slideChanged();
+  }
+  document.addEventListener("focusout", (event) => {
+    if (event.target.dataset?.slideTitle) commitTitle(event.target);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && event.target.dataset?.slideTitle) {
+      event.preventDefault();
+      event.target.blur();
+    }
+  });
+  document.addEventListener("change", (event) => {
+    const id = event.target.dataset?.slideNote;
+    if (!id) return;
+    const text = event.target.value;
+    if (slideKind(id) === "area") state.areaNotes[id.slice(5)] = text;
+    else state.managerTexts[id] = text;
+    slideChanged();
+  });
+  document.addEventListener("click", (event) => {
+    const restore = event.target.closest("[data-slide-restore]");
+    if (restore) {
+      state.included = [...state.included, restore.dataset.slideRestore];
+      slideChanged();
+      return;
+    }
+    const button = event.target.closest("[data-slide-action]");
+    if (!button) return;
+    const item = button.closest("[data-slide]");
+    const id = item.dataset.slide;
+    const action = button.dataset.slideAction;
+    if (action === "note") {
+      const note = item.querySelector(".slide-note");
+      note.hidden = !note.hidden;
+      if (!note.hidden) note.focus();
+    }
+    if (action === "ask") {
+      const index = deckSlides.findIndex((slide) => slide.id === id);
+      openChatTool("dashboard");
+      $("#question").value = `${deckSlides[index].title}: `;
+      $("#question").focus();
+    }
+    if (action === "remove") {
+      if (slideKind(id) === "area") {
+        state.evidenceAreas = customerAreas().filter((area) => area !== id.slice(5));
+      } else if (slideKind(id) === "upsell") {
+        state.approvedUpsells = state.approvedUpsells.filter((row) => `upsell-${row.id}` !== id);
+      } else state.included = state.included.filter((slide) => slide !== id);
+      slideChanged();
+    }
+    if (action === "up" || action === "down") {
+      const order = deckSlides
+        .filter((slide) => slideKind(slide.id) === "main")
+        .map((row) => row.id);
+      const at = order.indexOf(id);
+      const to = at + (action === "up" ? -1 : 1);
+      [order[at], order[to]] = [order[to], order[at]];
+      state.slideOrder = order;
+      slideChanged();
+    }
+  });
   function evidenceBlocks() {
     const chosen = customerAreas();
     const evidence = areaEvidence();
@@ -1847,7 +2101,7 @@
       scope.innerHTML = `<strong>${esc(scopeName())}</strong> · ${f(m.sites)} ${t(m.sites === 1 ? "site" : "sites")} · ${t("Compared with")} ${esc(baselineName())} ${t("at the same wash volume")}`;
   }
   // Section 02 is shown to the customer: neutral wording, no KAM instructions or
-  // filter links (site filtering lives in Explore data).
+  // filter links (site filtering lives in More settings).
   function renderOpportunityForCustomer() {
     const section = $("#opportunity-title")?.closest("section");
     const { focus } = context();
@@ -1901,10 +2155,138 @@
           `<li><label>${t("Action")}<input data-step="${index}" data-step-field="title" maxlength="${stepLimits.title}" value="${esc(step.title)}" /></label><label>${t("Owner")}<input data-step="${index}" data-step-field="owner" maxlength="${stepLimits.owner}" value="${esc(step.owner)}" /></label><label>${t("Timeline")}<input data-step="${index}" data-step-field="due" maxlength="${stepLimits.due}" value="${esc(step.due)}" placeholder="${t("E.g. Q2 2026")}" /></label><button type="button" class="text-button" data-step-remove="${index}">${t("Remove")}</button></li>`,
       )
       .join("");
-    return `<fieldset class="area-picker next-steps-editor"><legend>${t("Next steps shown in section 03")}</legend><p class="quiet">${t("Only the steps written here are shown to the customer. Keep to one to three.")}</p><ol>${rows}</ol>${preview ? `<details><summary>${t("Data-based suggestions")}</summary>${preview}</details>` : ""}<div class="kpi-actions">${state.nextSteps.length < 5 ? `<button type="button" class="secondary" data-step-add>${t("Add step")}</button>` : ""}${state.nextSteps.length || !suggestions.length ? "" : `<button type="button" class="text-button" data-step-suggest>${t("Start from suggestions")}</button>`}</div></fieldset>`;
+    return `<fieldset class="area-picker next-steps-editor"><legend>${t("Agreed next steps")}</legend><p class="quiet">${t("Only the steps written here are shown to the customer. Keep to one to three.")}</p><ol>${rows}</ol>${preview ? `<details><summary>${t("Data-based suggestions")}</summary>${preview}</details>` : ""}<div class="kpi-actions">${state.nextSteps.length < 5 ? `<button type="button" class="secondary" data-step-add>${t("Add step")}</button>` : ""}${state.nextSteps.length || !suggestions.length ? "" : `<button type="button" class="text-button" data-step-suggest>${t("Start from suggestions")}</button>`}</div></fieldset>`;
   }
-  // KAM controls for the customer-facing review live in Explore data.
+  // KAM controls for the customer-facing review live in the review settings panel.
+  const openPanels = new Set();
+  const panelOpen = (id) => (openPanels.has(id) ? "open" : "");
+  document.addEventListener(
+    "toggle",
+    (event) => {
+      const id = event.target.dataset?.panel;
+      if (!id) return;
+      if (event.target.open) openPanels.add(id);
+      else openPanels.delete(id);
+    },
+    true,
+  );
+  const reads = { show: "Show", keep: "Keep internal", decide: "Your call" };
+  // A manager may search in Finnish or English, whatever the page language is.
+  const industryKeywords = {
+    "Food & Beverage": "Elintarviketeollisuus ruoka",
+    Manufacturing: "Teollisuus",
+    Healthcare: "Terveydenhuolto",
+  };
+  function renderToday() {
+    const query = $("#customer-search").value;
+    const rows = data.customers.map((customer) => ({
+      id: customer.customer_id,
+      name: customer.customer_name,
+      industry: industryName(customer.industry),
+      keywords: `${customer.industry} ${industryKeywords[customer.industry] ?? ""}`,
+    }));
+    const found = globalThis.SalesModel.matchCustomers(rows, query, rows.length);
+    searchIndex = Math.min(searchIndex, Math.max(found.length - 1, 0));
+    $("#today-label").textContent = query.trim()
+      ? found.length
+        ? ""
+        : t("No customers found")
+      : t("Customers");
+    $("#today-list").innerHTML = found
+      .map(
+        ({ id, name, industry }, index) =>
+          `<button type="button" id="customer-option-${index}" class="customer-option" role="option" aria-selected="${index === searchIndex}" data-open-customer="${esc(id)}"><strong>${esc(name)}</strong><small>${esc(industry)}</small></button>`,
+      )
+      .join("");
+    $("#customer-search").setAttribute(
+      "aria-activedescendant",
+      found.length ? `customer-option-${searchIndex}` : "",
+    );
+  }
+  $("#customer-search").addEventListener("input", () => {
+    searchIndex = 0;
+    renderToday();
+  });
+  $("#customer-search").addEventListener("keydown", (event) => {
+    const options = [...document.querySelectorAll(".customer-option")];
+    if (event.key === "Enter") {
+      event.preventDefault();
+      options.at(searchIndex)?.click();
+      return;
+    }
+    if (!["ArrowDown", "ArrowUp"].includes(event.key) || !options.length) return;
+    event.preventDefault();
+    const step = event.key === "ArrowDown" ? 1 : -1;
+    searchIndex = (searchIndex + step + options.length) % options.length;
+    renderToday();
+  });
+  function setMode(next) {
+    mode = next;
+    render();
+    renderChat();
+    window.scrollTo(0, 0);
+  }
+  document.addEventListener("click", (event) => {
+    const card = event.target.closest("[data-open-customer]");
+    if (!card) return;
+    const customer = card.dataset.openCustomer;
+    void openCustomer(customer);
+  });
+  function renderMeetingAdvice() {
+    const sales = globalThis.SalesModel;
+    const { metrics } = context();
+    const advice = sales.audienceAdvice(state.audience, metrics, language);
+    const signals = metrics.hasData ? sales.salesSignals(data, selectionScope(), language) : null;
+    const roles = Object.entries(sales.audiences)
+      .map(
+        ([id, audience]) =>
+          `<option value="${id}" ${state.audience === id ? "selected" : ""}>${esc(audience[language === "fi" ? "fi" : "en"])}</option>`,
+      )
+      .join("");
+    const questions = sales
+      .conversation(state.audience, signals, language)
+      .map(({ ask, why }) => `<li><strong>${esc(ask)}</strong><small>${esc(why)}</small></li>`)
+      .join("");
+    $("#meeting-advice").innerHTML =
+      `<fieldset class="area-picker meeting-advice"><legend>${t("Who are you meeting?")}</legend><select id="audience" aria-label="${t("Who are you meeting?")}"><option value="">${t("Choose a role")}</option>${roles}</select>${advice ? `<p>${esc(advice.points[0])}</p>` : ""}${state.audience ? `<h3>${t("Ask in the meeting")}</h3><ol>${questions}</ol>` : ""}</fieldset>`;
+    const rows = (signals?.signals ?? [])
+      .map((signal) => `<div><dt>${esc(signal.label)}</dt><dd>${esc(signal.value)}</dd></div>`)
+      .join("");
+    $("#sales-signals").innerHTML = signals
+      ? `<details class="sales-signals" data-panel="sales" ${panelOpen("sales")}><summary><span>${t("For you only")}</span><em class="sales-read read-${signals.usage.read}">${t(reads[signals.usage.read])}</em></summary><div class="sales-usage"><div><span>${t("Textiles in active use")}</span><strong>${esc(signals.usage.value)}</strong><small>${esc(signals.usage.trend)} · ${esc(signals.usage.period)}</small></div></div><p>${esc(signals.usage.advice)}</p><button type="button" class="secondary" data-usage-toggle>${t(state.hideUsage ? "Show usage to the customer" : "Hide usage from the customer")}</button><p class="quiet">${t(state.hideUsage ? "Usage figures are hidden from the review and presentation." : "Usage figures are visible to the customer.")}</p><dl>${rows}</dl><p class="quiet">${t("This is the share of textiles scanned, the closest figure to capacity use in the data. The thresholds are demo assumptions to agree with Lindström.")}</p></details>`
+      : "";
+  }
+  function selectionScope() {
+    const { customer, from, to, country, continent, site } = state;
+    return { customer, from, to, country, continent, site };
+  }
+  document.addEventListener("change", (event) => {
+    if (event.target.id !== "audience") return;
+    state.audience = event.target.value;
+    state.evidenceAreas = null;
+    state.priority = globalThis.SalesModel.audiences[state.audience]?.priority ?? "neutral";
+    state.chatRevision += 1;
+    render();
+    $("#audience")?.focus();
+  });
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("[data-usage-toggle]")) {
+      state.hideUsage = !state.hideUsage;
+      if (!state.hideUsage) {
+        state.evidenceAreas = areaOrder(new Set([...customerAreas(), "adoption"]));
+        if (!state.visibleInsights.includes("opportunity"))
+          state.visibleInsights.push("opportunity");
+      }
+      invalidatePowerPoint(true);
+      state.chatRevision += 1;
+      render();
+      $("[data-usage-toggle]")?.focus();
+    }
+  });
   function renderReviewContent() {
+    renderMeetingAdvice();
+    const meetingNotes = $("#kam-notes");
+    if (meetingNotes !== document.activeElement) meetingNotes.value = state.meetingNotes;
     const editor = $("#review-next-steps");
     if (
       !editor.contains(document.activeElement) ||
@@ -1913,22 +2295,27 @@
       editor.innerHTML = nextStepsEditorHtml();
     $("#review-basics-picker").innerHTML = basicsPickerHtml();
     const chosen = customerAreas();
+    const priorities = priorityAreas();
+    const areaRow = (id, reason) =>
+      `<label><input type="checkbox" data-area-toggle="${id}" ${chosen.includes(id) ? "checked" : ""} /><span>${t(evidenceAreas.find(([area]) => area === id)[1])}${reason ? `<small>${esc(reason)}</small>` : ""}</span></label>`;
+    const others = evidenceAreas.filter(([id]) => !priorities.some((row) => row.id === id));
     $("#review-area-picker").innerHTML =
-      `<fieldset class="area-picker"><legend>${t("Areas for this customer")}</legend>${evidenceAreas
-        .map(
-          ([id, label]) =>
-            `<label class="family-${areaFamilies[id]}"><input type="checkbox" data-area-toggle="${id}" ${chosen.includes(id) ? "checked" : ""} />${t(label)}</label>`,
-        )
+      `<fieldset class="area-picker simple-areas"><legend>${t("What to show this customer")}</legend>${priorities
+        .map(({ id, reason }) => areaRow(id, reason))
         .join(
           "",
-        )}<button type="button" class="text-button" data-area-reset>${t("Use customer priorities")}</button></fieldset>`;
+        )}<details data-panel="other-areas" ${panelOpen("other-areas")}><summary>${t("Other areas")}</summary>${others
+        .map(([id]) => areaRow(id))
+        .join(
+          "",
+        )}</details><button type="button" class="text-button" data-area-reset>${t("Use suggested areas")}</button></fieldset>`;
     const evidence = context().metrics.hasData ? areaEvidence() : {};
     const kpis = customerKpis();
     const gaps = chosen.filter(
       (id) => evidence[id]?.missing && !kpis.some((kpi) => kpi.area === id && kpi.actual),
     );
     $("#review-area-gaps").innerHTML = gaps.length
-      ? `<div class="area-gaps"><strong>${t("Shown to the customer as “to be agreed together”:")}</strong><ul>${gaps
+      ? `<div class="area-gaps"><strong>${t("Needs a figure before it can appear:")}</strong><ul>${gaps
           .map(
             (id) =>
               `<li><span>${t(evidenceAreas.find(([area]) => area === id)[1])}</span> ${esc(evidence[id].hint)}</li>`,
@@ -1942,7 +2329,7 @@
     const { metrics: m, focus, sites, order, customer } = context();
     if (!m.hasData) {
       $("#story").innerHTML =
-        t`<section class="intro"><h1>No data matches the filters.</h1><p>${context().invalidPeriod ? t("The start month is after the end month.") : t("Choose another date range or location in Explore data.")}</p></section>`;
+        t`<section class="intro"><h1>No data matches the filters.</h1><p>${context().invalidPeriod ? t("The start month is after the end month.") : t("Choose another date range or location in More settings.")}</p></section>`;
       return;
     }
     const shortNames = {
@@ -1956,7 +2343,9 @@
     const cards = results();
     const history = historicalComparison();
     const comparable = { water: "waterLitres", emissions: "emissionsKgCo2e", repairs: "repairs" };
-    const visibleOrder = order.filter((id) => state.visibleInsights.includes(id));
+    const visibleOrder = order.filter(
+      (id) => state.visibleInsights.includes(id) && !(state.hideUsage && id === "opportunity"),
+    );
     const title =
       state.heading || state.titleEdits.cover
         ? esc(state.heading || state.titleEdits.cover)
@@ -1970,7 +2359,7 @@
         })
         .join(
           "",
-        )}</div><p class="quiet">Synthetic data. The baseline models an alternative laundry service at the same wash volume.</p>${summaryGraphics()}</section><section class="story-section" aria-labelledby="opportunity-title"${state.visibleInsights.includes("opportunity") ? "" : " hidden"}><div class="section-heading"><span class="section-number">02</span><h2 id="opportunity-title">What to investigate first</h2></div><div class="opportunity"><div><span class="section-kicker">${esc(focus.site_name)}</span><h3>Do textile allocations match demand?</h3><p>${f(focus.unscanned)} allocated textiles had no active scan in ${snapshotName()}. Start by reviewing this site with the customer.</p></div><div class="opportunity-visual">${snapshotGraphic(focus)}</div></div><p class="relevance">${esc(globalThis.MeetingModel.relevance("opportunity", state.priority, false, language))}</p>${siteBenchmark()}<details class="site-details"><summary>See other sites</summary><div class="table-wrap"><table><thead><tr><th>Site</th><th>Scanned ${snapshotName()}</th><th>Allocated textiles</th></tr></thead><tbody>${sites.map((site) => t`<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${f(site.utilization, 1)} %</td><td>${f(site.allocated)}</td></tr>`).join("")}</tbody></table></div><p class="quiet">Open a site to see its review. Ask the assistant to “show all sites” to return to the full review.</p></details></section><section class="story-section" aria-labelledby="next-title"><div class="section-heading"><span class="section-number">03</span><h2 id="next-title">Next year's priorities</h2></div><div class="next-chapter"><div><h3>One improvement<br />at a time</h3><p>Use these proposals to start a discussion and agree on next steps with the customer.</p></div><ol class="next-steps">${plan()
+        )}</div><p class="quiet">Synthetic data. The baseline models an alternative laundry service at the same wash volume.</p>${summaryGraphics()}</section><section class="story-section" aria-labelledby="opportunity-title"${state.visibleInsights.includes("opportunity") ? "" : " hidden"}><div class="section-heading"><span class="section-number">02</span><h2 id="opportunity-title">A good place to start together</h2></div><div class="opportunity"><div><span class="section-kicker">${esc(focus.site_name)}</span><h3>Do textile allocations match demand?</h3><p>${f(focus.unscanned)} allocated textiles had no active scan in ${snapshotName()}. Start by reviewing this site with the customer.</p></div><div class="opportunity-visual">${snapshotGraphic(focus)}</div></div><p class="relevance">${esc(globalThis.MeetingModel.relevance("opportunity", state.priority, false, language))}</p>${siteBenchmark()}<details class="site-details"><summary>See other sites</summary><div class="table-wrap"><table><thead><tr><th>Site</th><th>Scanned ${snapshotName()}</th><th>Allocated textiles</th></tr></thead><tbody>${sites.map((site) => t`<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${f(site.utilization, 1)} %</td><td>${f(site.allocated)}</td></tr>`).join("")}</tbody></table></div><p class="quiet">Open a site to see its review. Ask the assistant to “show all sites” to return to the full review.</p></details></section><section class="story-section" aria-labelledby="next-title"><div class="section-heading"><span class="section-number">03</span><h2 id="next-title">Next year's priorities</h2></div><div class="next-chapter"><div><h3>One improvement<br />at a time</h3><p>Use these proposals to start a discussion and agree on next steps with the customer.</p></div><ol class="next-steps">${plan()
         .map(
           ([title, ...details]) =>
             `<li>${esc(title)}${details.map((detail) => `<small>${esc(detail)}</small>`).join("")}</li>`,
@@ -1978,10 +2367,11 @@
         .join(
           "",
         )}</ol></div><details class="notes-details" ${state.note ? "open" : ""}><summary>Add a note to the presentation</summary><label for="meeting-note" class="sr-only">Meeting note</label><textarea id="meeting-note" maxlength="2000" placeholder="E.g. a customer goal or an agreed next step…">${esc(state.note)}</textarea><p class="quiet">The note stays in this tab until you change the customer, site or baseline.</p></details></section>`;
-    // The note editor moved to Explore data; the review shows the note in its opening.
+    // The note editor is in More settings; the review shows the note in its opening.
     $("#story .notes-details")?.remove();
     renderNextSteps();
     renderOpportunityForCustomer();
+    if (state.hideUsage) $("#opportunity-title")?.closest("section")?.remove();
     renderIntroForCustomer();
     const resultsSection = $("#results-title").closest("section");
     resultsSection.hidden = false;
@@ -2125,6 +2515,7 @@
     const chosen = new Set(customerAreas());
     if (event.target.checked) chosen.add(area);
     else chosen.delete(area);
+    if (area === "adoption" && event.target.checked) state.hideUsage = false;
     state.evidenceAreas = areaOrder(chosen);
     state.chatRevision += 1;
     render();
@@ -2230,6 +2621,7 @@
       repairs: "repairs",
     };
     metrics.innerHTML = t`<h2>Valitsemasi tiedot</h2><div class="dashboard-metric-grid">${state.dashboardLayout.metrics
+      .filter((id) => !state.hideUsage || !["scanned", "unscanned"].includes(id))
       .map((id) => {
         const [label, value, scope] = definitions[id];
         return `<article><span>${label}</span><strong>${value}</strong><small>${esc(scope)}</small>${kpiComparison(history, comparable[id])}</article>`;
@@ -2329,6 +2721,8 @@
       cooperationDescription: state.cooperationDescription,
       cooperationReason: state.cooperationReason,
       includeContractAgenda: state.includeContractAgenda,
+      audience: state.audience,
+      meetingNotes: state.meetingNotes,
       evidenceAreas: customerAreas(),
       customerBasics: customerBasics(),
       nextSteps: state.nextSteps,
@@ -2348,6 +2742,16 @@
         ? `<p class="message pending">${t(state.chatTool === "data" ? "Analyzing data…" : "Applying changes…")}</p>`
         : "");
     $("#chat").scrollTop = $("#chat").scrollHeight;
+    $("#chat").dataset.empty = t(
+      state.chatTool === "data"
+        ? "Ask about this customer's figures."
+        : "Tell me what you want to change in the review.",
+    );
+    $("#question").placeholder = t(
+      state.chatTool === "data"
+        ? "E.g. compare water by quarter"
+        : "E.g. focus on emissions or show the Turku site",
+    );
     const hasPrompts = $("#chat-prompts").children.length > 0;
     const started = state.chat.length > 0;
     $("#chat-prompts").hidden = started && !state.promptsOpen;
@@ -2627,8 +3031,7 @@
   $("#customer").innerHTML = data.customers
     .map((r) => `<option value="${r.customer_id}">${esc(r.customer_name)}</option>`)
     .join("");
-  $("#customer").addEventListener("change", async (event) => {
-    const customer = event.target.value;
+  async function openCustomer(customer) {
     $("#customer").value = state.customer;
     if (switchingReview) return;
     switchingReview = true;
@@ -2636,7 +3039,7 @@
     $("#composer").inert = true;
     try {
       await flushReviewSave();
-      await loadCustomerReview(customer);
+      if (await loadCustomerReview(customer)) setMode("prepare");
     } catch {
       /* The persistent save status explains the error. */
     } finally {
@@ -2645,7 +3048,8 @@
       $("#composer").inert = !storageReady;
       render();
     }
-  });
+  }
+  $("#customer").addEventListener("change", (event) => void openCustomer(event.target.value));
   for (const id of ["site", "baseline", "priority", "from", "to", "country", "continent"])
     $("#" + id).addEventListener("change", (event) => {
       state[id] = event.target.value;
@@ -2663,6 +3067,10 @@
       field.value = "";
     });
   document.addEventListener("input", (event) => {
+    if (event.target.id === "kam-notes") {
+      state.meetingNotes = event.target.value;
+      scheduleReviewSave();
+    }
     if (event.target.id === "meeting-note") {
       state.note = event.target.value;
       invalidatePowerPoint();
@@ -2683,6 +3091,32 @@
       clearScope();
       render();
       status("Review filtered to " + scopeName());
+    }
+  });
+  $("#back-today").addEventListener("click", () => {
+    flushReviewSave().catch(() => {});
+    setMode("home");
+    $("#customer-search").value = "";
+    searchIndex = 0;
+    renderToday();
+    $("#customer-search").focus();
+  });
+  $("#copy-summary").addEventListener("click", async () => {
+    const steps = agreedSteps();
+    if (!steps.length) {
+      $("#copy-status").textContent = t("Add an agreed next step first.");
+      return;
+    }
+    const { customer } = context();
+    const summary = [
+      `${customer.customer_name} · ${t("Agreed next steps")}`,
+      ...steps.map((step) => `• ${stepText(step)}`),
+    ].join("\n");
+    try {
+      await navigator.clipboard.writeText(summary);
+      $("#copy-status").textContent = t("Summary copied.");
+    } catch {
+      $("#copy-status").textContent = summary;
     }
   });
   $("#open-evidence").addEventListener("click", () => {
@@ -2713,6 +3147,7 @@
       link.href = ready.downloadUrl;
       link.setAttribute("aria-disabled", "false");
       link.title = t("Download PowerPoint");
+      renderApproval();
       return;
     }
     state.readyPresentation = null;
@@ -2720,7 +3155,36 @@
     link.removeAttribute("href");
     link.setAttribute("aria-disabled", "true");
     link.title = t("Generate the presentation first");
+    renderApproval();
   }
+  // Any edit after approval takes the review back to approval, so the file always matches it.
+  function renderApproval() {
+    const approved =
+      Boolean(approvedRequest) && state.readyPresentation?.request === approvedRequest;
+    $("#approve-review").hidden = approved;
+    $("#approved-status").hidden = !approved;
+    $("#download-powerpoint").hidden = !approved;
+    $("#open-review").hidden = !approved;
+  }
+  $("#approve-review").addEventListener("click", async () => {
+    const button = $("#approve-review");
+    if (button.disabled) return;
+    button.disabled = true;
+    button.textContent = t("Creating PowerPoint…");
+    try {
+      await flushReviewSave().catch(() => {});
+      const ready = await startPresentation();
+      if (!ready) throw new Error(t("Could not create the presentation. Try again."));
+      approvedRequest = ready.request;
+      status(t("Approved. The PowerPoint is ready."));
+    } catch (error) {
+      status(error.message || t("Could not create the presentation. Try again."));
+    } finally {
+      button.disabled = false;
+      button.textContent = t("Approve and create PowerPoint");
+      renderApproval();
+    }
+  });
   function presentationRequest(includeAgenda = true) {
     const scope = Object.fromEntries(
       ["customer", "from", "to", "country", "continent", "site", "baseline", "priority"].map(
@@ -2751,56 +3215,29 @@
       managerTexts: state.managerTexts,
       approvedUpsells: state.approvedUpsells,
       slideOrder: state.slideOrder,
+      hideUsage: state.hideUsage,
+      reviewAreas: includeAgenda ? reviewAreas() : [],
       language,
     };
   }
-  $("#open-review").addEventListener("click", async () => {
-    if (state.generating) return;
+  function startPresentation() {
     const payload = presentationRequest();
-    if (payload.note.length > 2000) {
-      status(t("Shorten the presentation note or exclude the KPI agenda."));
-      return;
-    }
-    invalidatePowerPoint();
-    const viewer = window.open(`/kopperoinenp/presentation.html?lang=${language}`, "_blank");
-    if (!viewer) {
-      status(t("Allow the presentation to open in a new tab and try again."));
-      return;
-    }
-    viewer.opener = null;
     const request = JSON.stringify(payload);
-    const button = $("#open-review");
-    state.generating = true;
-    button.disabled = true;
-    button.textContent = t("Preparing…");
-    try {
-      if (state.readyPresentation) {
-        const available = await fetch(`/api/presentations/${state.readyPresentation.id}`);
-        if (available.ok) {
-          if (!viewer.closed) viewer.location.replace(state.readyPresentation.viewUrl);
-          return;
-        }
-        invalidatePowerPoint(true);
-      }
+    if (payload.note.length > 2000) return Promise.resolve(null);
+    if (state.readyPresentation?.request === request)
+      return Promise.resolve(state.readyPresentation);
+    if (presentationJob?.request === request) return presentationJob.promise;
+    const promise = (async () => {
+      // Locked: the file is built exactly like the slides on the page, with no AI changes.
       const response = await fetch(`/api/presentations?lang=${language}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: request,
+        body: JSON.stringify({ ...payload, locked: true }),
       });
       const result = await response.json();
       if (!response.ok)
         throw new Error(result.error || t("Could not create the presentation. Try again."));
-      if (request !== JSON.stringify(presentationRequest()))
-        throw new Error(
-          t(
-            "The review changed during preparation. Open the presentation again with the current selection.",
-          ),
-        );
-      // Approved service proposals always remain at the end, outside the editable review order.
-      state.slideOrder = result.slides
-        .filter((slide) => !slide.id.startsWith("upsell-"))
-        .map((slide) => slide.id);
-      scheduleReviewSave();
+      if (request !== JSON.stringify(presentationRequest())) return null;
       const viewUrl = `/kopperoinenp/presentation.html?id=${encodeURIComponent(result.id)}&lang=${language}`;
       state.readyPresentation = {
         id: result.id,
@@ -2819,7 +3256,49 @@
         },
         result.expiresInSeconds * 1000 + 100,
       );
-      if (!viewer.closed) viewer.location.replace(viewUrl);
+      renderApproval();
+      return state.readyPresentation;
+    })().finally(() => {
+      if (presentationJob?.promise === promise) presentationJob = null;
+    });
+    presentationJob = { request, promise };
+    return promise;
+  }
+  $("#open-review").addEventListener("click", async () => {
+    if (state.generating) return;
+    const payload = presentationRequest();
+    if (payload.note.length > 2000) {
+      status(t("Shorten the presentation note or exclude the KPI agenda."));
+      return;
+    }
+    invalidatePowerPoint();
+    const viewer = window.open(`/kopperoinenp/presentation.html?lang=${language}`, "_blank");
+    if (!viewer) {
+      status(t("Allow the presentation to open in a new tab and try again."));
+      return;
+    }
+    viewer.opener = null;
+    const button = $("#open-review");
+    state.generating = true;
+    button.disabled = true;
+    button.textContent = t("Preparing…");
+    try {
+      if (state.readyPresentation) {
+        const available = await fetch(`/api/presentations/${state.readyPresentation.id}`);
+        if (available.ok) {
+          if (!viewer.closed) viewer.location.replace(state.readyPresentation.viewUrl);
+          return;
+        }
+        invalidatePowerPoint(true);
+      }
+      const ready = await startPresentation();
+      if (!ready)
+        throw new Error(
+          t(
+            "The review changed during preparation. Open the presentation again with the current selection.",
+          ),
+        );
+      if (!viewer.closed) viewer.location.replace(ready.viewUrl);
     } catch (error) {
       const message = error.message || t("Could not create the presentation. Try again.");
       status(message);
@@ -2829,7 +3308,7 @@
         );
     } finally {
       state.generating = false;
-      button.innerHTML = `${t("Open presentation")} <span aria-hidden="true">↗</span>`;
+      button.textContent = t("Open slideshow");
       button.disabled = !context().metrics.hasData || !state.included.length;
     }
   });
@@ -2851,5 +3330,5 @@
     data.customers.some((row) => row.customer_id === previousCustomer)
       ? previousCustomer
       : state.customer,
-  );
+  ).then(() => $("#customer-search").focus());
 })();

@@ -65,14 +65,14 @@ export async function renderPowerPoint(deck, provenance) {
       line: { color: templateStandard.magenta },
       fill: { color: templateStandard.magenta },
     });
-    slide.addText(t("CUSTOMER REVIEW"), {
+    slide.addText(item.kicker || t("CUSTOMER REVIEW"), {
       x: 2.25,
       y: 0.68,
       w: 10,
       h: 0.2,
-      fontSize: 9,
+      fontSize: 13,
       bold: true,
-      charSpacing: 1.7,
+      charSpacing: 1.2,
       color: cover ? "FFFFFF" : templateStandard.teal,
       margin: 0,
     });
@@ -81,152 +81,243 @@ export async function renderPowerPoint(deck, provenance) {
       y: 1.05,
       w: 12.1,
       h: 0.95,
-      fontSize: cover ? 38 : 30,
+      fontSize: cover ? 54 : 36,
       bold: true,
       color: ink,
       margin: 0,
       breakLine: false,
       fit: "shrink",
     });
-    if (item.kind === "overview") {
-      for (const [i, fact] of item.facts.entries()) {
-        const x = 0.6 + (i % 3) * 4.05,
-          y = 2.05 + Math.floor(i / 3) * 1.4;
-        slide.addShape(pptx.ShapeType.rect, {
+    const tile = (kpi, x, y, w, h, onDark) => {
+      slide.addShape(pptx.ShapeType.roundRect, {
+        x,
+        y,
+        w,
+        h,
+        rectRadius: 0.12,
+        line: { color: onDark ? "1D5C8E" : "F2F6F9" },
+        fill: { color: onDark ? "1D5C8E" : "F2F6F9" },
+      });
+      slide.addText(kpi.value, {
+        x: x + 0.25,
+        y: y + 0.2,
+        w: w - 0.5,
+        h: h * 0.55,
+        fontSize: 44,
+        bold: true,
+        color: onDark ? "FFFFFF" : templateStandard.blue,
+        margin: 0,
+        fit: "shrink",
+      });
+      slide.addText(kpi.label, {
+        x: x + 0.25,
+        y: y + h * 0.62,
+        w: w - 0.5,
+        h: h * 0.3,
+        fontSize: 18,
+        color: onDark ? "D9E6EF" : "4F5D68",
+        margin: 0,
+        fit: "shrink",
+      });
+    };
+    const layout = item.layout ?? "notes";
+    if (layout === "cover") {
+      slide.addText(item.lead ?? "", {
+        x: 0.6,
+        y: 2.15,
+        w: 11.8,
+        h: 0.6,
+        fontSize: 24,
+        color: "D9E6EF",
+        margin: 0,
+      });
+      item.kpis.forEach((kpi, i) => tile(kpi, 0.6 + i * 4.05, 3.35, 3.8, 1.9, true));
+    } else if (layout === "kpis") {
+      item.kpis.forEach((kpi, i) => tile(kpi, 0.6 + i * 3.05, 2.6, 2.85, 2.3, false));
+    } else if (layout === "steps") {
+      item.steps.forEach((step, i) => {
+        const x = 0.6 + i * 4.05;
+        slide.addShape(pptx.ShapeType.roundRect, {
           x,
-          y,
+          y: 2.3,
           w: 3.8,
-          h: 1.2,
-          line: { color: "E2EAF0" },
-          fill: { color: "F4F7FA" },
+          h: 3.4,
+          rectRadius: 0.12,
+          line: { color: "F2F6F9" },
+          fill: { color: "F2F6F9" },
         });
-        slide.addText(fact.label, {
-          x: x + 0.15,
-          y: y + 0.15,
-          w: 3.5,
-          h: 0.25,
-          fontSize: 12,
-          color: templateStandard.blue,
+        slide.addText(String(i + 1), {
+          x: x + 0.3,
+          y: 2.5,
+          w: 1,
+          h: 0.8,
+          fontSize: 40,
+          bold: true,
+          color: templateStandard.teal,
           margin: 0,
         });
-        slide.addText(fact.value, {
-          x: x + 0.15,
-          y: y + 0.55,
-          w: 3.5,
-          h: 0.45,
-          fontSize: 30,
-          bold: true,
+        slide.addText(step, {
+          x: x + 0.3,
+          y: 3.35,
+          w: 3.2,
+          h: 2.15,
+          fontSize: 20,
           color: templateStandard.blue,
           margin: 0,
           fit: "shrink",
+          valign: "top",
         });
-      }
-      slide.addText(item.paragraphs.join("\n"), {
+      });
+    } else if (layout === "notes") {
+      slide.addText((item.fine ?? []).join("\n\n"), {
         x: 0.6,
-        y: 5.15,
-        w: 12,
-        h: 0.85,
-        fontSize: 12,
+        y: 2.4,
+        w: 11.6,
+        h: 3,
+        fontSize: 20,
+        color: "4F5D68",
+        margin: 0,
+        valign: "top",
+        fit: "shrink",
+      });
+    } else {
+      slide.addText(item.hero ?? "", {
+        x: 0.6,
+        y: 2.25,
+        w: 5.1,
+        h: 1.35,
+        fontSize: 88,
+        bold: true,
         color: templateStandard.blue,
         margin: 0,
         fit: "shrink",
       });
-    } else if (item.chart) {
-      const top = item.value ? 2.7 : 2.05;
-      if (item.value)
-        slide.addText(item.value, {
-          x: 0.6,
-          y: 2,
-          w: 3.7,
-          h: 0.6,
-          fontSize: 38,
-          bold: true,
-          color: "003F72",
-          margin: 0,
+      slide.addText(item.lead ?? "", {
+        x: 0.6,
+        y: 3.7,
+        w: 4.9,
+        h: 0.95,
+        fontSize: 22,
+        color: "33475A",
+        margin: 0,
+        valign: "top",
+        fit: "shrink",
+      });
+      (item.kpis ?? []).forEach((kpi, i) => tile(kpi, 0.6 + i * 2.5, 4.7, 2.35, 1.3, false));
+      const type = item.chart?.type;
+      const frame = { x: 6, y: 2.1, w: 6.7, h: 4 };
+      const quiet = {
+        ...frame,
+        lang: t("en-GB"),
+        showTitle: false,
+        catAxisLabelFontSize: 15,
+        valAxisHidden: true,
+        valGridLine: { style: "none" },
+        catGridLine: { style: "none" },
+        showLegend: false,
+      };
+      if (type === "compare") {
+        const { labels, values, unit } = item.chart;
+        const most = Math.max(...values, 1);
+        values.forEach((value, i) => {
+          const y = 2.45 + i * 1.7;
+          const width = Math.max((value / most) * 6.4, 0.1);
+          slide.addText(labels[i], {
+            x: 6,
+            y,
+            w: 6.4,
+            h: 0.4,
+            fontSize: 20,
+            bold: true,
+            color: templateStandard.blue,
+            margin: 0,
+          });
+          slide.addShape(pptx.ShapeType.roundRect, {
+            x: 6,
+            y: y + 0.45,
+            w: width,
+            h: 0.62,
+            rectRadius: 0.08,
+            line: { color: i ? "DBE5EC" : templateStandard.blue },
+            fill: { color: i ? "DBE5EC" : templateStandard.blue },
+          });
+          const inside = width > 3;
+          slide.addText(`${number(value)} ${t(unit)}`, {
+            x: inside ? 6.2 : 6 + width + 0.15,
+            y: y + 0.45,
+            w: 5,
+            h: 0.62,
+            fontSize: 20,
+            bold: true,
+            color: inside && !i ? "FFFFFF" : templateStandard.blue,
+            margin: 0,
+            valign: "middle",
+          });
         });
-      slide.addText(item.paragraphs.join("\n\n"), {
-        x: 0.6,
-        y: top,
-        w: 4.6,
-        h: 2.2,
-        fontSize: 18,
-        color: ink,
-        margin: 0,
-        fit: "shrink",
-        valign: "top",
-      });
-      slide.addChart(
-        pptx.ChartType.bar,
-        [
+      } else if (type === "columns") {
+        slide.addChart(
+          pptx.ChartType.bar,
+          [{ name: t(item.chart.unit), labels: item.chart.labels, values: item.chart.values }],
           {
-            name: t(item.chart.unit),
-            labels:
-              item.kind === "repairs"
-                ? item.chart.labels
-                : item.chart.labels.map(
-                    (label, i) =>
-                      `${label} · ${number(item.chart.values[i])} ${t(item.chart.unit)}`,
-                  ),
-            values: item.chart.values,
+            ...quiet,
+            barDir: "col",
+            barGapWidthPct: 35,
+            chartColors: [templateStandard.green],
           },
-        ],
-        {
-          x: 5.6,
-          y: 2.05,
-          w: 7.1,
-          h: 3.8,
-          barDir: item.kind === "repairs" ? "col" : "bar",
-          catAxisLabelFontSize: 12,
-          valAxisLabelFontSize: 10,
-          showLegend: false,
-          showValue: false,
-          lang: t("en-GB"),
-          catAxisOrientation: item.kind === "repairs" ? "minMax" : "maxMin",
-          catAxisLabelFontFace: templateStandard.bodyFont,
-          valAxisLabelFontFace: templateStandard.bodyFont,
-          valAxisLabelFormatCode: "0",
-          valAxisHidden: item.kind !== "repairs",
-          dataLabelFormatCode: item.chart.unit === "items" ? "#,##0" : "#,##0.0",
-          chartColors:
-            item.kind === "repairs" ? [templateStandard.green] : [templateStandard.blue, "A9C1D4"],
-          showTitle: true,
-          title: t(item.chart.unit),
-          titleFontSize: 11,
-          showCatName: false,
-          showBorder: false,
-          showCatNameInLegend: false,
-          showMarker: false,
-          showCatNameInTitle: false,
-          valGridLine: { color: "E5EAF0", width: 1 },
-          showShadow: false,
-        },
-      );
-      slide.addText(item.relevance || "", {
-        x: 0.6,
-        y: 5.65,
-        w: 12.05,
-        h: 0.45,
-        fontSize: 12,
-        color: "003F72",
-        margin: 0,
-        fit: "shrink",
-      });
-    } else {
-      const paragraphs = item.paragraphs.join("\n\n");
-      slide.addText(paragraphs, {
-        x: 0.6,
-        y: cover ? 2.45 : 2.1,
-        w: 11.95,
-        h: cover ? 3.4 : 3.75,
-        fontSize: paragraphs.length > 1100 ? 14 : paragraphs.length > 750 ? 17 : cover ? 24 : 21,
-        color: ink,
-        margin: 0,
-        fit: "shrink",
-        valign: "top",
-        breakLine: false,
-        paraSpaceAfterPt: 14,
-      });
+        );
+      } else if (type === "donut") {
+        slide.addChart(
+          pptx.ChartType.doughnut,
+          [{ name: item.title, labels: item.chart.labels, values: item.chart.values }],
+          {
+            ...frame,
+            holeSize: 68,
+            chartColors: [templateStandard.blue, "DBE5EC"],
+            showLegend: true,
+            legendPos: "r",
+            legendFontSize: 16,
+            showPercent: false,
+            showValue: false,
+            showLabel: false,
+            dataBorder: { pt: 1, color: "FFFFFF" },
+          },
+        );
+      } else if (type === "line") {
+        const { labels, values, reference, name, referenceName } = item.chart;
+        const known = values.flatMap((value, i) => (value == null ? [] : [i]));
+        const pick = (list) => known.map((i) => list[i]);
+        slide.addChart(
+          pptx.ChartType.line,
+          [
+            { name, labels: pick(labels), values: pick(values) },
+            ...(reference
+              ? [{ name: referenceName ?? "", labels: pick(labels), values: pick(reference) }]
+              : []),
+          ],
+          {
+            ...quiet,
+            chartColors: [templateStandard.blue, "A9C1D4"],
+            lineDataSymbol: "none",
+            lineSize: 3,
+            showLegend: true,
+            legendPos: "b",
+            legendFontSize: 11,
+            catAxisLabelFontSize: 13,
+          },
+        );
+      }
     }
+    if (item.added?.length)
+      slide.addText(item.added.join(" "), {
+        x: 0.6,
+        y: 5.85,
+        w: 12.1,
+        h: 0.42,
+        fontSize: 15,
+        color: templateStandard.blue,
+        margin: 0,
+        fit: "shrink",
+      });
     if (item.boundary || item.source)
       slide.addText(
         [item.boundary, item.source ? t`Source: ${item.source}` : ""].filter(Boolean).join(" · "),
