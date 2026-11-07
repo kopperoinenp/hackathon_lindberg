@@ -25,8 +25,23 @@ remembers only the last customer ID. The persistent storage indicator reports
 loading/saving/saved/errors. On conflicts, reload rather than overwriting another
 window. Switching customers flushes pending changes and loads that customer's
 saved review (or defaults when none exists); assistant customer switches also load
-the saved target review before accepting further edits. Reset dashboard saves the
-default layout as the new preference. Chat transcript is intentionally session-only.
+the saved target review before accepting further edits. Chat transcript is intentionally session-only.
+
+The dashboard selector defaults to **Saved customer review**. Switching to
+**Original template** first flushes pending saves, keeps the full current review
+in memory, and displays the original defaults for the same customer. Template
+filtering is temporary and never written to the customer profile. Assistant edits,
+contract KPI editing and presentation generation are unavailable in the template
+preview; select the saved review to edit or export. Returning restores the saved
+review's filters, layout, commentary and session conversation. Switching customers
+or reloading always opens the selected customer's saved review. Switching is
+blocked while assistant edits or presentation generation are running; failed saves
+keep the current review visible. Reset dashboard is separate and asks for
+confirmation before saving the default layout as the new preference.
+
+Browser checks cover saved/original/saved round trips, temporary template filters,
+customer switching from template mode and reloading from template mode, verifying
+that the saved review's monetary estimate and filters remain unchanged.
 
 Tests cover disk persistence across a new store instance, customer isolation,
 concurrent/stale revisions, validation/corruption, and actual HTTP PUT/GET/409.

@@ -2,6 +2,18 @@
 (function (root) {
   "use strict";
   const finnish = {
+    "Dashboard view": "Dashboard-näkymä",
+    "Saved customer review": "Asiakkaan tallennettu katsaus",
+    "Original template": "Alkuperäinen pohja",
+    "Edits are saved to this customer’s review.":
+      "Muutokset tallentuvat tämän asiakkaan katsaukseen.",
+    "Original template preview. Your saved review is unchanged. Select Saved customer review to edit.":
+      "Alkuperäisen pohjan esikatselu. Tallennettu katsaus säilyy ennallaan. Muokkaa valitsemalla asiakkaan tallennettu katsaus.",
+    "Wait until loading or editing has finished before switching views.":
+      "Odota latauksen tai muokkauksen valmistumista ennen näkymän vaihtamista.",
+    "Replace this customer's saved dashboard layout with the original layout?":
+      "Korvataanko tämän asiakkaan tallennettu dashboard-rakenne alkuperäisellä rakenteella?",
+
     "Checking the dataset…": "Tarkistetaan aineistoa…",
     "Analysis unavailable": "Analyysiä ei voi aloittaa",
     "Activate a compatible dataset and reopen the workspace.":

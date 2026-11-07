@@ -84,11 +84,13 @@
     saveTimer;
   let saveQueue = Promise.resolve();
   let switchingReview = false;
+  let profileMode = "saved";
+  let customerDraft = null;
   function storageStatus(fi, en) {
     $("#review-storage-status").textContent = language === "fi" ? fi : en;
   }
   function scheduleReviewSave() {
-    if (storageLoading || !storageReady || storageBlocked) return;
+    if (profileMode !== "saved" || storageLoading || !storageReady || storageBlocked) return;
     clearTimeout(saveTimer);
     if (JSON.stringify(chatWorkspace()) === savedSignature) return;
     storageStatus("Tallennetaan…", "Saving…");
@@ -98,6 +100,7 @@
   }
   function flushReviewSave() {
     clearTimeout(saveTimer);
+    if (profileMode !== "saved") return saveQueue;
     if (storageBlocked) return Promise.reject(new Error("Reload the page before saving."));
     if (storageLoading || !storageReady) return saveQueue;
     const workspace = structuredClone(chatWorkspace());
@@ -143,7 +146,7 @@
     storageLoading = true;
     storageReady = false;
     state.chatRevision += 1;
-    $("main").inert = true;
+    $("#workspace").inert = true;
     $("#composer").inert = true;
     storageStatus("Ladataan katsausta…", "Loading review…");
     try {
@@ -177,6 +180,8 @@
         ])
           state[key] = record.workspace[key];
       }
+      profileMode = "saved";
+      customerDraft = null;
       savedRevision = record.revision;
       savedSignature = JSON.stringify(chatWorkspace());
       storageReady = true;
@@ -195,12 +200,51 @@
       return false;
     } finally {
       storageLoading = false;
-      $("main").inert = false;
-      $("#composer").inert = false;
+      $("#workspace").inert = false;
+      $("#composer").inert = profileMode === "original";
       render();
       renderChat();
     }
   }
+  async function switchProfileMode(nextMode) {
+    $("#review-profile-mode").value = profileMode;
+    if (nextMode === profileMode || switchingReview || storageLoading) return;
+    if (!storageReady || state.asking || state.generating) {
+      status(t("Wait until loading or editing has finished before switching views."));
+      return;
+    }
+    switchingReview = true;
+    $("#workspace").inert = true;
+    $("#composer").inert = true;
+    try {
+      await flushReviewSave();
+      const revision = state.chatRevision + 1;
+      if (nextMode === "original") {
+        customerDraft = structuredClone(state);
+        Object.assign(state, structuredClone(defaultReviewState), {
+          customer: state.customer,
+          chatRevision: revision,
+        });
+        profileMode = "original";
+      } else {
+        Object.assign(state, customerDraft, { chatRevision: revision });
+        customerDraft = null;
+        profileMode = "saved";
+      }
+      render();
+      renderChat();
+    } catch {
+      // Keep the current view and its edits when saving fails.
+    } finally {
+      switchingReview = false;
+      $("#workspace").inert = false;
+      $("#composer").inert = profileMode === "original";
+      $("#review-profile-mode").value = profileMode;
+    }
+  }
+  $("#review-profile-mode").addEventListener("change", (event) => {
+    switchProfileMode(event.target.value);
+  });
   window.addEventListener("pagehide", () => {
     flushReviewSave().catch(() => {});
   });
@@ -469,6 +513,19 @@
     renderDashboardEdits();
     renderDashboardLayout();
     if (state.view === "analysis") renderAnalysis();
+    const original = profileMode === "original";
+    $("#review-profile-mode").value = profileMode;
+    $("#profile-mode-help").textContent = t(
+      original
+        ? "Original template preview. Your saved review is unchanged. Select Saved customer review to edit."
+        : "Edits are saved to this customer’s review.",
+    );
+    $("#reset-dashboard").disabled = original;
+    $("#customer-profile-kpis").hidden = original;
+    $("#composer").inert = original || switchingReview || storageLoading;
+    $("#open-review").disabled ||= original;
+    const meetingNote = $("#meeting-note");
+    if (meetingNote) meetingNote.disabled = original;
     scheduleReviewSave();
   }
   function customerKpis() {
@@ -1077,7 +1134,7 @@
     $("#customer").value = state.customer;
     if (switchingReview) return;
     switchingReview = true;
-    $("main").inert = true;
+    $("#workspace").inert = true;
     $("#composer").inert = true;
     try {
       await flushReviewSave();
@@ -1086,8 +1143,8 @@
       /* The persistent save status explains the error. */
     } finally {
       switchingReview = false;
-      $("main").inert = false;
-      $("#composer").inert = false;
+      $("#workspace").inert = false;
+      $("#composer").inert = profileMode === "original";
     }
   });
   for (const id of ["site", "baseline", "priority", "from", "to", "country", "continent"])
@@ -1134,6 +1191,11 @@
     $("#evidence").showModal();
   });
   $("#reset-dashboard").addEventListener("click", () => {
+    if (
+      profileMode !== "saved" ||
+      !window.confirm(t("Replace this customer's saved dashboard layout with the original layout?"))
+    )
+      return;
     state.dashboardLayout = globalThis.WorkspaceModel.defaultDashboardLayout();
     state.chatRevision += 1;
     render();

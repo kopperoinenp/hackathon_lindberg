@@ -74,6 +74,12 @@
     <main id="workspace" hidden>
       <div class="toolbar">
         <span id="review-storage-status" role="status" aria-live="polite"></span>
+        <label for="review-profile-mode"
+          >Dashboard view<select id="review-profile-mode" aria-describedby="profile-mode-help">
+            <option value="saved">Saved customer review</option>
+            <option value="original">Original template</option>
+          </select></label
+        >
         <button id="reset-dashboard" class="text-button" type="button">Reset dashboard</button>
         <label for="customer">Customer<select id="customer"></select></label
         ><button id="open-review" class="primary">
@@ -91,9 +97,16 @@
           </svg>
         </a>
       </div>
+      <p id="profile-mode-help" class="profile-mode-help">
+        Edits are saved to this customer’s review.
+      </p>
       <section id="customer-overview" aria-label="Customer overview" aria-live="polite"></section>
       <section id="summary-panel" role="tabpanel" aria-labelledby="summary-tab">
-        <section class="review-priorities" aria-labelledby="review-priorities-title">
+        <section
+          id="customer-profile-kpis"
+          class="review-priorities"
+          aria-labelledby="review-priorities-title"
+        >
           <span class="section-kicker">CUSTOMER FOCUS</span>
           <h2 id="review-priorities-title">Contract KPIs and meeting agenda</h2>
           <p class="quiet">
