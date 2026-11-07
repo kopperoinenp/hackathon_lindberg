@@ -2,6 +2,10 @@
 (function (root) {
   "use strict";
   const finnish = {
+    "Source data cannot be edited through the assistant. Use a KAM note or estimate instead.":
+      "Lähdeaineistoa ei voi muuttaa apurilla. Voit lisätä KAM:in muistiinpanon tai arvion.",
+    "Approved service proposals stay at the end of the presentation.":
+      "Hyväksytyt palveluehdotukset säilyvät esityksen lopussa.",
     "Customer relationship": "Asiakassuhde",
     "Internal KAM assessment. Only shown in Explore data, never on presentation slides.":
       "KAM:in sisäinen arvio. Näkyy vain Tutki dataa -sivulla, ei esityksen dioissa.",

@@ -152,6 +152,9 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
   assert.equal(foreignAssessment.status, 403);
   assert.equal(page.status, 200);
   assert.ok(page.url.endsWith("/kopperoinenp/index.html"));
+  const legacy = await fetch(`${origin}/kopperoinenp-v2/index.html`);
+  assert.equal(legacy.status, 200);
+  assert.ok(legacy.url.endsWith("/kopperoinenp/index.html"));
   const html = await page.text();
   assert.ok(html.includes('new EventSource("/__preview_events")'));
   const assets = [...html.matchAll(/(?:src|href)="([^"#]+\.(?:js|css))"/g)].map((m) => m[1]);
@@ -193,7 +196,7 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
   assert.equal(logo.headers.get("content-type"), "image/webp");
   const escape = await fetch(`${origin}/%2e%2e%2fpackage.json`);
   assert.equal(escape.status, 404);
-  for (const old of ["kopperoinenp-v1", "kopperoinenp-v2"]) {
+  for (const old of ["kopperoinenp-v1"]) {
     assert.equal((await fetch(`${origin}/${old}/index.html`)).status, 404);
   }
   const config = await (await fetch(`${origin}/api/presentations/config`)).json();

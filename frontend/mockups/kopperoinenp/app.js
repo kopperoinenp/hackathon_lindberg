@@ -2991,6 +2991,7 @@
       state.chat.push({ user: false, text: text });
     } finally {
       state.asking = false;
+      renderUpsells();
       renderChat();
       updateChatToggle();
     }
