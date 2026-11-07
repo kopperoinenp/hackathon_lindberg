@@ -1177,3 +1177,11 @@ button:disabled {
   opacity: 0.35;
   pointer-events: none;
 }
+
+.message.pending {
+  color: #687b88;
+  background: #f4f7fa;
+}
+.message {
+  white-space: pre-wrap;
+}

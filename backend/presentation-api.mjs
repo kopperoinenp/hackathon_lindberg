@@ -8,10 +8,12 @@ import {
 } from "./presentation-model.mjs";
 import { generatePlan, providerConfig } from "./ai-provider.mjs";
 import { renderPowerPoint } from "./powerpoint.mjs";
+import { runReviewChat } from "./review-chat.mjs";
 import { templateStandard } from "./lindstrom-template.mjs";
 const files = new Map();
 const ttl = 10 * 60 * 1000;
 let busy = false;
+let chatBusy = false;
 function json(response, status, value) {
   response.writeHead(status, {
     "Content-Type": "application/json; charset=utf-8",
@@ -65,6 +67,20 @@ export async function handlePresentationApi(request, response, url) {
     for (const [id, file] of files) if (Date.now() > file.expires) files.delete(id);
     if (url.pathname === "/api/presentations/config" && request.method === "GET") {
       json(response, 200, providerConfig());
+      return true;
+    }
+    if (url.pathname === "/api/chat" && request.method === "POST") {
+      if (chatBusy)
+        throw new PresentationError(
+          "Apuri käsittelee edellistä viestiä. Yritä hetken kuluttua.",
+          429,
+        );
+      chatBusy = true;
+      try {
+        json(response, 200, await runReviewChat(await readJson(request)));
+      } finally {
+        chatBusy = false;
+      }
       return true;
     }
     const match = url.pathname.match(/^\/api\/presentations\/([a-f0-9-]{36})(\/download)?$/);
@@ -151,7 +167,9 @@ export async function handlePresentationApi(request, response, url) {
       error:
         error instanceof PresentationError
           ? error.message
-          : "PowerPointin muodostaminen epäonnistui.",
+          : url.pathname === "/api/chat"
+            ? "Apurin pyynnön käsittely epäonnistui."
+            : "PowerPointin muodostaminen epäonnistui.",
     });
   }
   return true;

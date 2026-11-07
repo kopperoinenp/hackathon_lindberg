@@ -29,3 +29,10 @@ Owned files: new backend presentation modules, existing preview/API entry point,
 presentation dialog and handlers, development checks, package/lockfile, related
 tests and these integration documents. Existing unrelated uncommitted scaffold
 files are preserved. Contract: [PRESENTATION_API.md](PRESENTATION_API.md).
+
+## Approved editing chat
+
+On 2026-11-07 the task owner authorized connecting the existing chat to AI for
+page edits. The interaction stays in the current composer and acknowledges only
+completion. Scope, chart, insight selection and explicit text edits use a validated
+patch; generated executable UI code is outside this interface. See [CHAT_API.md](CHAT_API.md).

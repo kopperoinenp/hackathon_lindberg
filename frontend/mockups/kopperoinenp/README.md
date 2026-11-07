@@ -2,10 +2,11 @@
 
 Human owner: kopperoinenp. This is the single maintained mock for this owner.
 Earlier v1/v2 directories have been removed at the task owner's request.
-No backend, external AI, production storage or framework is included.
+A local Node backend serves AI editing and PowerPoint export. No production storage
+or frontend framework is included.
 
-Run `pnpm preview` from the repository root. Open the printed local URL, or open
-this directory's `index.html` directly. Runtime files are plain HTML/CSS/JS.
+Run `pnpm preview` from the repository root. Open the printed local URL to use the API integration.
+Runtime files are plain HTML/CSS/JS.
 
 The top menu switches two panels in the same page:
 
@@ -20,10 +21,10 @@ shows its geography and period. Switching views preserves the selection and note
 Changing the customer, time, geography or baseline clears scope-specific notes.
 Invalid periods and empty selections display a missing-data state and disable export.
 
-Supported simulated chat examples: `keskity päästöihin`, `näytä Turun tilanne`,
-`rajaa Suomeen 2025-01 2025-03`, `näytä kaikki toimipaikat`, `vertaa kotipesuun`,
-`lisää esitykseen: sovitaan seuranta asiakkaan kanssa`.
-Other requests receive a limitation message rather than an invented analysis.
+Chat examples: `Näytä Suomen tammi–maaliskuu 2025 ja painota päästöjä`,
+`Entä Ruotsi?`, `Näytä vain vesi ja päästöt`, `Vaihda otsikoksi Vuoden asiakasarvo`.
+The AI interprets instructions into a typed patch; the backend validates all edits.
+The chat only acknowledges `Valmis` or `Ei muutoksia.`; failures show a short error.
 
 The source workbook is tracked unchanged in `data/source/`. Its three fictional
 customers have sites in Finland, Sweden and Poland, all in Europe. No other
@@ -58,8 +59,8 @@ The supplied PowerPoint reference is retained unchanged in `docs/references/`.
 
 The customer summary opens immediately with neutral default ordering, with no
 briefing form or required goals. Previously saved browser briefings are ignored.
-Users can adjust emphasis through the simulated chat or detailed analysis controls.
-Every insight explains its relevance. No generative AI service is called.
+Users can adjust emphasis through the AI editing chat or detailed analysis controls.
+Every insight explains its relevance; all calculations remain deterministic.
 
 `Avaa esitys` prepares the current review and opens it in a separate browser tab.
 The adjacent icon downloads the genuine editable PowerPoint. The viewer shows
@@ -69,5 +70,5 @@ Ready unchanged reviews are reused for ten minutes without another model call.
 
 The current interface is approved as the product baseline (docs/UI_BASELINE.md).
 OpenAI and Copilot are interchangeable behind the backend presentation-plan
-contract. The main summary chat remains simulated; only presentation planning
-is connected to AI in this first integration. API keys never enter this frontend.
+contract. The summary editing chat and presentation planning
+use separate strict schemas through the shared AI adapter. API keys never enter this frontend.

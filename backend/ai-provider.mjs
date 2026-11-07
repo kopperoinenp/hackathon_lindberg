@@ -87,15 +87,7 @@ async function post(url, token, body, fetchImpl, signal) {
     );
   }
 }
-export async function generatePlan(deck, { env = process.env, fetchImpl = fetch } = {}) {
-  const config = providerConfig(env);
-  if (!config.configured)
-    throw new PresentationError(
-      config.provider === "copilot"
-        ? "Copilot-käyttöoikeutta ei ole määritetty backendissä."
-        : "OpenAI API -avainta ei ole määritetty backendissä.",
-      503,
-    );
+export async function generatePlan(deck, options = {}) {
   const input = JSON.stringify({
     customer: deck.customer,
     period: deck.period,
@@ -110,6 +102,23 @@ export async function generatePlan(deck, { env = process.env, fetchImpl = fetch 
         boundary,
       })),
   });
+  return generateStructured(
+    { instructions, input, schema: planSchema, name: "customer_review_plan" },
+    options,
+  );
+}
+export async function generateStructured(
+  { instructions, input, schema, name },
+  { env = process.env, fetchImpl = fetch } = {},
+) {
+  const config = providerConfig(env);
+  if (!config.configured)
+    throw new PresentationError(
+      config.provider === "copilot"
+        ? "Copilot-käyttöoikeutta ei ole määritetty backendissä."
+        : "OpenAI API -avainta ei ole määritetty backendissä.",
+      503,
+    );
   if (Buffer.byteLength(input, "utf8") > 32768)
     throw new PresentationError("AI-palvelulle annettu aineisto on liian suuri.", 400);
   const signal = AbortSignal.timeout(90000);
@@ -128,9 +137,9 @@ export async function generatePlan(deck, { env = process.env, fetchImpl = fetch 
         text: {
           format: {
             type: "json_schema",
-            name: "customer_review_plan",
+            name,
             strict: true,
-            schema: planSchema,
+            schema,
           },
         },
       },
@@ -178,7 +187,7 @@ export async function generatePlan(deck, { env = process.env, fetchImpl = fetch 
       env.COPILOT_ACCESS_TOKEN,
       {
         message: {
-          text: `${instructions}\nSchema: ${JSON.stringify(planSchema)}\nInput: ${input}`,
+          text: `${instructions}\nSchema: ${JSON.stringify(schema)}\nInput: ${input}`,
         },
         locationHint: { timeZone: "Europe/Helsinki" },
         contextualResources: { webContext: { isWebEnabled: false } },

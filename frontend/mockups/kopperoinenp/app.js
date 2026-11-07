@@ -13,6 +13,11 @@
     country: "all",
     continent: "all",
     metric: "water",
+    summaryMetric: "auto",
+    visibleInsights: [...globalThis.MeetingModel.insightIds],
+    heading: "",
+    asking: false,
+    chatRevision: 0,
     view: "summary",
     site: "all",
     baseline: "B_LOCAL",
@@ -96,6 +101,7 @@
         )}</select></div><div class="trend-chart" style="grid-template-columns:repeat(${points.length}, minmax(0,1fr))" role="img" aria-label="${def.label}: ${points.map((point) => `${point.month} ${f(point.value / def.divisor, 1)} ${def.unit}`).join(", ")}">${points.map((point) => `<div class="trend-column"><span>${f(point.value / def.divisor)}</span><div class="trend-track"><i style="height:${(point.value / max) * 100}%"></i></div><small>${point.month.slice(5)}</small></div>`).join("")}</div><p class="quiet">${def.label} (${def.unit}) · Synteettinen ${state.metric === "repairs" ? "tapahtumamäärä" : "allokoitu arvio"}. Kuukausien kokonaismäärät, ei tehokkuusvertailu.</p></section><section class="analysis-card"><h2>Jakauma maittain</h2>${countries.map((point) => `<div class="country-row"><div><span>${globalThis.WorkspaceModel.countryNames[point.country]}</span><strong>${f(point.value / def.divisor, 1)} ${def.unit}</strong></div><div class="bar-track"><div class="bar-fill" style="width:${(point.value / countryMax) * 100}%"></div></div></div>`).join("")}<p class="quiet">${def.label} valitulta ajalta. Maakohtainen kokonaismäärä riippuu myös palvelun laajuudesta.</p></section></div><section class="analysis-card"><h2>Toimipaikat ja tekstiilien käyttö</h2><p class="quiet">Tilanne ${snapshotName()}. Skannausosuus ei yksin osoita vajaakäyttöä. Vesi ja korjaukset ovat koko valitulta jaksolta.</p><div class="table-wrap"><table><thead><tr><th>Toimipaikka</th><th>Maa</th><th>Skannattu</th><th>Allokoitu</th><th>Vesi, m³</th><th>Korjaukset</th></tr></thead><tbody>${ctx.sites.map((site) => `<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${globalThis.WorkspaceModel.countryNames[site.country]}</td><td>${site.utilization == null ? "Ei tietoa" : f(site.utilization, 1) + " %"}</td><td>${f(site.allocated)}</td><td>${f(site.water / 1000)}</td><td>${f(site.repairs)}</td></tr>`).join("")}</tbody></table></div></section>`;
   }
   function render() {
+    $("#customer").value = state.customer;
     invalidatePowerPoint();
     const ctx = context();
     const months = [...new Set(data.records.map((row) => row.month))].sort();
@@ -220,12 +226,18 @@
   }
   function summaryGraphics() {
     const ctx = context();
-    const metric =
-      state.priority === "emissions"
-        ? "emissions"
-        : ["circularity", "efficiency"].includes(state.priority)
-          ? "repairs"
-          : "water";
+    const preferredMetric =
+      state.summaryMetric !== "auto"
+        ? state.summaryMetric
+        : state.priority === "emissions"
+          ? "emissions"
+          : ["circularity", "efficiency"].includes(state.priority)
+            ? "repairs"
+            : "water";
+    const metric = state.visibleInsights.includes(preferredMetric)
+      ? preferredMetric
+      : ["water", "emissions", "repairs"].find((id) => state.visibleInsights.includes(id));
+    if (!metric) return "";
     const def = globalThis.SummaryCharts.definitions[metric];
     const points = globalThis.SummaryCharts.comparisonPoints(ctx, metric);
     const peak = points.reduce(
@@ -265,15 +277,20 @@
       state.customer
     ];
     const cards = results();
+    const visibleOrder = order.filter((id) => state.visibleInsights.includes(id));
+    const title = state.heading
+      ? esc(state.heading)
+      : `${shortName} ${periodName()}.<br />Mitä saatiin aikaan?`;
+
     $("#story").innerHTML =
-      `<section class="intro"><span class="section-kicker">VUOSIPALAVERIN VALMISTELU</span><h1>${shortName} ${periodName()}.<br />Mitä saatiin aikaan?</h1><p>${opening()}</p><div class="scope"><strong>${esc(scopeName())}</strong> · ${m.sites} ${m.sites === 1 ? "toimipaikka" : "toimipaikkaa"} · Vertailu: ${baselineName()}</div></section><section class="story-section" aria-labelledby="results-title"><div class="section-heading"><span class="section-number">01</span><h2 id="results-title">Jakson tärkeimmät tulokset</h2></div><div class="results">${order
+      `<section class="intro"><span class="section-kicker">VUOSIPALAVERIN VALMISTELU</span><h1>${title}</h1><p>${opening()}</p><div class="scope"><strong>${esc(scopeName())}</strong> · ${m.sites} ${m.sites === 1 ? "toimipaikka" : "toimipaikkaa"} · Vertailu: ${baselineName()}</div></section><section class="story-section" aria-labelledby="results-title"${visibleOrder.length ? "" : " hidden"}><div class="section-heading"><span class="section-number">01</span><h2 id="results-title">Jakson tärkeimmät tulokset</h2></div><div class="results">${visibleOrder
         .map((key) => {
           const card = cards[key];
           return `<article class="result"><div class="result-name">${card.name}</div><div class="result-value">${card.value}</div><span class="result-unit">${card.unit}</span>${card.visual}<h3>${card.title}</h3><p>${card.text}</p><div class="relevance"><strong>Miksi tämä nostetaan?</strong><p>${esc(globalThis.MeetingModel.relevance(key, state.priority, false))}</p></div><small>${card.boundary}</small></article>`;
         })
         .join(
           "",
-        )}</div><p class="quiet">Synteettinen aineisto. Vertailu kuvaa vaihtoehtoista pesumallia samalla pestyllä määrällä, ei nimettyä kilpailijaa.</p>${summaryGraphics()}</section><section class="story-section" aria-labelledby="opportunity-title"><div class="section-heading"><span class="section-number">02</span><h2 id="opportunity-title">Tärkein asia selvitettäväksi</h2></div><div class="opportunity"><div><span class="section-kicker">${esc(focus.site_name)}</span><h3>Vastaako tekstiilien määrä todellista tarvetta?</h3><p>${f(focus.unscanned)} allokoidulle tekstiilille ei näy aktiivista skannausta ${snapshotName()}. Aloitetaan tästä toimipaikasta ja tarkistetaan tilanne yhdessä asiakkaan kanssa.</p></div><div class="opportunity-visual">${snapshotGraphic(focus)}</div></div><p class="relevance">${esc(globalThis.MeetingModel.relevance("opportunity", state.priority, false))}</p>${siteBenchmark()}<details class="site-details"><summary>Katso myös muut toimipaikat</summary><div class="table-wrap"><table><thead><tr><th>Toimipaikka</th><th>Skannattu ${snapshotName()}</th><th>Allokoituja tekstiilejä</th></tr></thead><tbody>${sites.map((site) => `<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${f(site.utilization, 1)} %</td><td>${f(site.allocated)}</td></tr>`).join("")}</tbody></table></div><p class="quiet">Avaa toimipaikka nähdäksesi sen oman katsauksen. Palaa kokonaisuuteen pyytämällä apurilta ”näytä kaikki toimipaikat”.</p></details></section><section class="story-section" aria-labelledby="next-title"><div class="section-heading"><span class="section-number">03</span><h2 id="next-title">Yhteinen suunta ensi vuodelle</h2></div><div class="next-chapter"><div><h3>Yksi hyvä parannus<br />kerrallaan.</h3><p>Ota palaveriin mukaan selkeä keskustelunavaus. Nämä ovat ehdotuksia, joista sovitaan asiakkaan kanssa.</p></div><ol class="next-steps">${plan()
+        )}</div><p class="quiet">Synteettinen aineisto. Vertailu kuvaa vaihtoehtoista pesumallia samalla pestyllä määrällä, ei nimettyä kilpailijaa.</p>${summaryGraphics()}</section><section class="story-section" aria-labelledby="opportunity-title"${state.visibleInsights.includes("opportunity") ? "" : " hidden"}><div class="section-heading"><span class="section-number">02</span><h2 id="opportunity-title">Tärkein asia selvitettäväksi</h2></div><div class="opportunity"><div><span class="section-kicker">${esc(focus.site_name)}</span><h3>Vastaako tekstiilien määrä todellista tarvetta?</h3><p>${f(focus.unscanned)} allokoidulle tekstiilille ei näy aktiivista skannausta ${snapshotName()}. Aloitetaan tästä toimipaikasta ja tarkistetaan tilanne yhdessä asiakkaan kanssa.</p></div><div class="opportunity-visual">${snapshotGraphic(focus)}</div></div><p class="relevance">${esc(globalThis.MeetingModel.relevance("opportunity", state.priority, false))}</p>${siteBenchmark()}<details class="site-details"><summary>Katso myös muut toimipaikat</summary><div class="table-wrap"><table><thead><tr><th>Toimipaikka</th><th>Skannattu ${snapshotName()}</th><th>Allokoituja tekstiilejä</th></tr></thead><tbody>${sites.map((site) => `<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${f(site.utilization, 1)} %</td><td>${f(site.allocated)}</td></tr>`).join("")}</tbody></table></div><p class="quiet">Avaa toimipaikka nähdäksesi sen oman katsauksen. Palaa kokonaisuuteen pyytämällä apurilta ”näytä kaikki toimipaikat”.</p></details></section><section class="story-section" aria-labelledby="next-title"><div class="section-heading"><span class="section-number">03</span><h2 id="next-title">Yhteinen suunta ensi vuodelle</h2></div><div class="next-chapter"><div><h3>Yksi hyvä parannus<br />kerrallaan.</h3><p>Ota palaveriin mukaan selkeä keskustelunavaus. Nämä ovat ehdotuksia, joista sovitaan asiakkaan kanssa.</p></div><ol class="next-steps">${plan()
         .map(([title, note]) => `<li>${esc(title)}<small>${esc(note)}</small></li>`)
         .join(
           "",
@@ -289,137 +306,103 @@
     state.note = "";
     state.titleEdits = {};
     state.chat = [];
+    state.heading = "";
+    state.chatRevision += 1;
   }
-  function reply(question) {
-    const text = question.toLocaleLowerCase("fi");
-    const selection = globalThis.MeetingModel.selectionCommand(question);
-    if (selection) {
-      state.included = selection.include
-        ? [...new Set([...state.included, selection.id])]
-        : state.included.filter((id) => id !== selection.id);
-      render();
-      return selection.include
-        ? "Nosto on mukana nykyisessä esityksessä. Avaa esitys tarkistaaksesi kokonaisuuden."
-        : "Poistin noston esityksestä. Se säilyy katsauksen taustatietona. Lähteet ja tulkinnan rajat pysyvät mukana.";
-    }
-    let change = "";
-    if (/lisää (esitykseen|katsaukseen|muistiinpano)/.test(text)) {
-      state.note = question.replace(
-        /^.*?lisää (?:esitykseen|katsaukseen|muistiinpano(?:ksi)?)[\s:]+/i,
-        "",
-      );
-      render();
-      return "Lisäsin tekstin esityksen muistiinpanoksi. Se näkyy Yhteinen suunta ensi vuodelle -osiossa ja esityksen esikatselussa.";
-    }
-    if (/näytä|keskity|painota|vaihda|vertaa|tarkastele|rajaa/.test(text)) {
-      const country = /suomi|suomen|suomeen/.test(text)
-        ? "Finland"
-        : /ruotsi|ruotsin|ruotsiin/.test(text)
-          ? "Sweden"
-          : /puola|puolan|puolaan/.test(text)
-            ? "Poland"
-            : null;
-      if (country) {
-        if (
-          !data.sites.some((row) => row.customer_id === state.customer && row.country === country)
-        )
-          return "Tällä asiakkaalla ei ole toimipaikkoja pyydetyssä maassa. En muuttanut rajausta.";
-        state.country = country;
-        state.site = "all";
-        clearScope();
-        change = `Rajasin katsauksen maahan ${globalThis.WorkspaceModel.countryNames[country]}.`;
-      }
-      const months = text.match(/2025-(?:0[1-9]|1[0-2])/g);
-      if (months) {
-        state.from = months[0];
-        state.to = months[1] || months[0];
-        clearScope();
-        change += ` Valittu jakso on ${periodName()}.`;
-      }
-      const placeText = text
-        .replace(/turun/g, "turku")
-        .replace(/helsingin/g, "helsinki")
-        .replace(/tampereen/g, "tampere");
-      const site = data.sites
-        .filter((r) => r.customer_id === state.customer)
-        .find(
-          (r) =>
-            placeText.includes(r.site_name.toLowerCase()) ||
-            placeText.includes(r.city.toLowerCase()),
-        );
-      if (/kaikki toimipaikat|koko asiak/.test(text)) {
-        state.site = "all";
-        state.country = "all";
-        state.continent = "all";
-        clearScope();
-        change = "Näytän jälleen koko asiakkuuden.";
-      } else if (site) {
-        state.site = site.site_id;
-        state.country = "all";
-        state.continent = "all";
-        clearScope();
-        change = `Rajasin katsauksen toimipaikkaan ${site.site_name}.`;
-      }
-      const baseline = /kotipes/.test(text)
-        ? "B_HOME"
-        : /omaan pesul|oma pesul|omaa pesul|sisäi/.test(text)
-          ? "B_INHOUSE"
-          : /paikalli/.test(text)
-            ? "B_LOCAL"
-            : null;
-      if (baseline) {
-        state.baseline = baseline;
-        clearScope();
-        change += ` Vertailuna on nyt ${baselineName()}.`;
-      }
-      const priority = /päästö|ilmasto/.test(text)
-        ? "emissions"
-        : /vesi|veteen|veden|vettä/.test(text)
-          ? "water"
-          : /käyt|tehok|mitoit/.test(text)
-            ? "efficiency"
-            : /korj|kierto/.test(text)
-              ? "circularity"
-              : null;
-      if (priority) {
-        state.priority = priority;
-        change += " Muutin katsauksen painotusta ja esityksen nostojen järjestystä.";
-      }
-      if (change) {
-        render();
-        return (
-          change.trim() +
-          " Katsauksen lähtöluvut perustuvat samaan synteettiseen aineistoon. Rajauksen vaihto tyhjentää aiemman rajauksen muistiinpanot."
-        );
-      }
-    }
-    const { metrics: m, compare: c, focus } = context();
-    if (!m.hasData)
-      return "Nykyisellä rajauksella ei ole dataa. Korjaa ajanjakso tai alue Tutki dataa -näkymässä.";
-    if (/vesi|veden|vesis|veteen/.test(text))
-      return `Pesuun kohdistettu vedenkulutus on ${f(m.water / 1000)} m³. Samat ${f(m.kg)} pestyä kiloa kerrotaan vertailumallin l/kg-kertoimella. Ero on ${f(c.waterDifference / 1000)} m³. Vertailu: ${baselineName()}. Tämä on synteettinen arvio. Lähteet: Service_Activity, Customer_Impacts ja Baselines.`;
-    if (/päästö|ilmasto/.test(text))
-      return `Pesun ja toimitusten päästöarvio on ${f(m.emissions / 1000, 1)} t CO₂e. Ero vertailumalliin on ${f(c.emissionsDifference / 1000, 1)} t CO₂e. Lähteet: Customer_Impacts ja Baselines. Tekstiilien valmistus ja korjausten oletettu kädenjälki eivät sisälly rajaukseen.`;
-    if (/korj|kierto/.test(text))
-      return `Aineistossa on ${f(m.repairs)} korjaustapahtumaa. Lähde: Repairs.repair_count. Määrä ei kerro yksilöllisiä korjattuja tekstiilejä eikä sellaisenaan vältettyjä hankintoja. Siksi korjausten päästösäästöä ei tässä väitetä.`;
-    if (/käyt|paran|ensi|mitoit|skann/.test(text))
-      return `${focus.site_name}: ${snapshotName()} ${f(focus.utilization, 1)} % allokoiduista tekstiileistä näkyy aktiivisissa skannauksissa. ${f(focus.unscanned)} tekstiiliä jää ilman skannausta. Tarkistakaa varatekstiilit, sesonkitarve ja datan kattavuus. Vasta tämän jälkeen voidaan ehdottaa mitoituksen muutosta. Lähde: Service_Activity.`;
-    if (/kilpail|kustan|euro|säästö/.test(text))
-      return "Aineisto ei sisällä nimettyjen kilpailijoiden todennettuja tietoja tai hyväksyttyjä kustannus- ja työaikatietoja. En muodosta niistä säästöväitettä. Voimme verrata synteettisiä pesumalleja samalla pestyllä kilomäärällä.";
-    return "Tässä mockissa voin selittää vesi-, päästö- ja korjauslukuja tai tekstiilien käytön tarkistusta. Kokeile esimerkiksi ”keskity päästöihin”, ”näytä Turku”, ”näytä kaikki toimipaikat” tai ”vertaa kotipesuun”. Voit myös pyytää ”lisää esitykseen: asiakkaan tavoite on…”. Muut kysymykset vaativat myöhemmin oikean AI-yhteyden.";
+  function chatWorkspace() {
+    return {
+      ...presentationRequest(),
+      view: state.view,
+      metric: state.metric,
+      summaryMetric: state.summaryMetric,
+      visibleInsights: state.visibleInsights,
+      heading: state.heading,
+    };
   }
   function renderChat() {
-    $("#chat").innerHTML = state.chat
-      .map((msg) => `<p class="message ${msg.user ? "user" : ""}">${esc(msg.text)}</p>`)
-      .join("");
+    $("#chat").innerHTML =
+      state.chat
+        .map((msg) => `<p class="message ${msg.user ? "user" : ""}">${esc(msg.text)}</p>`)
+        .join("") + (state.asking ? '<p class="message pending">Muokataan…</p>' : "");
     $("#chat").scrollTop = $("#chat").scrollHeight;
+    $("#question").disabled = state.asking;
+    $("#ask-form button[type=submit]").disabled = state.asking;
+    $("#ask-form").setAttribute("aria-busy", String(state.asking));
   }
-  function ask(question) {
-    const response = reply(question);
-    state.chat.push({ user: true, text: question }, { user: false, text: response });
-    renderChat();
+  async function ask(question) {
+    if (state.asking) return;
+    const workspace = chatWorkspace(),
+      snapshot = JSON.stringify(workspace),
+      revision = state.chatRevision;
+    const history = state.chat
+      .slice(-6)
+      .map((msg) => ({ role: msg.user ? "user" : "assistant", content: msg.text.slice(0, 1800) }));
+    state.chat.push({ user: true, text: question });
+    state.asking = true;
     $("#chat").hidden = false;
+    renderChat();
     updateChatToggle();
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: question, history, workspace }),
+        signal: AbortSignal.timeout(95000),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Apurin pyyntö epäonnistui.");
+      if (revision !== state.chatRevision || snapshot !== JSON.stringify(chatWorkspace())) {
+        status("Katsaus vaihtui viestin käsittelyn aikana. Vanhaa vastausta ei käytetty.");
+        return;
+      }
+      const next = result.workspace;
+      const customerChanged = state.customer !== next.scope.customer;
+      for (const key of [
+        "customer",
+        "from",
+        "to",
+        "country",
+        "continent",
+        "site",
+        "baseline",
+        "priority",
+      ])
+        state[key] = next.scope[key];
+      for (const key of [
+        "view",
+        "metric",
+        "summaryMetric",
+        "visibleInsights",
+        "included",
+        "note",
+        "heading",
+        "titleEdits",
+      ])
+        state[key] = next[key];
+      if (customerChanged) {
+        state.chat = [{ user: true, text: question }];
+        state.chatRevision += 1;
+      }
+      render();
+      state.chat.push({ user: false, text: result.changed.length ? "Valmis" : "Ei muutoksia." });
+      if (result.changed.length) status("Valmis");
+    } catch (error) {
+      if (revision !== state.chatRevision || snapshot !== JSON.stringify(chatWorkspace())) {
+        status("Katsaus vaihtui. Voit lähettää uuden viestin nykyisestä rajauksesta.");
+        return;
+      }
+      const text =
+        error.name === "TimeoutError"
+          ? "Vastauksen hakeminen kesti liian kauan. Yritä uudelleen."
+          : error.name === "TypeError"
+            ? "Yhteys apuriin ei onnistunut. Yritä hetken kuluttua."
+            : error.message;
+      state.chat.push({ user: false, text: text });
+    } finally {
+      state.asking = false;
+      renderChat();
+      updateChatToggle();
+    }
   }
   $("#toggle-chat").addEventListener("click", () => {
     $("#chat").hidden = !$("#chat").hidden;
@@ -469,6 +452,8 @@
     state.country = "all";
     state.continent = "all";
     state.priority = "neutral";
+    state.visibleInsights = [...globalThis.MeetingModel.insightIds];
+    state.summaryMetric = "auto";
     clearScope();
     render();
     status("Asiakkaan oletuskatsaus on valmis.");

@@ -24,9 +24,12 @@ Never put a real key into an example file or a PR.
 Set `PRESENTATION_PROVIDER=openai`, `OPENAI_API_KEY` and optionally `OPENAI_MODEL`
 (default `gpt-5-mini`). The model chooses approved headline variants and ordering
 from computed evidence. It does not generate arbitrary slide prose or numerical
-claims in this first integration. Only the selected synthetic customer's computed
-insights are sent. Manager free-text notes/title edits stay out of the AI prompt.
-Paid calls happen only when the user presses the generation button. No paid calls
+claims in this first integration. Presentation planning sends only the selected synthetic customer's computed
+insights; manager notes/title edits stay out of that presentation prompt. The
+editing chat sends its instruction, recent history, workspace, synthetic catalog
+and computed evidence. See `docs/CHAT_API.md` for the separate chat contract.
+Presentation calls happen when the user opens a new presentation. Chat instructions also
+make paid calls through the same provider. No paid calls
 run in the automated tests; provider behavior is tested with injected HTTP fakes.
 
 ## Switch to Microsoft 365 Copilot
@@ -82,3 +85,11 @@ The enforced narrative and common/personalized structure follow reference slides
 10 and 11; see `docs/PRESENTATION_STANDARD.md`. Transport follows bounded-call
 patterns: fixed endpoints, no redirects/retries, one overall timeout, bounded
 response bytes and explicit response-shape checks. Restart after changing `.env`.
+
+## Review editing chat
+
+The summary chat now applies validated scope, chart, insight-selection and explicit
+text edits through `POST /api/chat`. It acknowledges only `Valmis` or `Ei muutoksia.`.
+It cannot change calculations or execute generated page code. No fake keyword
+response is used when the API fails. `deterministic` mode disables this chat.
+See `docs/NEXT_STEPS.md` for the reference-deck-based project roadmap.

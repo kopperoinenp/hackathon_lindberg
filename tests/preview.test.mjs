@@ -83,6 +83,24 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
     body: JSON.stringify({ included: [] }),
   });
   assert.equal(invalid.status, 400);
+  const chatUnavailable = await fetch(`${origin}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workspace: { scope: {} }, message: "Painota vettä" }),
+  });
+  assert.equal(chatUnavailable.status, 503);
+  const chatDenied = await fetch(`${origin}/api/chat`, {
+    method: "POST",
+    headers: { Origin: "https://untrusted.example", "Content-Type": "application/json" },
+    body: "{}",
+  });
+  assert.equal(chatDenied.status, 403);
+  const chatInvalid = await fetch(`${origin}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{",
+  });
+  assert.equal(chatInvalid.status, 400);
   const created = await fetch(`${origin}/api/presentations`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
