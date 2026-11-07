@@ -75,6 +75,201 @@
     dashboardLayout: globalThis.WorkspaceModel.defaultDashboardLayout(),
     chat: [],
   };
+  const defaultReviewState = structuredClone(state);
+  let storageLoading = true,
+    storageReady = false,
+    storageBlocked = false;
+  let savedSignature = "",
+    savedRevision = 0,
+    saveTimer;
+  let saveQueue = Promise.resolve();
+  let switchingReview = false;
+  let profileMode = "original";
+  let customerDraft = null;
+  function storageStatus(fi, en) {
+    $("#review-storage-status").textContent = language === "fi" ? fi : en;
+  }
+  function scheduleReviewSave() {
+    if (profileMode !== "saved" || storageLoading || !storageReady || storageBlocked) return;
+    clearTimeout(saveTimer);
+    if (JSON.stringify(chatWorkspace()) === savedSignature) return;
+    storageStatus("Tallennetaan…", "Saving…");
+    saveTimer = setTimeout(() => {
+      flushReviewSave().catch(() => {});
+    }, 250);
+  }
+  function flushReviewSave(force = false) {
+    clearTimeout(saveTimer);
+    if (profileMode !== "saved") return saveQueue;
+    if (storageBlocked) return Promise.reject(new Error("Reload the page before saving."));
+    if (storageLoading || !storageReady) return saveQueue;
+    const workspace = structuredClone(chatWorkspace());
+    const operation = saveQueue.then(async () => {
+      const signature = JSON.stringify(workspace);
+      if (!force && signature === savedSignature) return;
+      if (storageBlocked) throw new Error("Reload the page before saving.");
+      try {
+        const response = await fetch(
+          `/api/reviews/${encodeURIComponent(workspace.scope.customer)}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ revision: savedRevision, workspace }),
+            keepalive: true,
+            signal: AbortSignal.timeout(10000),
+          },
+        );
+        const result = await response.json();
+        if (!response.ok) {
+          if (response.status === 409) storageBlocked = true;
+          throw new Error(result.error || "Save failed");
+        }
+        savedRevision = result.revision;
+        savedSignature = signature;
+        storageStatus("Tallennettu", "Saved");
+      } catch (error) {
+        storageStatus(
+          storageBlocked
+            ? "Tallennusristiriita – lataa sivu uudelleen."
+            : "Tallennus epäonnistui. Muutokset ovat vain tällä sivulla.",
+          storageBlocked
+            ? "Save conflict – reload this page."
+            : "Save failed. Changes are only on this page.",
+        );
+        throw error;
+      }
+    });
+    saveQueue = operation.catch(() => {});
+    return operation;
+  }
+  async function loadCustomerReview(customer) {
+    storageLoading = true;
+    state.chatRevision += 1;
+    $("#workspace").inert = true;
+    $("#composer").inert = true;
+    storageStatus("Ladataan katsausta…", "Loading review…");
+    try {
+      const response = await fetch(`/api/reviews/${encodeURIComponent(customer)}`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(10000),
+      });
+      const record = await response.json();
+      if (!response.ok) throw new Error(record.error || "Load failed");
+      const revision = state.chatRevision;
+      Object.assign(state, structuredClone(defaultReviewState), {
+        customer,
+        chatRevision: revision,
+      });
+      if (record.workspace) {
+        Object.assign(state, record.workspace.scope);
+        for (const key of [
+          "view",
+          "metric",
+          "summaryMetric",
+          "visibleInsights",
+          "included",
+          "note",
+          "heading",
+          "titleEdits",
+          "slideOrder",
+          "cooperation",
+          "savings",
+          "managerTexts",
+          "dashboardLayout",
+        ])
+          state[key] = record.workspace[key];
+      }
+      profileMode = record.workspace ? "saved" : "original";
+      customerDraft = null;
+      savedRevision = record.revision;
+      savedSignature = JSON.stringify(chatWorkspace());
+      storageReady = true;
+      storageBlocked = false;
+      localStorage.setItem("lindstrom-review-customer", customer);
+      storageStatus(
+        record.workspace
+          ? "Tallennettu katsaus ladattu"
+          : "Tälle asiakkaalle ei ole vielä tallennettua katsausta.",
+        record.workspace ? "Saved review loaded" : "This customer has no saved review yet.",
+      );
+      return true;
+    } catch {
+      storageStatus(
+        "Valitun asiakkaan katsausta ei voitu ladata. Kokeile toista asiakasta.",
+        "Could not load the selected review. Try another customer.",
+      );
+      return false;
+    } finally {
+      storageLoading = false;
+      $("#workspace").inert = false;
+      $("#composer").inert = profileMode === "original";
+      render();
+      renderChat();
+    }
+  }
+  async function switchProfileMode(nextMode) {
+    $("#review-profile-mode").value = profileMode;
+    if (nextMode === profileMode || switchingReview || storageLoading) return;
+    if (nextMode === "saved" && savedRevision === 0) return;
+    if (!storageReady || state.asking || state.generating) {
+      status(t("Wait until loading or editing has finished before switching views."));
+      return;
+    }
+    switchingReview = true;
+    $("#workspace").inert = true;
+    $("#composer").inert = true;
+    try {
+      await flushReviewSave();
+      const revision = state.chatRevision + 1;
+      if (nextMode === "original") {
+        customerDraft = structuredClone(state);
+        Object.assign(state, structuredClone(defaultReviewState), {
+          customer: state.customer,
+          chatRevision: revision,
+        });
+        profileMode = "original";
+      } else {
+        Object.assign(state, customerDraft, { chatRevision: revision });
+        customerDraft = null;
+        profileMode = "saved";
+      }
+      render();
+      renderChat();
+    } catch {
+      // Keep the current view and its edits when saving fails.
+    } finally {
+      switchingReview = false;
+      $("#workspace").inert = false;
+      $("#composer").inert = profileMode === "original";
+      $("#review-profile-mode").value = profileMode;
+    }
+  }
+  $("#review-profile-mode").addEventListener("change", (event) => {
+    switchProfileMode(event.target.value);
+  });
+  $("#create-customer-review").addEventListener("click", async () => {
+    if (savedRevision > 0 || !storageReady || storageBlocked || switchingReview || storageLoading)
+      return;
+    switchingReview = true;
+    $("#workspace").inert = true;
+    const original = structuredClone(state);
+    try {
+      profileMode = "saved";
+      state.chatRevision += 1;
+      await flushReviewSave(true);
+    } catch {
+      profileMode = "original";
+      Object.assign(state, original);
+    } finally {
+      switchingReview = false;
+      $("#workspace").inert = false;
+      render();
+      renderChat();
+    }
+  });
+  window.addEventListener("pagehide", () => {
+    flushReviewSave().catch(() => {});
+  });
   const contractKpis = new Map();
   const includedAgendas = new Set();
   const kpiForm = $("#contract-kpi-form");
@@ -420,6 +615,32 @@
     renderDashboardEdits();
     renderDashboardLayout();
     if (state.view === "analysis") renderAnalysis();
+    const original = profileMode === "original";
+    const hasSavedReview = savedRevision > 0;
+    const customerName = data.customers.find(
+      (row) => row.customer_id === state.customer,
+    ).customer_name;
+    const savedOption = $("#review-profile-mode option[value=saved]");
+    savedOption.disabled = !hasSavedReview;
+    savedOption.textContent = `${t(hasSavedReview ? "Saved customer review" : "No saved review")} · ${customerName}`;
+    $("#create-customer-review").hidden = hasSavedReview;
+    $("#create-customer-review").disabled = !storageReady || storageBlocked || switchingReview;
+    $("#create-customer-review").textContent = `${t("Create customer review")} · ${customerName}`;
+    $("#review-profile-mode").value = profileMode;
+    $("#profile-mode-help").textContent = `${customerName}: ${t(
+      !hasSavedReview
+        ? "No review has been created for this customer. Create a customer review to edit and save it."
+        : original
+          ? "Original template preview. Your saved review is unchanged. Select Saved customer review to edit."
+          : "Edits are saved to this customer’s review.",
+    )}`;
+    $("#reset-dashboard").disabled = original;
+    $("#customer-profile-kpis").hidden = original;
+    $("#composer").inert = original || switchingReview || storageLoading;
+    $("#open-review").disabled ||= original;
+    const meetingNote = $("#meeting-note");
+    if (meetingNote) meetingNote.disabled = original;
+    scheduleReviewSave();
   }
   function customerKpis() {
     return contractKpis.get(state.customer) ?? [];
@@ -911,6 +1132,16 @@
       }
       const next = result.workspace;
       const customerChanged = state.customer !== next.scope.customer;
+      if (customerChanged) {
+        await flushReviewSave();
+        if (await loadCustomerReview(next.scope.customer))
+          status(
+            language === "fi"
+              ? "Asiakkaan tallennettu katsaus ladattu. Anna mahdolliset lisämuutokset tähän katsaukseen."
+              : "Customer review loaded. Apply further edits to this review.",
+          );
+        return;
+      }
       for (const key of [
         "customer",
         "from",
@@ -938,11 +1169,8 @@
         "dashboardLayout",
       ])
         state[key] = next[key];
-      if (customerChanged) {
-        state.chat = [{ user: true, text: question }];
-        state.chatRevision += 1;
-      }
       render();
+      await flushReviewSave();
       state.chat.push({ user: false, text: result.changed.length ? t("Done") : t("No changes.") });
       if (result.changed.length) {
         status(t("Done"));
@@ -1015,21 +1243,23 @@
   $("#customer").innerHTML = data.customers
     .map((r) => `<option value="${r.customer_id}">${esc(r.customer_name)}</option>`)
     .join("");
-  $("#customer").addEventListener("change", (event) => {
-    state.customer = event.target.value;
-    state.cooperation = "unrated";
-    state.savings = null;
-    state.managerTexts = {};
-    state.included = [...globalThis.MeetingModel.insightIds];
-    state.site = "all";
-    state.country = "all";
-    state.continent = "all";
-    state.priority = "neutral";
-    state.visibleInsights = [...globalThis.MeetingModel.insightIds];
-    state.summaryMetric = "auto";
-    clearScope();
-    render();
-    status(t("The customer's default review is ready."));
+  $("#customer").addEventListener("change", async (event) => {
+    const customer = event.target.value;
+    $("#customer").value = state.customer;
+    if (switchingReview) return;
+    switchingReview = true;
+    $("#workspace").inert = true;
+    $("#composer").inert = true;
+    try {
+      await flushReviewSave();
+      await loadCustomerReview(customer);
+    } catch {
+      /* The persistent save status explains the error. */
+    } finally {
+      switchingReview = false;
+      $("#workspace").inert = false;
+      $("#composer").inert = profileMode === "original";
+    }
   });
   for (const id of ["site", "baseline", "priority", "from", "to", "country", "continent"])
     $("#" + id).addEventListener("change", (event) => {
@@ -1051,6 +1281,7 @@
     if (event.target.id === "meeting-note") {
       state.note = event.target.value;
       invalidatePowerPoint();
+      scheduleReviewSave();
     }
   });
   document.addEventListener("click", (event) => {
@@ -1074,6 +1305,11 @@
     $("#evidence").showModal();
   });
   $("#reset-dashboard").addEventListener("click", () => {
+    if (
+      profileMode !== "saved" ||
+      !window.confirm(t("Replace this customer's saved dashboard layout with the original layout?"))
+    )
+      return;
     state.dashboardLayout = globalThis.WorkspaceModel.defaultDashboardLayout();
     state.chatRevision += 1;
     render();
@@ -1206,4 +1442,10 @@
   }
   bindLanguageControls(applyLanguage);
   applyLanguage();
+  const previousCustomer = localStorage.getItem("lindstrom-review-customer");
+  loadCustomerReview(
+    data.customers.some((row) => row.customer_id === previousCustomer)
+      ? previousCustomer
+      : state.customer,
+  );
 })();

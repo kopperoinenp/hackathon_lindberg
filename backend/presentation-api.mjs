@@ -11,6 +11,9 @@ import { renderPowerPoint } from "./powerpoint.mjs";
 import { runReviewChat } from "./review-chat.mjs";
 import { assessCooperation } from "./cooperation.mjs";
 import { templateStandard } from "./lindstrom-template.mjs";
+import { createReviewStore } from "./review-store.mjs";
+import { fileURLToPath } from "node:url";
+let reviewStore;
 const files = new Map();
 const ttl = 10 * 60 * 1000;
 let busy = false;
@@ -66,6 +69,18 @@ export async function handlePresentationApi(request, response, url) {
         403,
       );
     for (const [id, file] of files) if (Date.now() > file.expires) files.delete(id);
+    const reviewMatch = url.pathname.match(/^\/api\/reviews\/([A-Za-z0-9_-]+)$/);
+    if (reviewMatch) {
+      reviewStore ??= createReviewStore(
+        process.env.REVIEW_STORE_DIR ||
+          fileURLToPath(new URL("../.local/reviews/", import.meta.url)),
+      );
+      if (request.method === "GET") json(response, 200, await reviewStore.read(reviewMatch[1]));
+      else if (request.method === "PUT")
+        json(response, 200, await reviewStore.save(reviewMatch[1], await readJson(request)));
+      else throw new PresentationError("Method not allowed.", 405);
+      return true;
+    }
     if (url.pathname === "/api/presentations/config" && request.method === "GET") {
       json(response, 200, providerConfig());
       return true;
