@@ -250,8 +250,8 @@
     Full: "Laaja",
     "All available areas": "Kaikki saatavilla olevat osa-alueet",
     "Presentation length": "Esityksen laajuus",
+    "Repairs per 100 washes": "Korjausta 100 pesua kohden",
     "Customise the review": "Muokkaa katsausta",
-    "Active use": "Aktiivikäyttö",
     "More figures": "Tarkemmat luvut",
     "Name, industry, textiles, sites and countries are always shown.":
       "Nimi, toimiala, tekstiilit, toimipaikat ja maat näytetään aina.",

@@ -98,11 +98,13 @@ export async function renderPowerPoint(deck) {
         line: { color: onDark ? "1D5C8E" : "F2F6F9" },
         fill: { color: onDark ? "1D5C8E" : "F2F6F9" },
       });
+      const tones = { better: "17602F", worse: "9C1C1C", neutral: "4F5D68" };
+      const toneColor = (tone) => (onDark ? "D9E6EF" : (tones[tone] ?? tones.neutral));
       slide.addText(kpi.value, {
         x: x + 0.25,
-        y: y + 0.2,
+        y: y + 0.15,
         w: w - 0.5,
-        h: h * 0.55,
+        h: h * (kpi.delta ? 0.42 : 0.55),
         fontSize: 44,
         bold: true,
         color: onDark ? "FFFFFF" : templateStandard.blue,
@@ -111,14 +113,26 @@ export async function renderPowerPoint(deck) {
       });
       slide.addText(kpi.label, {
         x: x + 0.25,
-        y: y + h * 0.62,
+        y: y + h * (kpi.delta ? 0.52 : 0.62),
         w: w - 0.5,
-        h: h * 0.3,
+        h: h * (kpi.delta ? 0.2 : 0.3),
         fontSize: 18,
         color: onDark ? "D9E6EF" : "4F5D68",
         margin: 0,
         fit: "shrink",
       });
+      if (kpi.delta)
+        slide.addText(kpi.delta, {
+          x: x + 0.25,
+          y: y + h * 0.74,
+          w: w - 0.5,
+          h: h * 0.2,
+          fontSize: 15,
+          bold: true,
+          color: toneColor(kpi.tone),
+          margin: 0,
+          fit: "shrink",
+        });
     };
     const layout = item.layout ?? "notes";
     if (layout === "cover") {
@@ -203,7 +217,21 @@ export async function renderPowerPoint(deck) {
         valign: "top",
         fit: "shrink",
       });
-      (item.kpis ?? []).forEach((kpi, i) => tile(kpi, 0.6 + i * 2.5, 4.7, 2.35, 1.3, false));
+      if (item.trend)
+        slide.addText(item.trend.delta, {
+          x: 0.6,
+          y: 4.66,
+          w: 4.9,
+          h: 0.35,
+          fontSize: 18,
+          bold: true,
+          color: { better: "17602F", worse: "9C1C1C" }[item.trend.tone] ?? "4F5D68",
+          margin: 0,
+        });
+      const tileY = item.trend ? 5.04 : 4.72;
+      (item.kpis ?? []).forEach((kpi, i) =>
+        tile(kpi, 0.6 + i * 2.5, tileY, 2.35, 6.12 - tileY + 0.08, false),
+      );
       const type = item.chart?.type;
       const frame = { x: 6, y: 2.1, w: 6.7, h: 4 };
       const quiet = {

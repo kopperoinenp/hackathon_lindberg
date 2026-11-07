@@ -756,6 +756,7 @@
           `<label class="kpi-checkbox"><input type="checkbox" data-upsell-id="${esc(proposal.id)}" ${accepted.some((item) => item.id === proposal.id) ? "checked" : ""} ${disabled} /><span title="${esc(proposal.benefit)}"><strong>${esc(proposal.title)}</strong><small>${esc(proposal.benefit)}</small></span></label>`,
       )
       .join("");
+    $("#upsell-proposals").hidden = !proposals.length;
     $("#upsell-proposals").innerHTML = proposals.length
       ? `<h3>${esc(t("Offer in the presentation"))}</h3>${rows}${stale ? `<button type="button" id="clear-upsell-approvals" class="text-button">${esc(t("Clear all opportunity approvals for this customer"))}</button>` : ""}`
       : "";
@@ -1672,6 +1673,19 @@
     };
   }
   // What the manager approves is what the file contains: each chosen area becomes a slide.
+  // These areas show as the core slides, so a figure never appears on two slides.
+  const areaSlides = {
+    water: "sustainability",
+    emissions: "sustainability",
+    repairs: "operations",
+    opportunity: "adoption",
+  };
+  function deckInsights() {
+    const areas = deckAreas();
+    const kept = state.included.filter((id) => areas.includes(areaSlides[id]));
+    if (kept.some((id) => id !== "opportunity")) return kept;
+    return [...kept, state.included.find((id) => id !== "opportunity") ?? "water"];
+  }
   function deckAreas() {
     const chosen = customerBasics();
     const level = basicsPresets.find(
@@ -1693,7 +1707,7 @@
         .replace(/<[^>]*>/g, "")
         .trim();
     return deckAreas()
-      .filter((id) => id !== "scorecard")
+      .filter((id) => !["scorecard", ...Object.values(areaSlides)].includes(id))
       .filter((id) => !evidence[id]?.missing || kpis.some((kpi) => kpi.area === id && kpi.actual))
       .map((id) => {
         if (id === "performance" && steering) {
@@ -1720,9 +1734,11 @@
         }
         const block = evidence[id] ?? {};
         const kpi = kpis.find((item) => item.area === id && item.actual);
-        const stats = (block.stats ?? []).slice(0, 3).map(([value, label]) => ({
+        const stats = (block.stats ?? []).slice(0, 3).map(([value, label, change = ""]) => ({
           value: plain(value).slice(0, 40),
           label: plain(label).slice(0, 80),
+          delta: plain(change).split(" · ")[0].slice(0, 60) || null,
+          tone: /yoy-(better|worse|neutral)/.exec(change)?.[1] ?? null,
         }));
         return {
           id,
@@ -2038,7 +2054,6 @@
         ? t("Next steps agreed for the coming period, each with an owner and a timeline.")
         : t("Next steps will be agreed together in this meeting.");
   }
-  const reads = { show: "Show", keep: "Keep internal", decide: "Your call" };
   // A manager may search in Finnish or English, whatever the page language is.
   const industryKeywords = {
     "Food & Beverage": "Elintarviketeollisuus ruoka",
@@ -2117,7 +2132,6 @@
     const sales = globalThis.SalesModel;
     const { metrics } = context();
     const advice = sales.audienceAdvice(state.audience, metrics, language);
-    const signals = metrics.hasData ? sales.salesSignals(data, selectionScope(), language) : null;
     const roles = Object.entries(sales.audiences)
       .map(
         ([id, audience]) =>
@@ -2126,24 +2140,6 @@
       .join("");
     $("#meeting-advice").innerHTML =
       `<fieldset class="area-picker meeting-advice"><legend>${t("Who are you meeting?")}</legend><select id="audience" aria-label="${t("Who are you meeting?")}"><option value="">${t("Choose a role")}</option>${roles}</select>${advice ? `<p>${esc(advice.points[0])}</p>` : ""}</fieldset>`;
-    $("#for-you").hidden = !signals;
-    if (!signals) return;
-    const read = $("#for-you-read");
-    read.className = `sales-read read-${signals.usage.read}`;
-    read.textContent = t(reads[signals.usage.read]);
-    // Short facts only: value on the first line, what it means on the second.
-    const trend = signals.usage.trend
-      .replace("percentage points", "pp")
-      .replace("prosenttiyksikköä", "%-yks.");
-    const facts = [
-      [signals.usage.value, `${t("Active use")} ${trend}`],
-      ...signals.signals.map(({ label, value }) => [
-        value.split(" · ")[0].replace(`${context().customer.customer_name.split(" ")[0]} `, ""),
-        label,
-      ]),
-    ];
-    $("#sales-signals").innerHTML =
-      `<dl class="for-you-facts">${facts.map(([value, label]) => `<div><dd title="${esc(value)}">${esc(value)}</dd><dt title="${esc(label)}">${esc(label)}</dt></div>`).join("")}</dl><label class="kpi-checkbox"><input type="checkbox" data-usage-toggle ${state.hideUsage ? "checked" : ""} /><span>${t("Hide usage from the customer")}</span></label>`;
   }
   function selectionScope() {
     const { customer, from, to, country, continent, site } = state;
@@ -2157,20 +2153,6 @@
     state.chatRevision += 1;
     render();
     $("#audience")?.focus();
-  });
-  document.addEventListener("click", (event) => {
-    if (event.target.closest("[data-usage-toggle]")) {
-      state.hideUsage = !state.hideUsage;
-      if (!state.hideUsage) {
-        state.evidenceAreas = areaOrder(new Set([...customerAreas(), "adoption"]));
-        if (!state.visibleInsights.includes("opportunity"))
-          state.visibleInsights.push("opportunity");
-      }
-      invalidatePowerPoint(true);
-      state.chatRevision += 1;
-      render();
-      $("[data-usage-toggle]")?.focus();
-    }
   });
   function renderReviewContent() {
     renderMeetingAdvice();
@@ -2960,7 +2942,7 @@
       : "";
     return {
       scope,
-      included: state.included,
+      included: deckInsights(),
       titleEdits: state.titleEdits,
       note: [state.note, stepsNote, agendaNote].filter(Boolean).join("\n\n"),
       cooperation: state.cooperation,

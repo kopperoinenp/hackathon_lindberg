@@ -41,7 +41,9 @@ function validAreaStats(stats) {
         typeof stat?.value === "string" &&
         stat.value.length <= 40 &&
         typeof stat.label === "string" &&
-        stat.label.length <= 80,
+        stat.label.length <= 80 &&
+        (stat.delta == null || (typeof stat.delta === "string" && stat.delta.length <= 60)) &&
+        (stat.tone == null || ["better", "worse", "neutral"].includes(stat.tone)),
     )
   );
 }
@@ -181,7 +183,12 @@ export function validateRequest(input) {
         points: [...points],
         note,
         chart,
-        stats: stats.map(({ value, label }) => ({ value, label })),
+        stats: stats.map(({ value, label, delta = null, tone = null }) => ({
+          value,
+          label,
+          delta,
+          tone,
+        })),
       }),
     ),
     approvedUpsells: approvedUpsells.map((approval) => ({ ...approval })),
@@ -210,6 +217,7 @@ export function buildPresentation(input) {
     B_HOME: t("home laundering"),
     B_INHOUSE: t("in-house laundry"),
   }[request.scope.baseline];
+  const baselineLabel = baseline[0].toUpperCase() + baseline.slice(1);
   const scopeName =
     request.scope.site !== "all"
       ? focus.site_name
@@ -271,7 +279,7 @@ export function buildPresentation(input) {
         t`Allocated water consumption was ${f(m.water / 1000)} m³. The difference versus the baseline is ${f(Math.abs(c.waterDifference) / 1000)} m³.`,
       ],
       chart: {
-        labels: ["Lindström", t("Baseline")],
+        labels: ["Lindström", baselineLabel],
         values: [m.water / 1000, c.baselineWater / 1000],
         unit: "m³",
       },
@@ -296,7 +304,7 @@ export function buildPresentation(input) {
         t`Estimated laundry and delivery emissions were ${f(m.emissions / 1000, 1)} t CO₂e. The difference versus the baseline is ${f(Math.abs(c.emissionsDifference) / 1000, 1)} t CO₂e.`,
       ],
       chart: {
-        labels: ["Lindström", t("Baseline")],
+        labels: ["Lindström", baselineLabel],
         values: [m.emissions / 1000, c.baselineEmissions / 1000],
         unit: "t CO₂e",
       },
@@ -396,31 +404,53 @@ export function buildPresentation(input) {
       slide.facts = slide.facts?.filter((fact) => !usage.test(fact.label));
     }
   const delta = (value) => f(Math.abs(value));
-  const kpi = (value, label) => ({ value, label });
+  const kpi = (value, label, change = null) => ({ value, label, ...change });
+  // The same months a year earlier; better says which direction is good, if either is.
+  const earlierYear = Number(request.scope.from.slice(0, 4)) - 1;
+  const earlierScope = {
+    ...request.scope,
+    from: `${earlierYear}${request.scope.from.slice(4)}`,
+    to: `${earlierYear}${request.scope.to.slice(4)}`,
+  };
+  const earlier = globalThis.WorkspaceModel.buildContext(data, earlierScope).metrics;
+  const change = (now, before, better = null) => {
+    if (!earlier.hasData || !before) return null;
+    const percent = Number((((now - before) / before) * 100).toFixed(1));
+    const amount = new Intl.NumberFormat(t("en-GB"), {
+      maximumFractionDigits: 1,
+      signDisplay: "exceptZero",
+    }).format(percent);
+    const arrow = percent > 0 ? "↑" : percent < 0 ? "↓" : "→";
+    const tone =
+      !better || percent === 0
+        ? "neutral"
+        : percent > 0 === (better === "higher")
+          ? "better"
+          : "worse";
+    return { delta: `${arrow} ${amount} % ${t("vs")} ${earlierYear}`, tone };
+  };
+  const yearChange = (key, better = null) => change(m[key], earlier[key], better);
+  const repairRate = (metrics) => (metrics.washed ? (metrics.repairs / metrics.washed) * 100 : 0);
   Object.assign(slides.cover, {
     layout: "cover",
     kicker: t("Customer review"),
     lead: t("Key results and shared priorities for 2026."),
-    kpis: [
-      kpi(f(m.sites), t(m.sites === 1 ? "site" : "sites")),
-      kpi(f(m.allocated), t("textiles in service")),
-      kpi(f(m.repairs), t("repairs")),
-    ],
+    kpis: [],
   });
   Object.assign(slides.overview, {
     layout: "kpis",
     kicker: t("The service in numbers"),
     kpis: [
       kpi(f(m.sites), t("Sites")),
-      kpi(f(m.allocated), t("Textiles in service")),
-      kpi(`${f(m.kg / 1000)} t`, t("Washed")),
-      kpi(f(m.repairs), t("Repairs")),
+      kpi(f(m.allocated), t("Textiles in service"), yearChange("allocated")),
+      kpi(`${f(m.kg / 1000)} t`, t("Washed"), yearChange("kg")),
     ],
   });
   Object.assign(slides.water, {
     layout: "hero",
     kicker: t("Environmental estimate"),
     hero: slides.water.value,
+    trend: yearChange("water", "lower"),
     lead:
       c.waterDifference >= 0
         ? t`${delta(c.waterDifference / 1000)} m³ less water than the comparison`
@@ -430,6 +460,7 @@ export function buildPresentation(input) {
     layout: "hero",
     kicker: t("Environmental estimate"),
     hero: slides.emissions.value,
+    trend: yearChange("emissions", "lower"),
     lead:
       c.emissionsDifference >= 0
         ? t`${f(Math.abs(c.emissionsDifference) / 1000, 1)} t CO₂e less than the comparison`
@@ -438,8 +469,10 @@ export function buildPresentation(input) {
   Object.assign(slides.repairs, {
     layout: "hero",
     kicker: t("Textile care"),
-    hero: slides.repairs.value,
-    lead: t("repairs kept textiles in use"),
+    hero: f(repairRate(m), 1),
+    lead: t("Repairs per 100 washes"),
+    trend: change(repairRate(m), repairRate(earlier)),
+    kpis: [kpi(f(m.repairs), t("Repairs"), yearChange("repairs"))],
   });
   slides.water.chart.type = "compare";
   slides.emissions.chart.type = "compare";
@@ -505,7 +538,12 @@ export function buildPresentation(input) {
         title: area.title,
         hero: stats[0]?.value ?? "",
         lead: stats[0]?.label ?? area.headline,
-        kpis: stats.slice(1, 3).map(({ value, label }) => kpi(value, label)),
+        trend: stats[0]?.delta ? { delta: stats[0].delta, tone: stats[0].tone } : null,
+        kpis: stats
+          .slice(1, 3)
+          .map(({ value, label, delta, tone }) =>
+            kpi(value, label, delta ? { delta, tone } : null),
+          ),
         chart: area.chart,
         added: area.note ? [area.note] : [],
         paragraphs: [area.headline, ...area.points, area.note].filter(visible),

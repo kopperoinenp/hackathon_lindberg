@@ -169,3 +169,27 @@
     font-size: 32px;
   }
 }
+
+/* Change from the same months a year earlier. */
+.card-delta {
+  display: block;
+  margin-top: 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+.card-grid > div > .card-delta {
+  margin-top: 12px;
+  font-size: 16px;
+}
+.tone-better {
+  color: #17602f;
+}
+.tone-worse {
+  color: #9c1c1c;
+}
+.tone-neutral {
+  color: #4f5d68;
+}
+.layout-cover .card-delta {
+  color: #d9e6ef;
+}
