@@ -60,7 +60,7 @@ test("chat changes scope atomically and export retains the same selection", () =
   const deck = buildPresentation(result.workspace);
   assert.equal(result.reply, "Done");
   assert.ok(!deck.slides.some((s) => s.id === "repairs"));
-  for (const id of ["overview", "sources", "limits"])
+  for (const id of ["overview", "sources"])
     assert.ok(deck.slides.some((s) => s.id === id));
   const followup = applyChatPatch(result.workspace, scoped({ country: "Sweden" }), "Entä Ruotsi?");
   assert.equal(followup.workspace.scope.from, "2025-01");
@@ -193,8 +193,12 @@ test("agent tools execute on the proposed scope and the final patch cannot switc
   const first = { ...validatedPatch, analysisTools: ["footprint", "yoy"] };
   let calls = 0;
   const result = await runReviewChat(input, {
-    generate: async ({ input: payload, schema }) => {
+    generate: async ({ input: payload, schema, name }) => {
       if (++calls === 1) return first;
+      if (name === "assistant_reply") {
+        assert.equal(JSON.parse(payload).facts.results.length, 2);
+        return { reply: "Vertailu on valmis." };
+      }
       assert.equal(schema, chatSchema);
       const context = JSON.parse(payload);
       assert.equal(context.analyzedScope.country, "Finland");
@@ -207,7 +211,8 @@ test("agent tools execute on the proposed scope and the final patch cannot switc
   });
   assert.equal(result.workspace.view, "analysis");
   assert.equal(result.workspace.scope.country, "Finland");
-  assert.equal(calls, 2);
+  assert.equal(result.answer, "Vertailu on valmis.");
+  assert.equal(calls, 3);
   await assert.rejects(
     runReviewChat(input, { generate: async () => ({ ...first, analysisTools: ["unknown"] }) }),
     /invalid analysis tools/,
@@ -290,7 +295,7 @@ test("KAM tools set monetary estimates, slide commentary and traffic lights with
   assert.ok(
     deck.slides
       .find((s) => s.id === "plan")
-      .paragraphs.includes("KAM:in lisäys: Tarkistetaan sopimus"),
+      .paragraphs.includes("Tarkistetaan sopimus"),
   );
   assert.deepEqual(deck.slides.find((s) => s.id === "water").chart.values, evidence);
   assert.equal(

@@ -1454,7 +1454,7 @@ main {
 }
 
 :root:lang(en) #composer #chat:empty::before {
-  content: "Tell me what you want to change in the review.";
+  content: attr(data-empty);
 }
 @media (min-width: 761px) {
   :root:lang(en) #composer:has(#chat[hidden]) .chat-dock-heading::after {
@@ -2528,9 +2528,6 @@ main {
   border-radius: 6px;
   font: inherit;
 }
-.review-content > button {
-  justify-self: start;
-}
 .area-gaps {
   padding: 12px 14px;
   border-left: 4px solid #8796a3;
@@ -2764,4 +2761,454 @@ main {
 }
 .upsell-card .kpi-checkbox {
   margin-top: 20px;
+}
+/* Review settings sit beside the live review, so every change is seen at once. */
+#review-editor {
+  position: fixed;
+  top: 95px;
+  bottom: 0;
+  left: 0;
+  z-index: 30;
+  width: 400px;
+  overflow-y: auto;
+  border-right: 1px solid #cbd3da;
+  background: #f4f8fb;
+  box-shadow: 4px 0 18px #10243a1f;
+}
+#review-editor[hidden] {
+  display: none;
+}
+#review-editor .review-content {
+  margin: 0;
+  padding: 20px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.review-editor-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.review-editor-heading h2 {
+  margin: 4px 0 0;
+  font-size: 24px;
+}
+#workspace.editing {
+  max-width: none;
+  margin-left: 400px;
+  padding-inline: 32px;
+}
+@media (max-width: 900px) {
+  #review-editor {
+    top: auto;
+    right: 0;
+    z-index: 45;
+    width: auto;
+    max-height: 55vh;
+    border-top: 1px solid #cbd3da;
+    border-right: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  #workspace.editing {
+    margin-left: auto;
+    padding-inline: 16px;
+    padding-bottom: 58vh;
+  }
+}
+
+/* Meeting advice and account manager signals in the review settings. */
+.meeting-advice select {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #b7c6d0;
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+}
+.meeting-advice p,
+.sales-signals p {
+  margin: 8px 0;
+  font-size: 14px;
+}
+.meeting-advice ul {
+  margin: 8px 0;
+  padding-left: 18px;
+  font-size: 14px;
+}
+#review-editor .sales-signals {
+  border: 2px dashed #8796a3;
+  background: #fff;
+}
+.sales-usage {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sales-usage > div {
+  display: grid;
+}
+.sales-usage strong {
+  color: var(--brand-blue);
+  font-size: 28px;
+}
+.sales-usage span,
+.sales-usage small {
+  font-size: 13px;
+  color: #4f5d68;
+}
+.sales-read {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 700;
+}
+.sales-read.read-show {
+  background: #dff1e4;
+  color: #17602f;
+}
+.sales-read.read-keep {
+  background: #fbe6e6;
+  color: #9c1c1c;
+}
+.sales-read.read-decide {
+  background: #e7edf2;
+  color: #2f4757;
+}
+.sales-signals dl {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 0;
+  font-size: 14px;
+}
+.sales-signals dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.sales-signals dt {
+  color: #4f5d68;
+}
+.sales-signals dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+}
+
+/* One calm list: the customer's top areas first, everything else folded away. */
+#review-editor .simple-areas label,
+#review-editor .simple-areas label:has(input:checked) {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  margin: 0 0 6px;
+  padding: 8px 10px;
+  border: 1px solid #cbd3da;
+  border-radius: 6px;
+  background: #fff;
+  color: #1f2933;
+  font-weight: 600;
+}
+#review-editor .simple-areas label:has(input:checked) {
+  border-color: var(--brand-blue);
+  background: #eaf2f7;
+}
+.simple-areas small {
+  display: block;
+  color: #4f5d68;
+  font-weight: 400;
+}
+.simple-areas details {
+  margin: 6px 0;
+}
+.simple-areas summary,
+#more-settings > summary,
+.sales-signals summary {
+  color: var(--brand-blue);
+  font-weight: 700;
+  cursor: pointer;
+}
+.meeting-advice h3 {
+  margin: 12px 0 4px;
+  font-size: 15px;
+}
+.meeting-advice ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+.meeting-advice ol strong {
+  display: block;
+  font-weight: 600;
+}
+.meeting-advice ol small {
+  color: #4f5d68;
+}
+#more-settings {
+  display: grid;
+  gap: 12px;
+}
+#more-settings[open] > * + * {
+  margin-top: 12px;
+}
+#more-settings .filter-grid {
+  grid-template-columns: 1fr;
+  margin: 0;
+  padding: 12px;
+}
+#more-settings .review-priorities {
+  margin: 0;
+  padding: 14px;
+}
+
+/* The golden path: today's customers, prepare, present. */
+.toolbar[hidden],
+#today[hidden] {
+  display: none;
+}
+#today {
+  max-width: 620px;
+  margin: 8vh auto 0;
+}
+#today-title {
+  margin: 0 0 16px;
+  color: var(--brand-blue);
+  font-size: 34px;
+}
+#today-title:focus {
+  outline: none;
+}
+#customer-search {
+  width: 100%;
+  padding: 14px 18px;
+  border: 1px solid #b7c6d0;
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  font-size: 18px;
+}
+#customer-search:focus {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 1px;
+}
+#today-label {
+  margin: 16px 0 6px;
+}
+#today-label:empty {
+  display: none;
+}
+#today-list {
+  display: grid;
+  gap: 2px;
+  margin-top: 8px;
+}
+.customer-option {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: #1f2933;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.customer-option:hover,
+.customer-option[aria-selected="true"] {
+  background: #eaf2f7;
+}
+.customer-option strong {
+  color: var(--brand-blue);
+  font-weight: 600;
+}
+.customer-option small {
+  color: #4f5d68;
+}
+#after-meeting {
+  scroll-margin-top: 12px;
+}
+#after-meeting label {
+  display: block;
+}
+#after-meeting textarea {
+  display: block;
+  width: 100%;
+  min-height: 84px;
+  margin-top: 4px;
+  padding: 8px;
+  border: 1px solid #b7c6d0;
+  border-radius: 6px;
+  font: inherit;
+}
+#copy-status:empty {
+  display: none;
+}
+
+/* Readable sizes and comfortable targets. */
+#workspace .section-kicker {
+  font-size: 12px;
+}
+#workspace summary,
+#open-evidence {
+  min-height: 24px;
+}
+@media (max-width: 900px) {
+  #customer {
+    min-height: 36px;
+  }
+}
+body[data-mode="home"] #customer-overview,
+body[data-mode="home"] footer {
+  display: none;
+}
+
+/* Approval is the one main action; the file appears only for an approved review. */
+#approved-status {
+  color: #17602f;
+  font-weight: 700;
+}
+#approved-status[hidden],
+#download-powerpoint[hidden],
+#approve-review[hidden] {
+  display: none;
+}
+a#download-powerpoint {
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  height: auto;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--brand-red, #e4002b);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+a#download-powerpoint[hidden] {
+  display: none;
+}
+#more-settings [aria-labelledby="relationship-title"] label,
+#more-settings [aria-labelledby="relationship-title"] select,
+#more-settings [aria-labelledby="relationship-title"] textarea {
+  display: block;
+  width: 100%;
+}
+#upsell-details > summary {
+  padding: 10px 12px;
+  border: 1px solid #cbd3da;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--brand-blue);
+  font-weight: 700;
+  cursor: pointer;
+}
+#upsell-details[open] > summary {
+  margin-bottom: 10px;
+}
+
+/* The chosen customer is the page heading, so the selector stays out of the way. */
+.toolbar > label[for="customer"] {
+  display: none;
+}
+#review-editor .sales-signals {
+  padding: 10px 12px;
+  border: 1px dashed #8796a3;
+  border-radius: 8px;
+  background: #fff;
+}
+.sales-signals > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--brand-blue);
+  font-weight: 700;
+  cursor: pointer;
+}
+.sales-signals[open] > summary {
+  margin-bottom: 10px;
+}
+#after-meeting > summary {
+  color: var(--brand-blue);
+  font-weight: 700;
+  cursor: pointer;
+}
+#after-meeting[open] > summary {
+  margin-bottom: 10px;
+}
+
+/* Clear, roomy sections; the editing tools appear only when a section is in use. */
+body[data-mode="prepare"] #customer-overview,
+body[data-mode="prepare"] #summary-panel,
+body[data-mode="home"] #deck {
+  display: none;
+}
+#deck {
+  display: grid;
+  gap: 36px;
+  max-width: 1000px;
+  margin: 16px auto 0;
+}
+.deck-item {
+  position: relative;
+}
+.deck-actions {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.deck-item:hover .deck-actions,
+.deck-item:focus-within .deck-actions {
+  opacity: 1;
+}
+@media (hover: none) {
+  .deck-actions {
+    position: static;
+    margin-top: 8px;
+    opacity: 1;
+  }
+}
+.deck-actions button {
+  min-height: 28px;
+  padding: 3px 10px;
+  border: 1px solid #cbd3da;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--brand-blue);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.deck-actions button:hover {
+  background: #eaf2f7;
+}
+.slide-note {
+  display: block;
+  width: 100%;
+  min-height: 70px;
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px solid #b7c6d0;
+  border-radius: 6px;
+  font: inherit;
+}
+.slide-note[hidden] {
+  display: none;
 }

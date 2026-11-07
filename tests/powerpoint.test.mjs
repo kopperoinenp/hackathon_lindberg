@@ -31,8 +31,8 @@ test("export recalculates scoped values from the fixture and retains mandatory e
       .includes(request.note),
   );
   assert.deepEqual(
-    deck.slides.slice(-2).map((s) => s.id),
-    ["sources", "limits"],
+    deck.slides.slice(-1).map((s) => s.id),
+    ["sources"],
   );
   assert.throws(() =>
     validateRequest({ ...request, scope: { customer: "CUST002", site: "SITE001" } }),
@@ -49,7 +49,7 @@ test("AI can rank approved insights and choose headlines but cannot change facts
   assert.throws(() => applyPlan(base, { ...plan, unsupportedClaim: "Invented savings" }));
   assert.equal(deck.slides[1].id, "overview");
   assert.equal(deck.slides[2].id, "repairs");
-  assert.equal(deck.slides.at(-4).id, "opportunity");
+  assert.equal(deck.slides.at(-3).id, "opportunity");
   assert.throws(() => applyPlan(base, { ...plan, order: ["opportunity", ...plan.order] }));
   assert.equal(deck.slides.find((s) => s.id === "water").title, "Oma otsikko");
   assert.deepEqual(
@@ -126,13 +126,13 @@ test("PowerPoint export contains editable chart data, sources, notes and scope",
   const zip = await JSZip.loadAsync(bytes);
   const slides = Object.keys(zip.files).filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name));
   const charts = Object.keys(zip.files).filter((name) => /^ppt\/charts\/chart\d+\.xml$/.test(name));
-  assert.equal(slides.length, 8);
-  assert.equal(charts.length, 3);
+  assert.equal(slides.length, 7);
+  assert.equal(charts.length, 2);
   const xml = (await Promise.all(slides.map((name) => zip.file(name).async("string")))).join("\n");
   assert.match(xml, /Oma otsikko/);
   assert.match(xml, /Synthetic data/);
   assert.match(xml, /2025-01/);
-  assert.match(xml, /Interpretation limits/);
+  assert.match(xml, /About the figures/);
   assert.match(xml, /Sovitaan seuranta/);
   const types = await zip.file("[Content_Types].xml").async("string");
   for (const match of types.matchAll(/<Override\b[^>]*PartName="([^"]+)"/g))
@@ -212,13 +212,9 @@ test("Finnish charts use localized editable category labels without crowded nume
     /^ppt\/charts\/chart\d+\.xml$/.test(name),
   );
   const charts = await Promise.all(entries.map((name) => zip.file(name).async("string")));
-  assert.ok(charts.length >= 4);
-  assert.ok(
-    charts.some(
-      (xml) => xml.includes("maxMin") && xml.includes("Lindström · 3") && xml.includes("m³"),
-    ),
-  );
-  assert.ok(charts.some((xml) => xml.includes("kpl")));
+  assert.ok(charts.length >= 2);
+  const water = await zip.file("ppt/slides/slide3.xml").async("string");
+  assert.ok(water.includes("Lindström") && water.includes("m³"));
   assert.ok(charts.every((xml) => !xml.includes('showVal val="1"')));
   assert.ok(charts.every((xml) => !xml.includes("items")));
 });

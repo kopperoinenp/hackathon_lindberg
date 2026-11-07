@@ -51,3 +51,7 @@ They remain manually supplied material, not recalculated evidence. Selecting a
 different customer loads that customer's profile. The AI patch validator also
 preserves KAM material for same-customer scope changes and clears it on a customer
 change. The assistant stays available in both workspace tabs.
+
+The review also stores the role the account manager is meeting and whether usage figures are hidden. Hidden usage removes the adoption area, the opportunity section and slide, and every scan figure from the customer review and presentation. Explore data and the account manager's panel still show them.
+
+The workspace follows a meeting. It opens on one customer search, with recently opened customers below it and no figures. Opening a customer starts Prepare, where only the manager sees the role, questions, usage signal, areas and private notes. The page shows the deck itself: one card per slide, built by the same code as the file and without AI changes, so the preview and the PowerPoint match. The manager edits a slide in place or with the assistant, and approves it. Approval makes the PowerPoint available; any later edit takes the review back to approval. Internal notes, questions and signals never go into the file, because it can be sent to the customer.

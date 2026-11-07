@@ -164,6 +164,9 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
     "language.js",
     "meeting-model.js",
     "model.js",
+    "sales-model.js",
+    "slide-render.js",
+    "slides.css",
     "story-model.js",
     "styles.css",
     "summary-charts.js",
@@ -241,7 +244,7 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
   const presentation = await created.json();
   assert.deepEqual(
     presentation.slides.map((slide) => slide.id),
-    ["cover", "overview", "repairs", "plan", "sources", "limits"],
+    ["cover", "overview", "repairs", "plan", "sources"],
   );
   const reorderedResponse = await fetch(`${origin}/api/presentations`, {
     method: "POST",

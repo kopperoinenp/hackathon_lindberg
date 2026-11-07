@@ -102,10 +102,15 @@ export async function generatePlan(deck, options = {}) {
         boundary,
       })),
   });
-  return generateStructured(
+  const plan = await generateStructured(
     { instructions, input, schema: planSchema, name: "customer_review_plan" },
     options,
   );
+  // The fixed instructions name opportunity, so drop a headline for a slide left out of this deck.
+  const present = new Set(deck.slides.map((slide) => slide.id));
+  return Array.isArray(plan?.headlines)
+    ? { ...plan, headlines: plan.headlines.filter((choice) => present.has(choice?.id)) }
+    : plan;
 }
 export async function generateStructured(
   { instructions, input, schema, name },

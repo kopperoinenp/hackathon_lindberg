@@ -182,13 +182,20 @@ export async function handlePresentationApi(request, response, url) {
       response.end(file.bytes);
       return true;
     }
+    if (url.pathname === "/api/presentations/preview" && request.method === "POST") {
+      const base = buildPresentation(await readJson(request));
+      const deck = applyPlan(base, defaultPlan(base));
+      json(response, 200, { slides: deck.slides, footer: deck.footer });
+      return true;
+    }
     if (url.pathname !== "/api/presentations" || request.method !== "POST")
       throw new PresentationError("Unknown presentation endpoint.", 404);
     if (busy)
       throw new PresentationError("A presentation is being prepared. Try again shortly.", 429);
     busy = true;
     try {
-      const base = buildPresentation(await readJson(request));
+      const input = await readJson(request);
+      const base = buildPresentation(input);
       const config = providerConfig();
       const normalized = {
         ...base.request,
@@ -200,6 +207,7 @@ export async function handlePresentationApi(request, response, url) {
         .update(
           JSON.stringify({
             request: normalized,
+            locked: input.locked === true,
             provider: config.provider,
             model: config.model,
             story: storyVersion,
@@ -216,7 +224,9 @@ export async function handlePresentationApi(request, response, url) {
       }
 
       const plan =
-        config.provider === "deterministic" ? defaultPlan(base) : await generatePlan(base);
+        config.provider === "deterministic" || input.locked === true
+          ? defaultPlan(base)
+          : await generatePlan(base);
       const deck = applyPlan(base, plan);
       const bytes = await renderPowerPoint(deck, config);
       if (bytes.length > 5 * 1024 * 1024)

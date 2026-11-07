@@ -46,6 +46,7 @@ const kpiAreas = [
   "improvement",
   "future",
 ];
+const audienceIds = ["cfo", "sustainability", "operations", "procurement", "ceo"];
 const basicsIds = ["scope", "year", "siteTypes", "countries", "products", "locations"];
 const stepLimits = { title: 160, owner: 80, due: 40 };
 const nullableList = (values) => ({
@@ -304,6 +305,8 @@ export function normalizeWorkspace(input, { allowEmpty = false } = {}) {
     areaNotes: reviewAreaTexts(input.areaNotes ?? {}, 2000),
     contractKpis: validateContractKpis(input.contractKpis ?? []),
     includeContractAgenda: input.includeContractAgenda ?? false,
+    audience: audienceIds.includes(input.audience) ? input.audience : "",
+    meetingNotes: boundedText(input.meetingNotes ?? "", 2000),
     dashboardLayout: input.dashboardLayout ?? globalThis.WorkspaceModel.defaultDashboardLayout(),
   };
   if (typeof result.includeContractAgenda !== "boolean")
@@ -618,6 +621,8 @@ function describeChange(before, { workspace: after, changed }) {
   const place = globalThis.ReviewLanguage.translate(after.language, scope.country);
   const customer = data.customers.find((row) => row.customer_id === scope.customer);
   const parts = [];
+  if (changed.some((key) => /^(areaTitles|areaNotes|titleEdits|managerTexts)/.test(key)))
+    parts.push(say("Päivitin katsauksen tekstin.", "Updated the review text."));
   if (changed.includes("scope.customer"))
     parts.push(
       say(
@@ -666,6 +671,14 @@ const quickQueries = new Map([
 for (const [question, query] of [...quickQueries])
   quickQueries.set(globalThis.ReviewLanguage.translate("fi", question), query);
 
+// Round calculated results so a written reply can quote them as people read them.
+function readable(value) {
+  if (typeof value === "number") return Number(value.toFixed(Math.abs(value) >= 100 ? 0 : 1));
+  if (Array.isArray(value)) return value.map(readable);
+  if (value && typeof value === "object")
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, readable(item)]));
+  return value;
+}
 async function answerQuery(request, dataQuery, proposed, generate, options) {
   const query = refineQuery(dataQuery, request.message, request.lastQuery);
   if (query.clarify)
@@ -840,12 +853,32 @@ export async function runReviewChat(
     },
     options,
   );
-  const final = applyChatPatch(request.workspace, finalPatch, request.message);
-  if (
-    finalPatch.dataQuery !== null ||
-    final.workspace.view !== "analysis" ||
-    scopeKeys.some((key) => final.workspace.scope[key] !== analyzedScope[key])
-  )
+  // The comparison is already calculated, so a read-only search suggested here is not needed.
+  const applied = applyChatPatch(
+    proposed.workspace,
+    { ...finalPatch, dataQuery: null },
+    request.message,
+  );
+  if (scopeKeys.some((key) => applied.workspace.scope[key] !== analyzedScope[key]))
     throw new PresentationError("The assistant changed the analyzed scope. Try again.", 502);
-  return { ...final, message: describeChange(request.workspace, final) };
+  const final = { ...applied, changed: [...new Set([...proposed.changed, ...applied.changed])] };
+  const message = describeChange(request.workspace, final);
+  const language = replyLanguage(request.message, request.workspace.language);
+  const answer = await writeReply(
+    {
+      message: request.message,
+      history: request.history,
+      fallback:
+        message ||
+        (language === "fi"
+          ? "En saanut vertailusta selkeää vastausta. Kokeile tarkempaa kysymystä."
+          : "I could not get a clear answer from the comparison. Try a more specific question."),
+      language: language === "fi" ? "Finnish" : "English",
+      options: [],
+      facts: { results: readable(results) },
+    },
+    generate,
+    options,
+  );
+  return { ...final, message, answer };
 }
