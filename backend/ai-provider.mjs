@@ -109,7 +109,7 @@ export async function generatePlan(deck, options = {}) {
 }
 export async function generateStructured(
   { instructions, input, schema, name },
-  { env = process.env, fetchImpl = fetch } = {},
+  { env = process.env, fetchImpl = fetch, signal = AbortSignal.timeout(90000) } = {},
 ) {
   const config = providerConfig(env);
   if (!config.configured)
@@ -121,7 +121,6 @@ export async function generateStructured(
     );
   if (Buffer.byteLength(input, "utf8") > 32768)
     throw new PresentationError("The AI input is too large.", 400);
-  const signal = AbortSignal.timeout(90000);
   let text;
   if (config.provider === "openai") {
     const response = await post(

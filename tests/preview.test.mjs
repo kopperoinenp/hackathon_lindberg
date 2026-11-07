@@ -83,6 +83,7 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
   const assets = [...html.matchAll(/(?:src|href)="([^"#]+\.(?:js|css))"/g)].map((m) => m[1]);
   assert.deepEqual(assets.sort(), [
     "analysis-model.js",
+    "analysis-tools.js",
     "app.js",
     "brand.css",
     "dataset.js",
