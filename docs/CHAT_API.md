@@ -7,12 +7,9 @@ maximum 2000 characters. The configured AI provider returns a validated
 `{status:"green"|"yellow"|"red"|"unrated",reason}` with a Finnish explanation
 (maximum 400 characters). Green means smooth cooperation, yellow concerns needing
 follow-up, red serious unresolved issues/risk, unrated insufficient information.
-The response is a suggestion, not source-data evidence. The frontend provides a
-textarea, an explicit assess button and a manual color selector. Manual changes,
-description edits and customer changes invalidate any in-flight suggestion;
-failed assessment preserves the current color. Only the chosen color is sent to
-the presentation request. The description stays in page memory and is sent to
-the configured provider only for assessment; a reload clears it.
+The response is a suggestion, not source-data evidence. The dashboard has no
+assessment controls. The relationship rating can be set through review chat and
+is passed to the presentation request.
 Same-origin checks, request limits and the shared chat concurrency lock apply.
 
 ## KAM editing tools

@@ -1516,30 +1516,6 @@ main {
     grid-template-columns: 1fr;
   }
 }
-.cooperation-control {
-  margin-top: 20px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  border-top: 1px solid #dce2e7;
-  padding-top: 18px;
-}
-.cooperation-control label {
-  font-size: 13px;
-  font-weight: 700;
-  color: #003f72;
-}
-.cooperation-control select {
-  font: inherit;
-  padding: 10px;
-  max-width: 100%;
-}
-.cooperation-control small {
-  flex-basis: 100%;
-  font-size: 11px;
-  color: #52616b;
-}
 .kam-savings {
   background: white;
   border-left: 4px solid #003f72;
@@ -1631,55 +1607,4 @@ main {
 .dashboard-metric-grid small {
   font-size: 11px;
   color: #52616b;
-}
-.cooperation-control {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
-}
-.cooperation-control h3 {
-  margin: 0;
-  font-size: 20px;
-  color: #003f72;
-}
-.cooperation-control textarea {
-  width: 100%;
-  box-sizing: border-box;
-  font: inherit;
-  font-size: 14px;
-  padding: 14px;
-  border: 1px solid #b7c6d0;
-  border-radius: 6px;
-  resize: vertical;
-}
-.cooperation-control button,
-.cooperation-control select {
-  justify-self: start;
-}
-.cooperation-control p {
-  margin: 0;
-  font-size: 13px;
-}
-.cooperation-indicator {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  font-weight: 700;
-}
-.cooperation-indicator i {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: #667580;
-  display: inline-block;
-  border: 1px solid rgba(0, 0, 0, 0.15);
-}
-.cooperation-green i {
-  background: #578200;
-}
-.cooperation-yellow i {
-  background: #f4c542;
-}
-.cooperation-red i {
-  background: #e52330;
 }

@@ -9,11 +9,12 @@ Run `pnpm preview` from the repository root. Open the printed local URL to use t
 Runtime files are plain HTML/CSS/JS.
 
 Chat edits immediately update dashboard headings, metric selections, manager
-comments, meeting goals, savings estimates and relationship status. The page
+comments, meeting goals and savings estimates. The page
 scrolls to the changed section and briefly highlights it; chat lists the changes.
 Slide commentary is mirrored in the matching dashboard card. The customer name
 stays factual even when the overview slide heading is customized. These edits
-also remain in the presentation request; no PowerPoint download is needed to see them.
+also remain in the presentation request. The relationship rating can be set via
+chat and appears on the presentation slides.
 
 The dashboard starts with whole-customer basic information: industry, home country,
 all sites/countries and allocated textile stock from the customer's latest month.

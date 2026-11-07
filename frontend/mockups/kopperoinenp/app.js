@@ -34,17 +34,12 @@
     readyPresentation: null,
     note: "",
     cooperation: "unrated",
-    cooperationDescription: "",
-    cooperationReason: "",
-    cooperationSource: "unrated",
-    cooperationAssessing: false,
     savings: null,
     managerTexts: {},
     dashboardLayout: globalThis.WorkspaceModel.defaultDashboardLayout(),
     chat: [],
   };
   let statusTimer;
-  let cooperationRevision = 0;
   const context = () => storyContext(data, state);
   const baselineName = () =>
     ({
@@ -294,25 +289,6 @@
         "beforeend",
         t`<article class="kam-savings"><span>Säästetty raha · KAM:in arvio</span><strong>${f(state.savings, 2)} €</strong><small>KAM:in antama arvio. Summaa ei ole laskettu tai todennettu tämän aineiston perusteella.</small></article>`,
       );
-    const labels = {
-      unrated: t("Ei arvioitu"),
-      green: t("Vihreä – yhteistyö sujuu hyvin"),
-      yellow: t("Keltainen – vaatii huomiota"),
-      red: t("Punainen – vaatii toimenpiteitä"),
-    };
-    $("#customer-overview").insertAdjacentHTML(
-      "beforeend",
-      t`<div class="cooperation-control"><h3>Yhteistyön tila</h3><label for="cooperation-description">Kuvaa asiakassuhteen tilanne</label><textarea id="cooperation-description" rows="4" maxlength="2000" placeholder="Mikä sujuu hyvin? Onko avoimia ongelmia, palautetta tai sovittuja jatkotoimia?">${esc(state.cooperationDescription)}</textarea><button id="assess-cooperation" type="button" class="secondary" ${state.cooperationAssessing ? "disabled" : ""}>${state.cooperationAssessing ? t("Arvioidaan…") : t("Pyydä apurin väriarvio")}</button><label for="cooperation">Yhteistyön väri · voit vaihtaa käsin</label><select id="cooperation">${Object.entries(
-        labels,
-      )
-        .map(
-          ([id, label]) =>
-            `<option value="${id}" ${state.cooperation === id ? "selected" : ""}>${label}</option>`,
-        )
-        .join(
-          "",
-        )}</select><p class="cooperation-indicator cooperation-${state.cooperation}"><i aria-hidden="true"></i>${labels[state.cooperation]}</p><p id="cooperation-feedback" role="status">${esc(state.cooperationReason)}</p><small>${state.cooperationSource === "assistant" ? t("Apurin ehdotus kuvauksestasi. Voit korjata väriä käsin.") : state.cooperationSource === "manual" ? t("KAM:in käsin valitsema väri.") : t("Kirjoita kuvaus ja pyydä arvio, tai valitse väri itse.")} Väri näkyy esikatselussa ja PowerPointin jokaisella dialla.</small></div>`,
-    );
   }
   function status(text) {
     $("#status").textContent = text;
@@ -653,11 +629,6 @@
       }
       const next = result.workspace;
       const customerChanged = state.customer !== next.scope.customer;
-      if (!customerChanged && result.changed.includes("cooperation")) {
-        cooperationRevision += 1;
-        state.cooperationSource = "manual";
-        state.cooperationReason = t("Väri päivitetty KAM:in keskusteluohjeen perusteella.");
-      }
       for (const key of [
         "customer",
         "from",
@@ -686,10 +657,6 @@
       ])
         state[key] = next[key];
       if (customerChanged) {
-        state.cooperationDescription = "";
-        state.cooperationReason = "";
-        state.cooperationSource = "unrated";
-        cooperationRevision += 1;
         state.chat = [{ user: true, text: question }];
         state.chatRevision += 1;
       }
@@ -699,8 +666,7 @@
         status(t("Done"));
 
         const target = $(
-          !$("#customer-overview").hidden &&
-            result.changed.some((key) => ["savings", "cooperation"].includes(key))
+          !$("#customer-overview").hidden && result.changed.includes("savings")
             ? "#customer-overview"
             : "#story",
         );
@@ -770,10 +736,6 @@
   $("#customer").addEventListener("change", (event) => {
     state.customer = event.target.value;
     state.cooperation = "unrated";
-    state.cooperationDescription = "";
-    state.cooperationReason = "";
-    state.cooperationSource = "unrated";
-    cooperationRevision += 1;
     state.savings = null;
     state.managerTexts = {};
     state.included = [...globalThis.MeetingModel.insightIds];
@@ -804,34 +766,14 @@
       field.value = "";
     });
   document.addEventListener("input", (event) => {
-    if (event.target.id === "cooperation-description") {
-      state.cooperationDescription = event.target.value;
-      cooperationRevision += 1;
-      if (state.cooperationSource === "assistant")
-        $("#cooperation-feedback").textContent = t(
-          "Kuvaus muuttui. Pyydä uusi arvio päivittääksesi värin.",
-        );
-    }
     if (event.target.id === "meeting-note") {
       state.note = event.target.value;
       invalidatePowerPoint();
     }
   });
-  document.addEventListener("change", (event) => {
-    if (event.target.id === "cooperation") {
-      state.cooperation = event.target.value;
-      state.cooperationSource = "manual";
-      state.cooperationReason = t("KAM vahvisti värin manuaalisesti.");
-      cooperationRevision += 1;
-      render();
-      invalidatePowerPoint();
-      status(t("Yhteistyön tila päivitetty. Avaa esitys uudelleen päivittääksesi diat."));
-    }
-  });
   document.addEventListener("click", (event) => {
     const button = event.target.closest("button");
     if (!button) return;
-    if (button.id === "assess-cooperation") assessRelationship();
     if (button.dataset.view) {
       state.view = button.dataset.view;
       render();
@@ -855,44 +797,6 @@
     render();
     status("Dashboardin oletusrakenne palautettu.");
   });
-  async function assessRelationship() {
-    if (state.cooperationAssessing) return;
-    if (!state.cooperationDescription.trim()) {
-      $("#cooperation-feedback").textContent = t("Kirjoita ensin kuvaus asiakassuhteesta.");
-      return;
-    }
-    const revision = cooperationRevision,
-      customer = state.customer;
-    state.cooperationAssessing = true;
-    const button = $("#assess-cooperation");
-    button.disabled = true;
-    button.textContent = t("Arvioidaan…");
-    try {
-      const response = await fetch(`/api/cooperation?lang=${language}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ description: state.cooperationDescription, language }),
-        signal: AbortSignal.timeout(95000),
-      });
-      const result = await response.json();
-      if (revision !== cooperationRevision || customer !== state.customer) return;
-      if (!response.ok) throw new Error(result.error || t("Arviointi epäonnistui."));
-      state.cooperation = result.status;
-      state.cooperationReason = result.reason;
-      state.cooperationSource = "assistant";
-      invalidatePowerPoint();
-      status(t("Apurin väriarvio päivitetty. Voit muuttaa sitä käsin."));
-    } catch (error) {
-      if (revision === cooperationRevision && customer === state.customer)
-        state.cooperationReason =
-          error.name === "TimeoutError"
-            ? t("Arviointi aikakatkaistiin. Nykyinen väri säilytettiin.")
-            : t("Arviointi epäonnistui. Nykyinen väri säilytettiin. ") + (error.message || "");
-    } finally {
-      state.cooperationAssessing = false;
-      render();
-    }
-  }
   function invalidatePowerPoint(force = false) {
     const ready = state.readyPresentation;
     if (

@@ -480,24 +480,6 @@
     "Säästetty raha · KAM:in arvio": "Estimated savings · Account manager",
     "KAM:in antama arvio. Summaa ei ole laskettu tai todennettu tämän aineiston perusteella.":
       "Estimate supplied by the account manager.",
-    "Ei arvioitu": "Not assessed",
-    "Vihreä – yhteistyö sujuu hyvin": "Green – cooperation is going well",
-    "Keltainen – vaatii huomiota": "Yellow – needs attention",
-    "Punainen – vaatii toimenpiteitä": "Red – action needed",
-    "Yhteistyön tila": "Relationship status",
-    "Kuvaa asiakassuhteen tilanne": "Describe the customer relationship",
-    "Mikä sujuu hyvin? Onko avoimia ongelmia, palautetta tai sovittuja jatkotoimia?":
-      "What is going well? Are there open issues, feedback or agreed next steps?",
-    "Arvioidaan…": "Assessing…",
-    "Pyydä apurin väriarvio": "Ask the assistant to assess",
-    "Yhteistyön väri · voit vaihtaa käsin": "Relationship rating · editable",
-    "Apurin ehdotus kuvauksestasi. Voit korjata väriä käsin.":
-      "Suggested by the assistant from your description. You can change the rating.",
-    "KAM:in käsin valitsema väri.": "Rating selected by the account manager.",
-    "Kirjoita kuvaus ja pyydä arvio, tai valitse väri itse.":
-      "Describe the relationship for an assessment, or select a rating.",
-    " Väri näkyy esikatselussa ja PowerPointin jokaisella dialla.":
-      " The rating appears in the preview and on each PowerPoint slide.",
     "KAM:in näkökulma": "Account manager's perspective",
     "Palaverin tavoite · KAM": "Meeting goal · Account manager",
     "Tekstiilejä asiakkaalla": "Allocated textiles",
@@ -518,22 +500,6 @@
     Säästöarvio: "Savings estimate",
     "Säästöarviota ei ole annettu. Kerro apurille summa euroina.":
       "Enter a savings estimate in euros through the assistant.",
-    "Väri päivitetty KAM:in keskusteluohjeen perusteella.":
-      "Rating updated from the account manager's instruction.",
-    "Kuvaus muuttui. Pyydä uusi arvio päivittääksesi värin.":
-      "The description changed. Request a new assessment to update the rating.",
-    "KAM vahvisti värin manuaalisesti.": "The account manager confirmed the rating manually.",
-    "Yhteistyön tila päivitetty. Avaa esitys uudelleen päivittääksesi diat.":
-      "Relationship rating updated. Reopen the presentation to update the slides.",
-    "Kirjoita ensin kuvaus asiakassuhteesta.":
-      "Enter a description of the customer relationship first.",
-    "Arviointi epäonnistui.": "The assessment failed.",
-    "Apurin väriarvio päivitetty. Voit muuttaa sitä käsin.":
-      "The assistant updated the rating. You can change it manually.",
-    "Arviointi aikakatkaistiin. Nykyinen väri säilytettiin.":
-      "The assessment timed out. The current rating was retained.",
-    "Arviointi epäonnistui. Nykyinen väri säilytettiin. ":
-      "The assessment failed. The current rating was retained. ",
     "Oletusnäkymä palautettu.": "Default dashboard restored.",
     "Yhteistyö: ": "Relationship: ",
     " · KAM:in arvio": " · Account manager's assessment",
@@ -574,12 +540,6 @@
       '<article class="kam-savings"><span>Estimated savings · Account manager</span><strong>',
     " €</strong><small>KAM:in antama arvio. Summaa ei ole laskettu tai todennettu tämän aineiston perusteella.</small></article>":
       " €</strong><small>Estimate supplied by the account manager.</small></article>",
-    '<div class="cooperation-control"><h3>Yhteistyön tila</h3><label for="cooperation-description">Kuvaa asiakassuhteen tilanne</label><textarea id="cooperation-description" rows="4" maxlength="2000" placeholder="Mikä sujuu hyvin? Onko avoimia ongelmia, palautetta tai sovittuja jatkotoimia?">':
-      '<div class="cooperation-control"><h3>Relationship status</h3><label for="cooperation-description">Describe the customer relationship</label><textarea id="cooperation-description" rows="4" maxlength="2000" placeholder="What is going well? Are there open issues, feedback or agreed next steps?">',
-    '</button><label for="cooperation">Yhteistyön väri · voit vaihtaa käsin</label><select id="cooperation">':
-      '</button><label for="cooperation">Relationship rating · editable</label><select id="cooperation">',
-    " Väri näkyy esikatselussa ja PowerPointin jokaisella dialla.</small></div>":
-      " The rating appears in the preview and on each PowerPoint slide.</small></div>",
     '<div class="kam-dashboard-note"><strong>KAM:in näkökulma</strong><p>':
       '<div class="kam-dashboard-note"><strong>Account manager\'s perspective</strong><p>',
     '<div class="kam-dashboard-note"><strong>Palaverin tavoite · KAM</strong><p>':
