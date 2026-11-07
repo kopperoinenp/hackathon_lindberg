@@ -4,8 +4,13 @@
   const { escapeHtml: esc } = globalThis.ReviewModel;
   const { storyContext } = globalThis.StoryModel;
   const $ = (query) => document.querySelector(query);
+  let language = localStorage.getItem("lindstrom-language") === "fi" ? "fi" : "en";
+  let translate = globalThis.ReviewLanguage.translator(language);
+  const t = (...args) => translate(...args);
+  const localizePage = globalThis.ReviewLanguage.page();
+  const countryName = (country) => t(globalThis.WorkspaceModel.countryNames[country]);
   const f = (number, digits = 0) =>
-    new Intl.NumberFormat("fi-FI", { maximumFractionDigits: digits }).format(number);
+    new Intl.NumberFormat(t("en-GB"), { maximumFractionDigits: digits }).format(number);
   const state = {
     customer: "CUST001",
     from: "2025-01",
@@ -34,14 +39,14 @@
   const context = () => storyContext(data, state);
   const baselineName = () =>
     ({
-      B_LOCAL: "paikallinen ulkoistettu pesula",
-      B_HOME: "kotipesu",
-      B_INHOUSE: "asiakkaan oma pesula",
+      B_LOCAL: t("local outsourced laundry"),
+      B_HOME: t("home laundering"),
+      B_INHOUSE: t("in-house laundry"),
     })[state.baseline];
   const scopeName = () => scopeLabel();
   function periodName() {
     return state.from === "2025-01" && state.to === "2025-12"
-      ? "vuosi 2025"
+      ? "2025"
       : `${state.from} – ${state.to}`;
   }
   function snapshotName() {
@@ -50,28 +55,135 @@
   function scopeLabel() {
     const site = data.sites.find((row) => row.site_id === state.site);
     return [
-      site ? site.site_name : "Kaikki toimipaikat",
-      state.country !== "all" ? globalThis.WorkspaceModel.countryNames[state.country] : "",
+      site ? site.site_name : t("All sites"),
+      state.country !== "all" ? countryName(state.country) : "",
     ]
       .filter(Boolean)
       .join(" · ");
   }
   function updateChatToggle() {
-    $("#toggle-chat").textContent = $("#chat").hidden ? "Näytä keskustelu" : "Piilota keskustelu";
+    $("#toggle-chat").textContent = $("#chat").hidden
+      ? t("Show conversation")
+      : t("Hide conversation");
     $("#toggle-chat").setAttribute("aria-expanded", String(!$("#chat").hidden));
+  }
+  function detailedAnalysis() {
+    const detail = globalThis.WorkspaceModel.analyzeDetails(data, state);
+    const number = (value, unit = "", digits = 1) =>
+      value == null ? t("Unavailable") : [f(value, digits), unit].filter(Boolean).join(" ");
+    const table = (headings, rows) =>
+      `<div class="table-wrap"><table><thead><tr>${headings
+        .map((heading) => `<th scope="col">${heading}</th>`)
+        .join("")}</tr></thead><tbody>${rows
+        .map((row) => `<tr>${row.map((cell) => `<td>${esc(cell)}</td>`).join("")}</tr>`)
+        .join("")}</tbody></table></div>`;
+    const { service } = detail;
+    const routeNames = {
+      reuse_kg: t("Reuse"),
+      recycling_kg: t("Recycling"),
+      energy_recovery_kg: t("Energy recovery"),
+      incineration_kg: t("Incineration"),
+    };
+    return t`
+      <section class="analysis-card">
+        <h2>Textile use by product</h2>
+        <p class="quiet">Allocation and scan coverage for ${esc(detail.snapshotMonth ?? "–")}.
+        Wash frequency divides washes in the period by the sum of monthly allocations.
+        Repair frequency counts events per 100 washes. Sources: Service_Activity, Products, Repairs and Customer_Impacts.</p>
+        ${table(
+          [
+            t("Product"),
+            t("Allocated"),
+            t("Scanned"),
+            t("Washes"),
+            t("Washes / item / month"),
+            t("Repairs / 100 washes"),
+            t("Water / kg"),
+            t("Energy / kg"),
+          ],
+          detail.products.map((product) => [
+            product.name,
+            number(product.allocated, "items", 0),
+            number(product.scannedPct, "%"),
+            number(product.washed, "", 0),
+            number(product.washesPerPieceMonth),
+            number(product.repairsPerHundredWashes),
+            number(product.waterPerKg, "l", 2),
+            number(product.energyPerKg, "kWh", 2),
+          ]),
+        )}
+      </section>
+      <section class="analysis-card">
+        <h2>Service cycles</h2>
+        <p><strong>${number(service.count, t("recorded cycles"), 0)}</strong> ·
+        Median ${number(service.medianHours, "h")} · 90% of cycles within ${number(service.p90Hours, "h")} ·
+        Flagged late ${number(service.latePct, "%")} · Service requests ${number(service.requests, "", 0)}</p>
+        <p class="quiet">Cycles are grouped by pickup month. Late flags come from the source data.
+        The figures cover recorded synthetic cycles. Service requests count contacts.
+        Sources: Service_Cycles and Service_Activity.</p>
+        ${
+          service.count
+            ? table(
+                [t("Site"), t("Cycles"), t("Median"), "P90", t("Late")],
+                detail.serviceBySite.map((site) => [
+                  site.name,
+                  number(site.count, "", 0),
+                  number(site.medianHours, "h"),
+                  number(site.p90Hours, "h"),
+                  number(site.latePct, "%"),
+                ]),
+              )
+            : t("<p>No recorded service cycles match the filters.</p>")
+        }
+      </section>
+      <section class="analysis-card">
+        <h2>Energy and textile circularity</h2>
+        <p >Energy ${number(detail.energy, "kWh", 0)} · ${number(detail.energyPerKg, t("kWh / kg washed"), 2)} ·
+        Selected baseline ${number(detail.baselineEnergy, "kWh", 0)} ·
+        Baseline minus Lindström ${number(detail.energyDifference, "kWh", 0)}</p>
+        <p>Allocated textile waste ${number(detail.waste, "kg")} · ${number(detail.wastePerKg, t("kg / kg washed"), 3)}</p>
+        ${table(
+          [t("Treatment route"), t("Allocated amount"), t("Share")],
+          detail.wasteRoutes.map((route) => [
+            routeNames[route.key],
+            number(route.kg, "kg"),
+            number(route.share == null ? null : route.share * 100, "%"),
+          ]),
+        )}
+        <p class="quiet">Synthetic allocated estimates. The comparison uses the same washed weight.
+        Waste follows the laundry's monthly treatment mix.
+        Sources: Customer_Impacts, Baselines and Waste_Circularity.</p>
+      </section>
+      <section class="analysis-card">
+        <h2>Repair impact scenarios</h2>
+        ${table(
+          [
+            t("Assumed share of repairs that delay replacement"),
+            t("Estimated delayed replacements"),
+            t("Estimated product footprint"),
+          ],
+          detail.repairScenarios.map((scenario) => [
+            number(scenario.factor * 100, "%", 0),
+            number(scenario.replacements),
+            number(scenario.emissions == null ? null : scenario.emissions / 1000, "t CO₂e", 2),
+          ]),
+        )}
+        <p class="quiet">The scenarios use the source assumption that one repair may delay one replacement.
+        The product footprint estimate is separate from laundry and delivery emissions. Sources: Repairs and Assumptions.</p>
+      </section>`;
   }
   function renderAnalysis() {
     const ctx = context(),
       m = ctx.metrics;
     if (!m.hasData) {
       $("#analysis-content").innerHTML =
-        `<section class="empty-state"><h2>${ctx.invalidPeriod ? "Tarkista ajanjakso" : "Rajauksella ei ole dataa"}</h2><p>${ctx.invalidPeriod ? "Alkukuukausi ei voi olla loppukuukauden jälkeen." : "Vaihda maata, toimipaikkaa tai ajanjaksoa."}</p></section>`;
+        `<section class="empty-state"><h2>${ctx.invalidPeriod ? t("Check the date range") : t("No data matches the filters")}</h2><p>${ctx.invalidPeriod ? t("The start month must be on or before the end month.") : t("Choose another country, site or date range.")}</p></section>`;
       return;
     }
     const definitions = {
-      water: { label: "Vedenkulutus", unit: "m³", divisor: 1000 },
-      emissions: { label: "Pesun ja toimitusten päästöt", unit: "t CO₂e", divisor: 1000 },
-      repairs: { label: "Korjaukset", unit: "kpl", divisor: 1 },
+      water: { label: t("Water consumption"), unit: "m³", divisor: 1000 },
+      emissions: { label: t("Laundry and delivery emissions"), unit: "t CO₂e", divisor: 1000 },
+      repairs: { label: t("Repairs"), unit: "items", divisor: 1 },
     };
     const def = definitions[state.metric],
       points = globalThis.WorkspaceModel.series(ctx, state.metric),
@@ -79,18 +191,18 @@
     const max = Math.max(...points.map((point) => point.value), 1),
       countryMax = Math.max(...countries.map((point) => point.value), 1);
     $("#analysis-content").innerHTML =
-      `<div class="analysis-scope"><strong>${esc(scopeLabel())}</strong><span>${periodName()} · ${ctx.rows.length} kuukausittaista toimipaikkariviä</span></div><div class="analysis-kpis">${[
-        ["Pesuun käytetty vesi", f(m.water / 1000) + " m³"],
-        ["Pesu ja toimitukset", f(m.emissions / 1000, 1) + " t CO₂e"],
-        ["Korjaukset", f(m.repairs) + " kpl"],
-        ["Allokoidut tekstiilit", f(m.allocated) + " kpl"],
+      t`<div class="analysis-scope"><strong>${esc(scopeLabel())}</strong><span>${periodName()} · ${ctx.rows.length} monthly site records</span></div><div class="analysis-kpis">${[
+        [t("Water used for washing"), f(m.water / 1000) + " m³"],
+        [t("Laundry and delivery"), f(m.emissions / 1000, 1) + " t CO₂e"],
+        [t("Repairs"), f(m.repairs) + " items"],
+        [t("Allocated textiles"), f(m.allocated) + " items"],
       ]
         .map(
           ([label, value]) => `<article><span>${label}</span><strong>${value}</strong></article>`,
         )
         .join(
           "",
-        )}</div><div class="analysis-charts"><section class="analysis-card"><div class="chart-heading"><h2>Kehitys kuukausittain</h2><label for="metric" class="sr-only">Kaavioiden mittari</label><select id="metric">${Object.entries(
+        )}</div><div class="analysis-charts"><section class="analysis-card"><div class="chart-heading"><h2>Monthly trend</h2><label for="metric" class="sr-only">Chart metric</label><select id="metric">${Object.entries(
         definitions,
       )
         .map(
@@ -99,7 +211,7 @@
         )
         .join(
           "",
-        )}</select></div><div class="trend-chart" style="grid-template-columns:repeat(${points.length}, minmax(0,1fr))" role="img" aria-label="${def.label}: ${points.map((point) => `${point.month} ${f(point.value / def.divisor, 1)} ${def.unit}`).join(", ")}">${points.map((point) => `<div class="trend-column"><span>${f(point.value / def.divisor)}</span><div class="trend-track"><i style="height:${(point.value / max) * 100}%"></i></div><small>${point.month.slice(5)}</small></div>`).join("")}</div><p class="quiet">${def.label} (${def.unit}) · Synteettinen ${state.metric === "repairs" ? "tapahtumamäärä" : "allokoitu arvio"}. Kuukausien kokonaismäärät, ei tehokkuusvertailu.</p></section><section class="analysis-card"><h2>Jakauma maittain</h2>${countries.map((point) => `<div class="country-row"><div><span>${globalThis.WorkspaceModel.countryNames[point.country]}</span><strong>${f(point.value / def.divisor, 1)} ${def.unit}</strong></div><div class="bar-track"><div class="bar-fill" style="width:${(point.value / countryMax) * 100}%"></div></div></div>`).join("")}<p class="quiet">${def.label} valitulta ajalta. Maakohtainen kokonaismäärä riippuu myös palvelun laajuudesta.</p></section></div><section class="analysis-card"><h2>Toimipaikat ja tekstiilien käyttö</h2><p class="quiet">Tilanne ${snapshotName()}. Skannausosuus ei yksin osoita vajaakäyttöä. Vesi ja korjaukset ovat koko valitulta jaksolta.</p><div class="table-wrap"><table><thead><tr><th>Toimipaikka</th><th>Maa</th><th>Skannattu</th><th>Allokoitu</th><th>Vesi, m³</th><th>Korjaukset</th></tr></thead><tbody>${ctx.sites.map((site) => `<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${globalThis.WorkspaceModel.countryNames[site.country]}</td><td>${site.utilization == null ? "Ei tietoa" : f(site.utilization, 1) + " %"}</td><td>${f(site.allocated)}</td><td>${f(site.water / 1000)}</td><td>${f(site.repairs)}</td></tr>`).join("")}</tbody></table></div></section>`;
+        )}</select></div><div class="trend-chart" style="grid-template-columns:repeat(${points.length}, minmax(0,1fr))" role="img" aria-label="${t(def.label)}: ${points.map((point) => `${point.month} ${f(point.value / def.divisor, 1)} ${def.unit}`).join(", ")}">${points.map((point) => `<div class="trend-column"><span>${f(point.value / def.divisor)}</span><div class="trend-track"><i style="height:${(point.value / max) * 100}%"></i></div><small>${point.month.slice(5)}</small></div>`).join("")}</div><p class="quiet">${t(def.label)} (${def.unit}) · Synthetic ${state.metric === "repairs" ? t("event count") : t("allocated estimate")}. Monthly totals reflect service volume.</p></section><section class="analysis-card"><h2>Breakdown by country</h2>${countries.map((point) => `<div class="country-row"><div><span>${countryName(point.country)}</span><strong>${f(point.value / def.divisor, 1)} ${def.unit}</strong></div><div class="bar-track"><div class="bar-fill" style="width:${(point.value / countryMax) * 100}%"></div></div></div>`).join("")}<p class="quiet">${t(def.label)} for the selected period. Country totals reflect service volume.</p></section></div><section class="analysis-card"><h2>Sites and textile use</h2><p class="quiet">Snapshot for ${snapshotName()}. Scan coverage flags where to investigate. Water and repairs cover the full period.</p><div class="table-wrap"><table><thead><tr><th>Site</th><th>Country</th><th>Scanned</th><th>Allocated</th><th>Water, m³</th><th>Repairs</th></tr></thead><tbody>${ctx.sites.map((site) => t`<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${countryName(site.country)}</td><td>${site.utilization == null ? t("Unavailable") : f(site.utilization, 1) + " %"}</td><td>${f(site.allocated)}</td><td>${f(site.water / 1000)}</td><td>${f(site.repairs)}</td></tr>`).join("")}</tbody></table></div></section>${detailedAnalysis()}`;
   }
   function render() {
     $("#customer").value = state.customer;
@@ -114,15 +226,12 @@
     }
     const available = data.sites.filter((row) => row.customer_id === state.customer);
     $("#country").innerHTML =
-      '<option value="all">Kaikki maat</option>' +
+      t('<option value="all">All countries</option>') +
       [...new Set(available.map((row) => row.country))]
-        .map(
-          (country) =>
-            `<option value="${country}">${globalThis.WorkspaceModel.countryNames[country]}</option>`,
-        )
+        .map((country) => `<option value="${country}">${countryName(country)}</option>`)
         .join("");
     $("#site").innerHTML =
-      '<option value="all">Kaikki toimipaikat</option>' +
+      t('<option value="all">All sites</option>') +
       available
         .filter((row) => state.country === "all" || row.country === state.country)
         .map((row) => `<option value="${row.site_id}">${esc(row.site_name)}</option>`)
@@ -139,7 +248,7 @@
     }
     $("#open-review").disabled = !ctx.metrics.hasData || state.generating || !state.included.length;
     renderStory();
-    renderAnalysis();
+    if (state.view === "analysis") renderAnalysis();
   }
   function status(text) {
     $("#status").textContent = text;
@@ -149,79 +258,87 @@
   }
   function chart(actual, alternative, unit) {
     const maximum = Math.max(actual, alternative, 1);
-    return `<div class="mini-chart" role="img" aria-label="Lindström ${f(actual)} ${unit}, vertailumalli ${f(alternative)} ${unit}"><div class="bar-label"><span>Lindström</span><span>${f(actual)} ${unit}</span></div><div class="bar-track"><div class="bar-fill" style="width:${(actual / maximum) * 100}%"></div></div><div class="bar-label"><span>Vertailumalli</span><span>${f(alternative)} ${unit}</span></div><div class="bar-track"><div class="bar-fill alt" style="width:${(alternative / maximum) * 100}%"></div></div></div>`;
+    return t`<div class="mini-chart" role="img" aria-label="Lindström ${f(actual)} ${unit}, baseline ${f(alternative)} ${unit}"><div class="bar-label"><span>Lindström</span><span>${f(actual)} ${unit}</span></div><div class="bar-track"><div class="bar-fill" style="width:${(actual / maximum) * 100}%"></div></div><div class="bar-label"><span>Baseline</span><span>${f(alternative)} ${unit}</span></div><div class="bar-track"><div class="bar-fill alt" style="width:${(alternative / maximum) * 100}%"></div></div></div>`;
   }
   function results() {
     const { metrics: m, compare: c } = context();
     return {
       water: {
-        name: "Vesi",
+        name: t("Water"),
         value: `${c.waterDifference >= 0 ? "−" : "+"}${f(Math.abs(c.waterPercent), 0)} %`,
-        unit: "vertailumalliin nähden",
+        unit: t("versus baseline"),
         title:
           c.waterDifference >= 0
-            ? "Vähemmän vettä samaan pesumäärään"
-            : "Vedenkulutus ylittää vertailumallin",
-        text: `Pesuun kohdistettu vedenkulutus oli ${f(m.water / 1000)} m³. Ero valittuun vaihtoehtoon on ${f(Math.abs(c.waterDifference) / 1000)} m³.`,
+            ? t("Less water for the same wash volume")
+            : t("Water consumption exceeds the baseline"),
+        text: t`Allocated water consumption was ${f(m.water / 1000)} m³. The difference versus the baseline is ${f(Math.abs(c.waterDifference) / 1000)} m³.`,
         visual: chart(m.water / 1000, c.baselineWater / 1000, "m³"),
         source: "Customer_Impacts, Baselines",
-        boundary: "Laskennallinen arvio · pesun vedenkulutus",
+        boundary: t("Calculated estimate · water used for washing"),
       },
       emissions: {
-        name: "Ilmastovaikutus",
+        name: t("Climate impact"),
         value: `${c.emissionsDifference >= 0 ? "−" : "+"}${f(Math.abs(c.emissionsPercent), 0)} %`,
-        unit: "vertailumalliin nähden",
+        unit: t("versus baseline"),
         title:
           c.emissionsDifference >= 0
-            ? "Pienempi pesun ja toimitusten jalanjälki"
-            : "Pesun ja toimitusten päästöt ylittävät vertailun",
-        text: `Pesun ja toimitusten päästöarvio on ${f(m.emissions / 1000, 1)} t CO₂e. Ero vertailumalliin on ${f(Math.abs(c.emissionsDifference) / 1000, 1)} t CO₂e.`,
+            ? t("Lower laundry and delivery footprint")
+            : t("Laundry and delivery emissions exceed the baseline"),
+        text: t`Estimated laundry and delivery emissions were ${f(m.emissions / 1000, 1)} t CO₂e. The difference versus the baseline is ${f(Math.abs(c.emissionsDifference) / 1000, 1)} t CO₂e.`,
         visual: chart(m.emissions / 1000, c.baselineEmissions / 1000, "t CO₂e"),
         source: "Customer_Impacts, Baselines",
-        boundary: "Laskennallinen arvio · pesu ja toimitukset",
+        boundary: t("Calculated estimate · laundry and delivery"),
       },
       repairs: {
-        name: "Tekstiilien huolto",
+        name: t("Textile care"),
         value: f(m.repairs),
-        unit: "korjausta valitulla jaksolla",
-        title: "Korjaaminen tukee pidempää käyttöä",
-        text: "Tekstiilejä huollettiin korjaamalla. Määrä kertoo korjaustoiminnasta; vältettyjä hankintoja tai päästöjä siitä ei suoraan päätellä.",
+        unit: t("repairs in the selected period"),
+        title: t("Repairs help textiles last longer"),
+        text: t(
+          "The count shows recorded repairs. Avoided purchases and emissions require separate evidence.",
+        ),
         visual: globalThis.SummaryCharts.repairBars(context()),
-        source: "Repairs",
-        boundary: "Synteettinen tapahtumamäärä · ei yksilöllisiä tekstiilejä",
+        source: t("Repairs"),
+        boundary: t("Synthetic count of repair events"),
       },
     };
   }
   function opening() {
     return {
-      neutral:
-        "Tässä yleiskatsauksessa tarkastelemme vedenkäyttöä, pesun ja toimitusten päästöjä sekä korjaustoimintaa ilman erillistä painotusta. Lopuksi käymme läpi yhteisen kehitysehdotuksen.",
+      neutral: t(
+        "Review water use, laundry and delivery emissions, and repairs. End with a proposed improvement to discuss together.",
+      ),
       water:
         context().customer.industry === "Food & Beverage"
-          ? "Elintarvikeasiakkaan katsaukseen nostamme vedenkäytön ja tekstiilien huollon. Tässä näkyvät vuoden tärkeimmät havainnot."
-          : "Tässä katsauksessa korostuu vedenkäyttö. Käydään ensin läpi vuoden tärkeimmät tulokset ja sitten yhteinen kehitysehdotus.",
-      efficiency:
-        "Tässä katsauksessa korostuvat tekstiilien huolto ja todellinen tarve. Käydään ensin läpi vuoden tulokset ja sitten mitoituksen tarkistus.",
-      circularity:
-        "Asiakkaan katsauksessa korostuvat tekstiilien huolto ja käytön jatkuvuus. Korjaustoiminnan rinnalla tarkistetaan, mistä tarvitaan vielä lisätietoa.",
-      emissions:
-        "Tässä katsauksessa keskitymme pesun ja toimitusten ilmastovaikutukseen. Vertailun rajaus ja oletukset kulkevat tulosten mukana.",
+          ? t(
+              "For this food and beverage customer, the review highlights water use and textile care.",
+            )
+          : t(
+              "This review focuses on water use, starting with the results and ending with a proposed improvement.",
+            ),
+      efficiency: t("This review focuses on textile care and checks how allocations match demand."),
+      circularity: t(
+        "This review looks at repairs and continued textile use, including where more evidence is needed.",
+      ),
+      emissions: t(
+        "This review focuses on laundry and delivery emissions, with the comparison scope and assumptions shown alongside the results.",
+      ),
     }[state.priority];
   }
   function plan() {
     const { focus } = context();
     return [
       [
-        `Tarkistetaan ${focus.site_name} yhdessä asiakkaan kanssa.`,
-        "Varmistetaan varatekstiilien tarve ja skannausten kattavuus.",
+        t`Review ${focus.site_name} with the customer.`,
+        t("Check reserve stock needs and scan coverage."),
       ],
       [
-        "Sovitaan yksi konkreettinen parannus ja sen vastuuhenkilö.",
-        "Mitoitusta muutetaan vasta tarkistetun tarpeen perusteella.",
+        t("Agree on one improvement and assign an owner."),
+        t("Confirm demand before changing allocations."),
       ],
       [
-        "Palataan tuloksiin seuraavassa seurantapalaverissa.",
-        "Mahdollinen säästö arvioidaan vasta hyväksytyillä lähtötiedoilla.",
+        t("Review progress at the next meeting."),
+        t("Estimate potential savings once the inputs have been agreed."),
       ],
     ];
   }
@@ -256,52 +373,50 @@
       })
       .join(", ");
     const total = shares.reduce((sum, point) => sum + point.value, 0);
-    return `<div class="summary-graphics"><section class="summary-chart-card"><div class="graphic-heading"><div><span class="section-kicker">KEHITYS VALITULLA JAKSOLLA</span><h3>${metric === "repairs" ? "Korjaustoiminta kuukausittain" : def.label + " vertailumalliin nähden"}</h3></div><span class="chart-period">${esc(periodName())}</span></div><div class="chart-legend"><span><i class="legend-actual"></i>Lindström</span>${metric === "repairs" ? "" : '<span><i class="legend-baseline"></i>Valittu vertailumalli</span>'}</div>${globalThis.SummaryCharts.lineChart(ctx, metric)}<div class="chart-takeaway"><strong>Suurin kuukausimäärä: ${peak.month}</strong><span>${f(peak.actual / def.divisor, 1)} ${def.unit}</span></div><p class="quiet">${metric === "repairs" ? "Synteettiset korjaustapahtumat. Määrä ei ole yksilöllisten tekstiilien määrä." : "Laskennallinen arvio. Molemmissa malleissa on sama pesty kilomäärä. Kuukausien kokonaismäärät eivät yksin osoita tehokkuutta."}</p></section><section class="summary-chart-card geography-card"><span class="section-kicker">MISTÄ KOKONAISUUS MUODOSTUU?</span><h3>${metric === "water" ? "Vedenkäyttö" : metric === "emissions" ? "Päästöt" : "Korjaukset"} maittain</h3><div class="country-donut" style="background:conic-gradient(${total ? stops : "#e4e9ed 0% 100%"})" role="img" aria-label="${shares.map((point) => `${globalThis.WorkspaceModel.countryNames[point.country]} ${f(point.share * 100, 1)} prosenttia`).join(", ")}"><div><strong>${f(total / def.divisor)}</strong><span>${def.unit} yhteensä</span></div></div><div class="country-legend">${shares.map((point, index) => `<div><i style="background:${colors[index % colors.length]}"></i><span>${globalThis.WorkspaceModel.countryNames[point.country]}</span><strong>${f(point.share * 100, 1)} %</strong></div>`).join("")}</div><p class="quiet">Osuudet valitun jakson kokonaismäärästä. Toimipaikkojen määrä ja palvelun laajuus vaikuttavat jakaumaan.</p></section></div>`;
+    return t`<div class="summary-graphics"><section class="summary-chart-card"><div class="graphic-heading"><div><span class="section-kicker">TRENDS OVER THE PERIOD</span><h3>${metric === "repairs" ? t("Monthly repair activity") : t(def.label) + t(" versus baseline")}</h3></div><span class="chart-period">${esc(periodName())}</span></div><div class="chart-legend"><span><i class="legend-actual"></i>Lindström</span>${metric === "repairs" ? "" : t('<span><i class="legend-baseline"></i>Selected baseline</span>')}</div>${globalThis.SummaryCharts.lineChart(ctx, metric)}<div class="chart-takeaway"><strong>Highest monthly total: ${peak.month}</strong><span>${f(peak.actual / def.divisor, 1)} ${def.unit}</span></div><p class="quiet">${metric === "repairs" ? t("Synthetic count of recorded repair events.") : t("Calculated estimate using the same washed weight in both models. Monthly totals reflect service volume.")}</p></section><section class="summary-chart-card geography-card"><span class="section-kicker">WHERE DOES THE TOTAL COME FROM?</span><h3>${metric === "water" ? t("Water use") : metric === "emissions" ? t("Emissions") : t("Repairs")} by country</h3><div class="country-donut" style="background:conic-gradient(${total ? stops : "#e4e9ed 0% 100%"})" role="img" aria-label="${shares.map((point) => t`${countryName(point.country)} ${f(point.share * 100, 1)} percent`).join(", ")}"><div><strong>${f(total / def.divisor)}</strong><span>${def.unit} total</span></div></div><div class="country-legend">${shares.map((point, index) => `<div><i style="background:${colors[index % colors.length]}"></i><span>${countryName(point.country)}</span><strong>${f(point.share * 100, 1)} %</strong></div>`).join("")}</div><p class="quiet">Shares of the selected period total reflect the number of sites and service volume.</p></section></div>`;
   }
   function snapshotGraphic(site) {
     const ratio = Math.max(0, Math.min(site.utilization || 0, 100));
-    return `<div class="snapshot-ring" style="--scan-angle:${ratio * 3.6}deg" role="img" aria-label="Skannattu ${f(site.scanned)} tekstiiliä, ilman skannausta ${f(site.unscanned)}, allokoitu yhteensä ${f(site.allocated)}"><div><strong>${f(site.utilization, 1)} %</strong><span>skannausosuus</span></div></div><div class="snapshot-counts"><span><i></i>${f(site.scanned)} skannattu</span><span><i></i>${f(site.unscanned)} ilman skannausta</span></div><p class="ratio-caption">Tilanne ${snapshotName()}. Osuus kertoo skannaustiedosta; varatekstiilit, sesonki ja datan puutteet tarkistetaan ennen mitoituksen muutosta.</p>`;
+    return t`<div class="snapshot-ring" style="--scan-angle:${ratio * 3.6}deg" role="img" aria-label="Scanned ${f(site.scanned)} textiles, unscanned ${f(site.unscanned)}, allocated total ${f(site.allocated)}"><div><strong>${f(site.utilization, 1)} %</strong><span>scan coverage</span></div></div><div class="snapshot-counts"><span><i></i>${f(site.scanned)} scanned</span><span><i></i>${f(site.unscanned)} unscanned</span></div><p class="ratio-caption">Snapshot for ${snapshotName()}. Check reserve stock, seasonal demand and data coverage before changing allocations.</p>`;
   }
   function siteBenchmark() {
     const ctx = context(),
       shown = ctx.sites.filter((site) => site.utilization !== null).slice(0, 5);
-    return `<div class="site-benchmark"><div><h3>${shown.length === 1 ? "Valitun toimipaikan skannausosuus" : shown.length + " pienintä toimipaikan skannausosuutta"}</h3><p class="quiet">${snapshotName()} · Selvityksen lähtökohta, ei todistettu vajaakäyttö.</p></div><div class="site-ranking">${shown.map((site) => `<div><span>${esc(site.site_name)}</span><div><i style="width:${Math.min(site.utilization, 100)}%"></i></div><strong>${f(site.utilization, 1)} %</strong></div>`).join("")}</div></div>`;
+    return t`<div class="site-benchmark"><div><h3>${shown.length === 1 ? t("Scan coverage at the selected site") : shown.length + t(" sites with the lowest scan coverage")}</h3><p class="quiet">${snapshotName()} · Starting point for a joint review.</p></div><div class="site-ranking">${shown.map((site) => `<div><span>${esc(site.site_name)}</span><div><i style="width:${Math.min(site.utilization, 100)}%"></i></div><strong>${f(site.utilization, 1)} %</strong></div>`).join("")}</div></div>`;
   }
   function renderStory() {
     const { metrics: m, focus, sites, order } = context();
     if (!m.hasData) {
       $("#story").innerHTML =
-        `<section class="intro"><h1>Tällä rajauksella ei ole dataa.</h1><p>${context().invalidPeriod ? "Alkukuukausi on loppukuukauden jälkeen." : "Valitse toinen ajanjakso tai maantieteellinen rajaus Tutki dataa -näkymässä."}</p></section>`;
+        t`<section class="intro"><h1>No data matches the filters.</h1><p>${context().invalidPeriod ? t("The start month is after the end month.") : t("Choose another date range or location in Explore data.")}</p></section>`;
       return;
     }
-    const shortName = { CUST001: "NorthStarin", CUST002: "Apexin", CUST003: "Medioran" }[
-      state.customer
-    ];
+    const shortName = { CUST001: "NorthStar", CUST002: "Apex", CUST003: "Mediora" }[state.customer];
     const cards = results();
     const visibleOrder = order.filter((id) => state.visibleInsights.includes(id));
     const title = state.heading
       ? esc(state.heading)
-      : `${shortName} ${periodName()}.<br />Mitä saatiin aikaan?`;
+      : t`${shortName} · ${periodName()}<br />What did we achieve?`;
 
     $("#story").innerHTML =
-      `<section class="intro"><span class="section-kicker">VUOSIPALAVERIN VALMISTELU</span><h1>${title}</h1><p>${opening()}</p><div class="scope"><strong>${esc(scopeName())}</strong> · ${m.sites} ${m.sites === 1 ? "toimipaikka" : "toimipaikkaa"} · Vertailu: ${baselineName()}</div></section><section class="story-section" aria-labelledby="results-title"${visibleOrder.length ? "" : " hidden"}><div class="section-heading"><span class="section-number">01</span><h2 id="results-title">Jakson tärkeimmät tulokset</h2></div><div class="results">${visibleOrder
+      t`<section class="intro"><span class="section-kicker">ANNUAL REVIEW PREPARATION</span><h1>${title}</h1><p>${opening()}</p><div class="scope"><strong>${esc(scopeName())}</strong> · ${m.sites} ${t(m.sites === 1 ? "site" : "sites")} · Baseline: ${baselineName()}</div></section><section class="story-section" aria-labelledby="results-title"${visibleOrder.length ? "" : " hidden"}><div class="section-heading"><span class="section-number">01</span><h2 id="results-title">Key results for the period</h2></div><div class="results">${visibleOrder
         .map((key) => {
           const card = cards[key];
-          return `<article class="result"><div class="result-name">${card.name}</div><div class="result-value">${card.value}</div><span class="result-unit">${card.unit}</span>${card.visual}<h3>${card.title}</h3><p>${card.text}</p><div class="relevance"><strong>Miksi tämä nostetaan?</strong><p>${esc(globalThis.MeetingModel.relevance(key, state.priority, false))}</p></div><small>${card.boundary}</small></article>`;
+          return t`<article class="result"><div class="result-name">${card.name}</div><div class="result-value">${card.value}</div><span class="result-unit">${card.unit}</span>${card.visual}<h3>${card.title}</h3><p>${card.text}</p><div class="relevance"><strong>Why this matters</strong><p>${esc(globalThis.MeetingModel.relevance(key, state.priority, false, language))}</p></div><small>${card.boundary}</small></article>`;
         })
         .join(
           "",
-        )}</div><p class="quiet">Synteettinen aineisto. Vertailu kuvaa vaihtoehtoista pesumallia samalla pestyllä määrällä, ei nimettyä kilpailijaa.</p>${summaryGraphics()}</section><section class="story-section" aria-labelledby="opportunity-title"${state.visibleInsights.includes("opportunity") ? "" : " hidden"}><div class="section-heading"><span class="section-number">02</span><h2 id="opportunity-title">Tärkein asia selvitettäväksi</h2></div><div class="opportunity"><div><span class="section-kicker">${esc(focus.site_name)}</span><h3>Vastaako tekstiilien määrä todellista tarvetta?</h3><p>${f(focus.unscanned)} allokoidulle tekstiilille ei näy aktiivista skannausta ${snapshotName()}. Aloitetaan tästä toimipaikasta ja tarkistetaan tilanne yhdessä asiakkaan kanssa.</p></div><div class="opportunity-visual">${snapshotGraphic(focus)}</div></div><p class="relevance">${esc(globalThis.MeetingModel.relevance("opportunity", state.priority, false))}</p>${siteBenchmark()}<details class="site-details"><summary>Katso myös muut toimipaikat</summary><div class="table-wrap"><table><thead><tr><th>Toimipaikka</th><th>Skannattu ${snapshotName()}</th><th>Allokoituja tekstiilejä</th></tr></thead><tbody>${sites.map((site) => `<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${f(site.utilization, 1)} %</td><td>${f(site.allocated)}</td></tr>`).join("")}</tbody></table></div><p class="quiet">Avaa toimipaikka nähdäksesi sen oman katsauksen. Palaa kokonaisuuteen pyytämällä apurilta ”näytä kaikki toimipaikat”.</p></details></section><section class="story-section" aria-labelledby="next-title"><div class="section-heading"><span class="section-number">03</span><h2 id="next-title">Yhteinen suunta ensi vuodelle</h2></div><div class="next-chapter"><div><h3>Yksi hyvä parannus<br />kerrallaan.</h3><p>Ota palaveriin mukaan selkeä keskustelunavaus. Nämä ovat ehdotuksia, joista sovitaan asiakkaan kanssa.</p></div><ol class="next-steps">${plan()
+        )}</div><p class="quiet">Synthetic data. The baseline models an alternative laundry service at the same wash volume.</p>${summaryGraphics()}</section><section class="story-section" aria-labelledby="opportunity-title"${state.visibleInsights.includes("opportunity") ? "" : " hidden"}><div class="section-heading"><span class="section-number">02</span><h2 id="opportunity-title">What to investigate first</h2></div><div class="opportunity"><div><span class="section-kicker">${esc(focus.site_name)}</span><h3>Do textile allocations match demand?</h3><p>${f(focus.unscanned)} allocated textiles had no active scan in ${snapshotName()}. Start by reviewing this site with the customer.</p></div><div class="opportunity-visual">${snapshotGraphic(focus)}</div></div><p class="relevance">${esc(globalThis.MeetingModel.relevance("opportunity", state.priority, false, language))}</p>${siteBenchmark()}<details class="site-details"><summary>See other sites</summary><div class="table-wrap"><table><thead><tr><th>Site</th><th>Scanned ${snapshotName()}</th><th>Allocated textiles</th></tr></thead><tbody>${sites.map((site) => t`<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${f(site.utilization, 1)} %</td><td>${f(site.allocated)}</td></tr>`).join("")}</tbody></table></div><p class="quiet">Open a site to see its review. Ask the assistant to “show all sites” to return to the full review.</p></details></section><section class="story-section" aria-labelledby="next-title"><div class="section-heading"><span class="section-number">03</span><h2 id="next-title">Next year's priorities</h2></div><div class="next-chapter"><div><h3>One improvement<br />at a time</h3><p>Use these proposals to start a discussion and agree on next steps with the customer.</p></div><ol class="next-steps">${plan()
         .map(([title, note]) => `<li>${esc(title)}<small>${esc(note)}</small></li>`)
         .join(
           "",
-        )}</ol></div><details class="notes-details" ${state.note ? "open" : ""}><summary>Lisää oma muistiinpano esitykseen</summary><label for="meeting-note" class="sr-only">Oma palaverimuistiinpano</label><textarea id="meeting-note" maxlength="2000" placeholder="Esimerkiksi asiakkaan tavoite tai palaverissa sovittu seuraava askel…">${esc(state.note)}</textarea><p class="quiet">Muistiinpano säilyy tässä välilehdessä. Asiakkaan, toimipaikan tai vertailun vaihtaminen tyhjentää sen.</p></details></section>`;
+        )}</ol></div><details class="notes-details" ${state.note ? "open" : ""}><summary>Add a note to the presentation</summary><label for="meeting-note" class="sr-only">Meeting note</label><textarea id="meeting-note" maxlength="2000" placeholder="E.g. a customer goal or an agreed next step…">${esc(state.note)}</textarea><p class="quiet">The note stays in this tab until you change the customer, site or baseline.</p></details></section>`;
   }
   function evidenceHtml() {
     if (!context().metrics.hasData)
-      return "<p>Nykyisellä rajauksella ei ole dataa. Korjaa rajaus ennen laskennan tarkastelua.</p>";
+      return t("<p>No data matches the filters. Adjust them to view the calculation.</p>");
     const { metrics: m, compare: c, baseline: b, customer } = context();
-    return `<p class="quiet">${esc(customer.customer_name)} · ${esc(scopeName())} · ${periodName()}</p><p class="quiet">Kaikki asiakasluvut ovat synteettisiä. Veden ja päästöjen luvut ovat lisäksi laskennallisia, pesulatasolta kohdistettuja arvioita.</p><section class="method-section"><h3>Vertailu: ${baselineName()}</h3><p>Sama pesty kilomäärä, eri vedenkulutus- ja päästökertoimet. Vaihtoehdot ovat havainnollistavia pesumalleja, eivät nimettyjen kilpailijoiden mitattuja tuloksia.</p><div class="formula">Vesiero: ${f(m.kg, 1)} kg × ${f(b.water_l_per_kg, 2)} l/kg − ${f(m.water)} l = ${f(c.waterDifference)} l<br />Päästöero: ${f(m.kg, 1)} kg × ${f(b.process_kgco2e_per_kg + b.delivery_kgco2e_per_kg, 3)} kg CO₂e/kg − ${f(m.emissions)} kg CO₂e = ${f(c.emissionsDifference)} kg CO₂e</div><p>Rajaus on pesun vedenkulutus sekä pesun ja toimitusten päästöt, ei tekstiilien koko elinkaari. Pyöristetyt luvut näytetään katsauksessa. Vertailukertoimien herkkyysvaihtelut eivät vielä sisälly mockiin.</p></section><section class="method-section"><h3>Lähteet ja laskenta</h3><p>Lindstrom_SinceAI_Customer_Value_Synthetic_Data_Pack.xlsx, repositorion data/source-kansiossa.</p><ul><li>Customers ja Sites: kuvitteellinen asiakkuus ja toimipaikat.</li><li>Service_Activity: valitun jakson pestyt kilot sekä ${snapshotName()} tilanteen allokointi ja skannaukset.</li><li>Customer_Impacts: allocated_water_l, allocated_process_kgco2e ja allocated_delivery_kgco2e, summat valitulta jaksolta.</li><li>Repairs: korjaustapahtumien summa valitulta jaksolta. Ei yksilöllisten tekstiilien määrä.</li><li>Baselines: valitun vertailumallin kertoimet.</li></ul></section><section class="method-section"><h3>Mitä tuloksista ei voi päätellä?</h3><ul><li>Skannausosuus ei osoita tekstiilien todellista vajaakäyttöä. Se on tarkistettava havainto.</li><li>Korjaus ei automaattisesti tarkoita vältettyä hankintaa. Korjausten oletettua päästökädenjälkeä ei lasketa yhteen pesun päästöeron kanssa.</li><li>Käyttäjiä ei summata tuoteriveiltä ilman yksilöivää avainta.</li><li>Kustannussäästöihin, palvelupyyntöjen ratkaisuun ja sääntelyväitteisiin ei ole tässä riittäviä lähtötietoja.</li><li>Toimialan mukainen painotus on muokattava ehdotus, ei compliance-arvio.</li></ul></section>`;
+    return t`<p class="quiet">${esc(customer.customer_name)} · ${esc(scopeName())} · ${periodName()}</p><p class="quiet">All customer figures are synthetic. Water and emissions are calculated estimates allocated from laundry-level data.</p><section class="method-section"><h3>Baseline: ${baselineName()}</h3><p>The baselines apply different water and emissions factors to the same washed weight. They represent illustrative laundry models.</p><div class="formula">Water difference: ${f(m.kg, 1)} kg × ${f(b.water_l_per_kg, 2)} l/kg − ${f(m.water)} l = ${f(c.waterDifference)} l<br />Emissions difference: ${f(m.kg, 1)} kg × ${f(b.process_kgco2e_per_kg + b.delivery_kgco2e_per_kg, 3)} kg CO₂e/kg − ${f(m.emissions)} kg CO₂e = ${f(c.emissionsDifference)} kg CO₂e</div><p>The scope covers water used in washing and laundry and delivery emissions. Figures in the review are rounded.</p></section><section class="method-section"><h3>Sources and calculations</h3><p>Lindstrom_SinceAI_Customer_Value_Synthetic_Data_Pack.xlsx, in the repository's data/source folder.</p><ul><li>Customers and Sites: synthetic customer and site records.</li><li>Service_Activity: washed kilograms in the period and allocations and scans for ${snapshotName()}.</li><li>Customer_Impacts: allocated_water_l, allocated_process_kgco2e and allocated_delivery_kgco2e, summed over the period.</li><li>Repairs: number of repair events in the selected period.</li><li>Baselines: factors for the selected comparison.</li></ul></section><section class="method-section"><h3>Interpretation limits</h3><ul><li>Scan coverage highlights where to investigate actual textile use.</li><li>Repair scenarios depend on assumptions about delayed purchases. Their estimated impact is shown separately from laundry emissions.</li><li>Unique wearer counts require person identifiers.</li><li>Cost savings, request resolution and regulatory claims require further evidence.</li><li>Industry focus is an editable suggestion.</li></ul></section>`;
   }
   function clearScope() {
     state.note = "";
@@ -325,7 +440,7 @@
     $("#chat").innerHTML =
       state.chat
         .map((msg) => `<p class="message ${msg.user ? "user" : ""}">${esc(msg.text)}</p>`)
-        .join("") + (state.asking ? '<p class="message pending">Muokataan…</p>' : "");
+        .join("") + (state.asking ? t('<p class="message pending">Applying changes…</p>') : "");
     $("#chat").scrollTop = $("#chat").scrollHeight;
     $("#question").disabled = state.asking;
     $("#ask-form button[type=submit]").disabled = state.asking;
@@ -345,16 +460,20 @@
     renderChat();
     updateChatToggle();
     try {
-      const response = await fetch("/api/chat", {
+      const response = await fetch(`/api/chat?lang=${language}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: question, history, workspace }),
         signal: AbortSignal.timeout(95000),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Apurin pyyntö epäonnistui.");
+      if (!response.ok) throw new Error(result.error || t("The assistant request failed."));
       if (revision !== state.chatRevision || snapshot !== JSON.stringify(chatWorkspace())) {
-        status("Katsaus vaihtui viestin käsittelyn aikana. Vanhaa vastausta ei käytetty.");
+        status(
+          t(
+            "The review changed while the request was running. Send a new request for the current review.",
+          ),
+        );
         return;
       }
       const next = result.workspace;
@@ -387,18 +506,18 @@
         state.chatRevision += 1;
       }
       render();
-      state.chat.push({ user: false, text: result.changed.length ? "Valmis" : "Ei muutoksia." });
-      if (result.changed.length) status("Valmis");
+      state.chat.push({ user: false, text: result.changed.length ? t("Done") : t("No changes.") });
+      if (result.changed.length) status(t("Done"));
     } catch (error) {
       if (revision !== state.chatRevision || snapshot !== JSON.stringify(chatWorkspace())) {
-        status("Katsaus vaihtui. Voit lähettää uuden viestin nykyisestä rajauksesta.");
+        status(t("The review changed. Send a new request for the current filters."));
         return;
       }
       const text =
         error.name === "TimeoutError"
-          ? "Vastauksen hakeminen kesti liian kauan. Yritä uudelleen."
+          ? t("The request timed out. Try again.")
           : error.name === "TypeError"
-            ? "Yhteys apuriin ei onnistunut. Yritä hetken kuluttua."
+            ? t("Could not reach the assistant. Try again shortly.")
             : error.message;
       state.chat.push({ user: false, text: text });
     } finally {
@@ -459,7 +578,7 @@
     state.summaryMetric = "auto";
     clearScope();
     render();
-    status("Asiakkaan oletuskatsaus on valmis.");
+    status(t("The customer's default review is ready."));
   });
   for (const id of ["site", "baseline", "priority", "from", "to", "country", "continent"])
     $("#" + id).addEventListener("change", (event) => {
@@ -468,7 +587,7 @@
       if (id !== "priority") clearScope();
       render();
       renderChat();
-      status("Katsaus päivitetty.");
+      status(t("Review updated."));
     });
   for (const [form, input] of [["ask-form", "question"]])
     $("#" + form).addEventListener("submit", (event) => {
@@ -496,7 +615,7 @@
       state.view = "summary";
       clearScope();
       render();
-      status("Katsaus rajattu toimipaikkaan " + scopeName());
+      status("Review filtered to " + scopeName());
     }
   });
   $("#open-evidence").addEventListener("click", () => {
@@ -516,7 +635,7 @@
     const link = $("#download-powerpoint");
     link.removeAttribute("href");
     link.setAttribute("aria-disabled", "true");
-    link.title = "Luo esitys ensin";
+    link.title = t("Generate the presentation first");
   }
   function presentationRequest() {
     const scope = Object.fromEntries(
@@ -530,14 +649,15 @@
       titleEdits: state.titleEdits,
       note: state.note,
       slideOrder: state.slideOrder,
+      language,
     };
   }
   $("#open-review").addEventListener("click", async () => {
     if (state.generating) return;
     invalidatePowerPoint();
-    const viewer = window.open("/kopperoinenp/presentation.html", "_blank");
+    const viewer = window.open(`/kopperoinenp/presentation.html?lang=${language}`, "_blank");
     if (!viewer) {
-      status("Salli esityksen avautuminen uuteen välilehteen ja yritä uudelleen.");
+      status(t("Allow the presentation to open in a new tab and try again."));
       return;
     }
     viewer.opener = null;
@@ -545,7 +665,7 @@
     const button = $("#open-review");
     state.generating = true;
     button.disabled = true;
-    button.textContent = "Valmistellaan…";
+    button.textContent = t("Preparing…");
     try {
       if (state.readyPresentation) {
         const available = await fetch(`/api/presentations/${state.readyPresentation.id}`);
@@ -555,20 +675,22 @@
         }
         invalidatePowerPoint(true);
       }
-      const response = await fetch("/api/presentations", {
+      const response = await fetch(`/api/presentations?lang=${language}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: request,
       });
       const result = await response.json();
       if (!response.ok)
-        throw new Error(result.error || "Esitystä ei voitu luoda. Yritä uudelleen.");
+        throw new Error(result.error || t("Could not create the presentation. Try again."));
       if (request !== JSON.stringify(presentationRequest()))
         throw new Error(
-          "Katsaus muuttui valmistelun aikana. Avaa esitys uudelleen nykyisillä valinnoilla.",
+          t(
+            "The review changed during preparation. Open the presentation again with the current selection.",
+          ),
         );
       state.slideOrder = result.slides.map((slide) => slide.id);
-      const viewUrl = `/kopperoinenp/presentation.html?id=${encodeURIComponent(result.id)}`;
+      const viewUrl = `/kopperoinenp/presentation.html?id=${encodeURIComponent(result.id)}&lang=${language}`;
       state.readyPresentation = {
         id: result.id,
         viewUrl,
@@ -578,7 +700,7 @@
       const link = $("#download-powerpoint");
       link.href = result.downloadUrl;
       link.setAttribute("aria-disabled", "false");
-      link.title = "Lataa PowerPoint";
+      link.title = t("Download PowerPoint");
       setTimeout(
         () => {
           if (state.readyPresentation?.id === result.id) invalidatePowerPoint();
@@ -587,17 +709,34 @@
       );
       if (!viewer.closed) viewer.location.replace(viewUrl);
     } catch (error) {
-      const message = error.message || "Esitystä ei voitu luoda. Yritä uudelleen.";
+      const message = error.message || t("Could not create the presentation. Try again.");
       status(message);
       if (!viewer.closed)
         viewer.location.replace(
-          `/kopperoinenp/presentation.html?error=${encodeURIComponent(message)}`,
+          `/kopperoinenp/presentation.html?lang=${language}&error=${encodeURIComponent(message)}`,
         );
     } finally {
       state.generating = false;
-      button.innerHTML = 'Avaa esitys <span aria-hidden="true">↗</span>';
+      button.innerHTML = 'Open presentation <span aria-hidden="true">↗</span>';
       button.disabled = !context().metrics.hasData || !state.included.length;
     }
   });
-  render();
+  function applyLanguage() {
+    translate = globalThis.ReviewLanguage.translator(language);
+    localizePage(language);
+    for (const button of document.querySelectorAll("[data-language]"))
+      button.setAttribute("aria-pressed", String(button.dataset.language === language));
+    updateChatToggle();
+    render();
+    $("#download-powerpoint").title = t(
+      state.readyPresentation ? "Download PowerPoint" : "Generate the presentation first",
+    );
+  }
+  for (const button of document.querySelectorAll("[data-language]"))
+    button.addEventListener("click", () => {
+      language = button.dataset.language;
+      localStorage.setItem("lindstrom-language", language);
+      applyLanguage();
+    });
+  applyLanguage();
 })();

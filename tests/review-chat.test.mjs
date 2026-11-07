@@ -30,7 +30,7 @@ test("chat changes scope atomically and export retains the same selection", () =
   assert.equal(result.workspace.scope.priority, "emissions");
   assert.deepEqual(result.workspace.included, ["water", "emissions"]);
   const deck = buildPresentation(result.workspace);
-  assert.equal(result.reply, "Valmis");
+  assert.equal(result.reply, "Done");
   assert.ok(!deck.slides.some((s) => s.id === "repairs"));
   for (const id of ["overview", "sources", "limits"])
     assert.ok(deck.slides.some((s) => s.id === id));
@@ -95,7 +95,7 @@ test("explicit text works and no-op returns a short status", () => {
   const q = applyChatPatch(result.workspace, patch(), "Mitä ajanjaksoa tarkoitat?");
   assert.deepEqual(q.changed, []);
   assert.deepEqual(q.workspace, result.workspace);
-  assert.equal(q.reply, "Ei muutoksia.");
+  assert.equal(q.reply, "No changes.");
 });
 test("chat can repair a reversed current period and bounds untrusted history", () => {
   const current = normalizeWorkspace(
@@ -160,7 +160,7 @@ test("explicit slide swap survives AI planning, repeated swaps and unsupported r
     patch({ slideSwap: { first: 1, second: 2 } }),
     "vaihda powerpointin ekan ja toisen dian paikkoja",
   );
-  assert.equal(swapped.reply, "Valmis");
+  assert.equal(swapped.reply, "Done");
   assert.deepEqual(swapped.workspace.slideOrder.slice(0, 2), ["overview", "cover"]);
   const { applyPlan, defaultPlan } = await import("../backend/presentation-model.mjs");
   const base = buildPresentation(swapped.workspace);
@@ -189,7 +189,7 @@ test("explicit slide swap survives AI planning, repeated swaps and unsupported r
         scoped({ priority: "water" }),
         "vaihda powerpointin ekan ja toisen dian paikkoja",
       ),
-    /järjestystä ei muutettu/,
+    /slide order could not be changed/,
   );
   assert.throws(
     () => applyChatPatch(current, patch({ supported: false, heading: "English" }), "English"),

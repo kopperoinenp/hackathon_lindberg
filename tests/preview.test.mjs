@@ -36,6 +36,7 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
     "app.js",
     "brand.css",
     "data.js",
+    "language.js",
     "meeting-model.js",
     "model.js",
     "story-model.js",
@@ -136,11 +137,23 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
   const native = await JSZip.loadAsync(
     await (await fetch(`${origin}${reordered.downloadUrl}`)).arrayBuffer(),
   );
+  assert.match(await native.file("ppt/slides/slide1.xml").async("string"), /Service use and care/);
+  assert.match(await native.file("ppt/slides/slide2.xml").async("string"), /Mediora/);
+  const finnish = await fetch(`${origin}/api/presentations?lang=fi`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ language: "fi", scope: { customer: "CUST003" }, included: ["repairs"] }),
+  });
+  assert.equal(finnish.status, 201);
+  const localized = await finnish.json();
+  assert.notEqual(localized.id, presentation.id);
+  assert.equal(localized.slides[1].title, "Palvelun käyttö ja huolto yhdellä silmäyksellä");
+  const fiBytes = await (await fetch(`${origin}${localized.downloadUrl}`)).arrayBuffer();
+  const fiDeck = await JSZip.loadAsync(fiBytes);
   assert.match(
-    await native.file("ppt/slides/slide1.xml").async("string"),
+    await fiDeck.file("ppt/slides/slide2.xml").async("string"),
     /Palvelun käyttö ja huolto/,
   );
-  assert.match(await native.file("ppt/slides/slide2.xml").async("string"), /Mediora/);
   const reused = await fetch(`${origin}/api/presentations`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },

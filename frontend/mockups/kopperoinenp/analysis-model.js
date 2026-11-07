@@ -1,7 +1,7 @@
 /* Shared scope for the presentation and analyst views. No estimated trend data. */
 (function (root) {
   "use strict";
-  const countryNames = { Finland: "Suomi", Sweden: "Ruotsi", Poland: "Puola" };
+  const countryNames = { Finland: "Finland", Sweden: "Sweden", Poland: "Poland" };
   const continentOf = (country) => (Object.hasOwn(countryNames, country) ? "Europe" : "Unknown");
   const sum = (rows, field) => rows.reduce((total, row) => total + (row[field] || 0), 0);
   const value = (row, metric) =>
@@ -33,12 +33,12 @@
       sites: new Set(rows.map((row) => row.site)).size,
     };
   }
-  function select(data, selection) {
+  function select(data, selection, rows = data.records) {
     const from = selection.from || "2025-01",
       to = selection.to || "2025-12";
     const metadata = new Map(data.sites.map((site) => [site.site_id, site]));
     if (from > to) return [];
-    return data.records.filter((row) => {
+    return rows.filter((row) => {
       const site = metadata.get(row.site);
       return (
         row.customer === selection.customer &&
@@ -104,8 +104,94 @@
       };
     });
   }
+  const ratio = (total, denominator) =>
+    total != null && denominator > 0 ? total / denominator : null;
+  const total = (rows, field) =>
+    rows.length && rows.every((row) => Number.isFinite(row[field])) ? sum(rows, field) : null;
+  function serviceMetrics(groups) {
+    const hours = groups.flatMap((group) => group.hours).sort((a, b) => a - b);
+    const count = hours.length;
+    const middle = Math.floor(count / 2);
+    return {
+      count,
+      medianHours: count ? (hours[middle] + hours[Math.floor((count - 1) / 2)]) / 2 : null,
+      p90Hours: count ? hours[Math.ceil(count * 0.9) - 1] : null,
+      latePct: ratio(sum(groups, "late") * 100, count),
+    };
+  }
+  function analyzeDetails(data, selection) {
+    const rows = select(data, selection, data.detail ?? []);
+    const cycles = select(data, selection, data.cycleGroups ?? []);
+    const snapshotMonth = [...new Set(rows.map((row) => row.month))].sort().at(-1) ?? null;
+    const kg = total(rows, "customer_washed_kg");
+    const energy = total(rows, "allocated_energy_kwh");
+    const baseline = data.baselines.find((row) => row.baseline_id === selection.baseline);
+    const baselineEnergy = kg != null && baseline ? kg * baseline.energy_kwh_per_kg : null;
+    const waste = total(rows, "allocated_textile_waste_kg");
+    return {
+      snapshotMonth,
+      service: { ...serviceMetrics(cycles), requests: total(rows, "service_requests") },
+      serviceBySite: data.sites
+        .map((site) => ({
+          name: site.site_name,
+          ...serviceMetrics(cycles.filter((group) => group.site === site.site_id)),
+        }))
+        .filter((site) => site.count)
+        .sort((a, b) => b.p90Hours - a.p90Hours),
+      energy,
+      energyPerKg: ratio(energy, kg),
+      baselineEnergy,
+      energyDifference: baselineEnergy != null && energy != null ? baselineEnergy - energy : null,
+      waste,
+      wastePerKg: ratio(waste, kg),
+      wasteRoutes: ["reuse_kg", "recycling_kg", "energy_recovery_kg", "incineration_kg"].map(
+        (key) => {
+          const routeKg = total(
+            rows.map((row) => row.wasteRoutes),
+            key,
+          );
+          return { key, kg: routeKg, share: ratio(routeKg, waste) };
+        },
+      ),
+      repairScenarios: [0, 0.5, 1].map((factor) => {
+        const replacements = total(rows, "estimated_replacements_postponed");
+        const emissions = total(rows, "estimated_avoided_product_kgco2e");
+        return {
+          factor,
+          replacements: replacements == null ? null : replacements * factor,
+          emissions: emissions == null ? null : emissions * factor,
+        };
+      }),
+      products: (data.products ?? []).flatMap((product) => {
+        const id = product.product_id;
+        const productRows = rows.filter((row) => row.product === id);
+        if (!productRows.length) return [];
+        const snapshot = productRows.filter((row) => row.month === snapshotMonth);
+        const allocated = total(snapshot, "allocated_pieces");
+        const scanned = total(snapshot, "active_assets_scanned");
+        const washed = total(productRows, "washed_pieces");
+        const allocationMonths = total(productRows, "allocated_pieces");
+        const repairs = total(productRows, "repair_count");
+        const productKg = total(productRows, "customer_washed_kg");
+        return [
+          {
+            name: product.product_name,
+            allocated,
+            scannedPct: ratio(scanned == null ? null : scanned * 100, allocated),
+            washed,
+            washesPerPieceMonth: ratio(washed, allocationMonths),
+            repairs,
+            repairsPerHundredWashes: ratio(repairs == null ? null : repairs * 100, washed),
+            waterPerKg: ratio(total(productRows, "allocated_water_l"), productKg),
+            energyPerKg: ratio(total(productRows, "allocated_energy_kwh"), productKg),
+          },
+        ];
+      }),
+    };
+  }
   root.WorkspaceModel = {
     select,
+    analyzeDetails,
     summarize,
     buildContext,
     series,

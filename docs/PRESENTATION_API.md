@@ -62,7 +62,7 @@ are retained. Restarting the service removes them.
 
 ## Errors and operational limits
 
-JSON `{error: "Finnish user-facing explanation"}`. 400 invalid scope/content,
+JSON `{error: "English user-facing explanation"}`. 400 invalid scope/content,
 403 cross-origin/invalid host, 404 absent/expired download, 413 too large,
 415 non-JSON request, 429 another generation in progress, 502 provider/invalid AI
 output, 503 missing provider configuration, 504 timeout, 500 rendering failure.

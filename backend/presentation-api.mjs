@@ -34,21 +34,21 @@ function receipt(id, file) {
 }
 async function readJson(request) {
   if (!/^application\/json(?:;|$)/i.test(request.headers["content-type"] || ""))
-    throw new PresentationError("Käytä JSON-pyyntöä.", 415);
+    throw new PresentationError("Send a JSON request.", 415);
   const chunks = [];
   let size = 0;
   for await (const chunk of request.iterator({ destroyOnReturn: false })) {
     size += chunk.length;
     if (size > 32768) {
       request.resume();
-      throw new PresentationError("Esityspyyntö on liian suuri.", 413);
+      throw new PresentationError("The request is too large.", 413);
     }
     chunks.push(chunk);
   }
   try {
     return JSON.parse(Buffer.concat(chunks).toString("utf8"));
   } catch {
-    throw new PresentationError("Virheellinen JSON.");
+    throw new PresentationError("Invalid JSON.");
   }
 }
 export async function handlePresentationApi(request, response, url) {
@@ -61,7 +61,7 @@ export async function handlePresentationApi(request, response, url) {
       (origin && origin !== `http://${host}`)
     )
       throw new PresentationError(
-        "Esityspalvelu hyväksyy vain saman paikallisen sovelluksen pyynnöt.",
+        "The presentation service accepts requests from this local application only.",
         403,
       );
     for (const [id, file] of files) if (Date.now() > file.expires) files.delete(id);
@@ -72,7 +72,7 @@ export async function handlePresentationApi(request, response, url) {
     if (url.pathname === "/api/chat" && request.method === "POST") {
       if (chatBusy)
         throw new PresentationError(
-          "Apuri käsittelee edellistä viestiä. Yritä hetken kuluttua.",
+          "The assistant is handling another request. Try again shortly.",
           429,
         );
       chatBusy = true;
@@ -87,7 +87,7 @@ export async function handlePresentationApi(request, response, url) {
     if (match && request.method === "GET") {
       const file = files.get(match[1]);
       if (!file)
-        throw new PresentationError("Esitys on vanhentunut. Luo PowerPoint uudelleen.", 404);
+        throw new PresentationError("The presentation has expired. Generate it again.", 404);
       if (!match[2]) {
         json(response, 200, {
           customer: file.deck.customer,
@@ -110,9 +110,9 @@ export async function handlePresentationApi(request, response, url) {
       return true;
     }
     if (url.pathname !== "/api/presentations" || request.method !== "POST")
-      throw new PresentationError("Tuntematon esitysrajapinta.", 404);
+      throw new PresentationError("Unknown presentation endpoint.", 404);
     if (busy)
-      throw new PresentationError("Esitystä muodostetaan parhaillaan. Yritä hetken kuluttua.", 429);
+      throw new PresentationError("A presentation is being prepared. Try again shortly.", 429);
     busy = true;
     try {
       const base = buildPresentation(await readJson(request));
@@ -147,7 +147,7 @@ export async function handlePresentationApi(request, response, url) {
       const deck = applyPlan(base, plan);
       const bytes = await renderPowerPoint(deck, config);
       if (bytes.length > 5 * 1024 * 1024)
-        throw new PresentationError("Esitystiedosto ylitti sallitun koon.", 500);
+        throw new PresentationError("The presentation exceeds the file size limit.", 500);
       const id = randomUUID();
       if (files.size >= 8) files.delete(files.keys().next().value);
       files.set(id, {
@@ -156,20 +156,21 @@ export async function handlePresentationApi(request, response, url) {
         config,
         requestKey,
         expires: Date.now() + ttl,
-        name: `${base.request.scope.customer}-asiakaskatsaus-${base.request.scope.from}-${base.request.scope.to}.pptx`,
+        name: `${base.request.scope.customer}-customer-review-${base.request.scope.from}-${base.request.scope.to}.pptx`,
       });
       json(response, 201, receipt(id, files.get(id)));
     } finally {
       busy = false;
     }
   } catch (error) {
+    const message =
+      error instanceof PresentationError
+        ? error.message
+        : url.pathname === "/api/chat"
+          ? "Could not process the assistant request."
+          : "Could not create the PowerPoint.";
     json(response, error instanceof PresentationError ? error.status : 500, {
-      error:
-        error instanceof PresentationError
-          ? error.message
-          : url.pathname === "/api/chat"
-            ? "Apurin pyynnön käsittely epäonnistui."
-            : "PowerPointin muodostaminen epäonnistui.",
+      error: globalThis.ReviewLanguage.translate(url.searchParams.get("lang"), message),
     });
   }
   return true;

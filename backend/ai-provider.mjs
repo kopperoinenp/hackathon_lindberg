@@ -45,24 +45,24 @@ async function post(url, token, body, fetchImpl, signal) {
       signal,
     });
   } catch {
-    throw new PresentationError("AI-palveluun ei saatu yhteyttä tai pyyntö aikakatkaistiin.", 504);
+    throw new PresentationError("Could not reach the AI service or the request timed out.", 504);
   }
   if (!response.ok)
     throw new PresentationError(
       response.status === 401
-        ? "AI-palvelun tunnistautuminen epäonnistui."
+        ? "AI service authentication failed."
         : response.status === 429
-          ? "AI-palvelun käyttöraja täyttyi. Yritä myöhemmin."
-          : `AI-palvelu hylkäsi pyynnön (HTTP ${response.status}).`,
+          ? "The AI service rate limit was reached. Try again later."
+          : `The AI service rejected the request (HTTP ${response.status}).`,
       502,
     );
   const maximumBytes = 262144;
   if (Number(response.headers.get("content-length")) > maximumBytes) {
     await response.body?.cancel();
-    throw new PresentationError("AI-palvelun vastaus ylitti sallitun koon.", 502);
+    throw new PresentationError("The AI response exceeded the size limit.", 502);
   }
   const reader = response.body?.getReader();
-  if (!reader) throw new PresentationError("AI-palvelu palautti tyhjän vastauksen.", 502);
+  if (!reader) throw new PresentationError("The AI service returned an empty response.", 502);
   const chunks = [];
   let bytes = 0;
   try {
@@ -72,7 +72,7 @@ async function post(url, token, body, fetchImpl, signal) {
       bytes += value.length;
       if (bytes > maximumBytes) {
         await reader.cancel();
-        throw new PresentationError("AI-palvelun vastaus ylitti sallitun koon.", 502);
+        throw new PresentationError("The AI response exceeded the size limit.", 502);
       }
       chunks.push(value);
     }
@@ -81,7 +81,7 @@ async function post(url, token, body, fetchImpl, signal) {
     if (error instanceof PresentationError) throw error;
     throw new PresentationError(
       signal.aborted
-        ? "AI-palvelun pyyntö aikakatkaistiin."
+        ? "The AI service request timed out."
         : "AI-palvelu palautti virheellisen vastauksen.",
       signal.aborted ? 504 : 502,
     );
@@ -115,12 +115,12 @@ export async function generateStructured(
   if (!config.configured)
     throw new PresentationError(
       config.provider === "copilot"
-        ? "Copilot-käyttöoikeutta ei ole määritetty backendissä."
-        : "OpenAI API -avainta ei ole määritetty backendissä.",
+        ? "Copilot access is not configured on the server."
+        : "The OpenAI API key is not configured on the server.",
       503,
     );
   if (Buffer.byteLength(input, "utf8") > 32768)
-    throw new PresentationError("AI-palvelulle annettu aineisto on liian suuri.", 400);
+    throw new PresentationError("The AI input is too large.", 400);
   const signal = AbortSignal.timeout(90000);
   let text;
   if (config.provider === "openai") {
@@ -148,7 +148,7 @@ export async function generateStructured(
     );
     if (response.status !== "completed")
       throw new PresentationError(
-        "OpenAI ei saanut esityssuunnitelmaa valmiiksi. Yritä uudelleen.",
+        "OpenAI could not complete the presentation plan. Try again.",
         502,
       );
     if (
@@ -157,16 +157,19 @@ export async function generateStructured(
         (item) => !item || typeof item !== "object" || item.type === "function_call",
       )
     )
-      throw new PresentationError("AI palautti virheellisen esitysvastauksen.", 502);
+      throw new PresentationError("The AI service returned an invalid presentation response.", 502);
     const parts = [];
     for (const item of response.output) {
       if (item.type !== "message") continue;
       if (!Array.isArray(item.content))
-        throw new PresentationError("AI palautti virheellisen esitysvastauksen.", 502);
+        throw new PresentationError(
+          "The AI service returned an invalid presentation response.",
+          502,
+        );
       for (const part of item.content) {
         if (part?.type === "output_text") {
           if (typeof part.text !== "string")
-            throw new PresentationError("AI palautti virheellisen tekstivastauksen.", 502);
+            throw new PresentationError("The AI service returned invalid text.", 502);
           parts.push(part.text);
         }
       }
@@ -181,7 +184,7 @@ export async function generateStructured(
       signal,
     );
     if (typeof conversation.id !== "string" || !/^[a-zA-Z0-9-]+$/.test(conversation.id))
-      throw new PresentationError("Copilot palautti virheellisen keskustelutunnuksen.", 502);
+      throw new PresentationError("Copilot returned an invalid conversation ID.", 502);
     const response = await post(
       `https://graph.microsoft.com/beta/copilot/conversations/${conversation.id}/chat`,
       env.COPILOT_ACCESS_TOKEN,
@@ -196,11 +199,11 @@ export async function generateStructured(
       signal,
     );
     text = Array.isArray(response.messages) ? response.messages.at(-1)?.text : null;
-  } else throw new PresentationError("Tuntematon AI-palvelu.", 503);
+  } else throw new PresentationError("Unknown AI service.", 503);
   try {
     if (typeof text !== "string") throw new Error("Missing text");
     return JSON.parse(text);
   } catch {
-    throw new PresentationError("AI ei palauttanut hyväksyttävää JSON-esityssuunnitelmaa.", 502);
+    throw new PresentationError("The AI service returned an invalid JSON response.", 502);
   }
 }

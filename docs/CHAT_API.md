@@ -26,7 +26,7 @@ accepted. At least one insight must remain selected. Mandatory deck chapters sta
 Unsupported, ambiguous or question-only requests return an empty patch.
 
 JSON success: `{workspace, changed, reply}`. `changed` is the list of modified
-field paths. `reply` is exactly `Valmis` or `Ei muutoksia.`. The browser displays
+field paths. `reply` is exactly `Done` or `No changes.`. The browser displays
 only that status. It renders all user text as escaped text and recalculates the
 charts through deterministic models. Customer changes clear customer-specific
 notes/titles/selections; other data-scope changes clear notes and edited titles.
@@ -73,7 +73,7 @@ The model patch now requires `supported:boolean` and nullable `slideSwap` with
 validates the resulting deck, and stores its order for both native and browser
 export. Invalid, equal or out-of-range positions fail without changes. Model
 output cannot silently substitute priority or insight selection for a requested
-slide swap. Unsupported requests return 422 with a short message, never `Valmis`.
+slide swap. Unsupported requests return 422 with a short message, never `Done`.
 The rest of the strict nullable patch contract remains unchanged.
 
 The extension passed all 34 tests plus Ruff/ESLint/Prettier. A real OpenAI browser
