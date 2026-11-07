@@ -1,14 +1,22 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
+import { mkdtemp, writeFile, unlink, rmdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-test("preview redirects to the mock and serves every relative asset", async (t) => {
+async function startPreview(t, dataset = "") {
   const child = spawn(process.execPath, ["scripts/preview.mjs"], {
-    env: { ...process.env, PORT: "0", PRESENTATION_PROVIDER: "deterministic" },
+    env: {
+      ...process.env,
+      PORT: "0",
+      PRESENTATION_PROVIDER: "deterministic",
+      REVIEW_DATASET: dataset,
+    },
     stdio: ["ignore", "pipe", "pipe"],
   });
   t.after(() => child.kill());
-  const origin = await new Promise((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     let output = "";
     const timeout = setTimeout(() => reject(new Error("Preview did not start")), 5000);
     child.on("error", reject);
@@ -25,6 +33,36 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
       }
     });
   });
+}
+
+test("invalid active data leaves the preview available and blocks analysis", async (t) => {
+  const folder = await mkdtemp(join(tmpdir(), "lindberg-invalid-dataset-"));
+  const candidate = join(folder, "candidate.json");
+  await writeFile(candidate, '{"source":"Candidate","year":"2025","status":"SYNTHETIC"}');
+  t.after(async () => {
+    await unlink(candidate);
+    await rmdir(folder);
+  });
+  const origin = await startPreview(t, candidate);
+  const page = await fetch(origin);
+  assert.equal(page.status, 200);
+  assert.match(await page.text(), /id="dataset-status"/);
+  for (const [endpoint, body] of [
+    ["presentations", {}],
+    ["chat", { message: "Show results", workspace: { scope: {} } }],
+  ]) {
+    const response = await fetch(origin + "/api/" + endpoint + "?lang=fi", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    assert.equal(response.status, 503);
+    assert.match((await response.json()).error, /yhteensopivaa aineistoa/);
+  }
+});
+
+test("preview redirects to the mock and serves every relative asset", async (t) => {
+  const origin = await startPreview(t);
   const page = await fetch(origin);
   const emptyAssessment = await fetch(`${origin}/api/cooperation`, {
     method: "POST",
@@ -47,7 +85,7 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
     "analysis-model.js",
     "app.js",
     "brand.css",
-    "data.js",
+    "dataset.js",
     "language.js",
     "meeting-model.js",
     "model.js",
@@ -60,6 +98,10 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
     assert.equal(response.status, 200, `${asset} should be served`);
     assert.ok((await response.text()).length > 0);
   }
+  const dataset = await fetch(new URL("data.js", page.url));
+  assert.equal(dataset.status, 200);
+  assert.match(dataset.headers.get("content-type"), /^text\/plain/);
+  assert.match(await dataset.text(), /globalThis\.REVIEW_DATA = \{/);
   const font = await fetch(new URL("assets/libre-franklin.woff2", page.url));
   assert.equal(font.status, 200);
   assert.equal(font.headers.get("content-type"), "font/woff2");

@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="brand.css" />
     <script src="language.js" defer></script>
-    <script src="data.js" defer></script>
+    <script src="dataset.js" defer></script>
     <script src="model.js" defer></script>
     <script src="story-model.js" defer></script>
     <script src="analysis-model.js" defer></script>
@@ -20,7 +20,7 @@
       <a class="brand" href="#" aria-label="Lindström — customer workspace"
         ><img src="assets/lindstrom-logo.webp" alt="Lindström" width="153" height="33"
       /></a>
-      <nav class="view-tabs" role="tablist" aria-label="Workspace view">
+      <nav class="view-tabs" role="tablist" aria-label="Workspace view" hidden>
         <button
           id="summary-tab"
           role="tab"
@@ -64,7 +64,14 @@
         </div>
       </div>
     </header>
-    <main>
+    <main id="dataset-status" role="status">
+      <section class="empty-state">
+        <h1 id="dataset-title">Checking the dataset…</h1>
+        <p id="dataset-issue"></p>
+        <p id="dataset-recovery" hidden>Activate a compatible dataset and reopen the workspace.</p>
+      </section>
+    </main>
+    <main id="workspace" hidden>
       <div class="toolbar">
         <button id="reset-dashboard" class="text-button" type="button">Reset dashboard</button>
         <label for="customer">Customer<select id="customer"></select></label
@@ -190,7 +197,7 @@
         ><span>Customer workspace · Synthetic data</span>
       </footer>
     </main>
-    <section id="composer" class="conversation chat-dock" aria-label="Edit review">
+    <section id="composer" class="conversation chat-dock" aria-label="Edit review" hidden>
       <div class="chat-dock-heading">
         <span>Lindström assistant</span
         ><button id="toggle-chat" class="text-button" aria-expanded="false" aria-controls="chat">
