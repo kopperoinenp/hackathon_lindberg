@@ -12,6 +12,17 @@ const workspace = (customer = "CUST001") => ({
   cooperation: "yellow",
   dashboardLayout: { sections: ["savings", "metrics"], metrics: ["allocated"] },
   managerTexts: { plan: "Meet next month" },
+  contractKpis: [
+    {
+      label: "Delivery",
+      area: "performance",
+      actual: "97 %",
+      target: "99 %",
+      source: "Q4 report",
+      priority: true,
+    },
+  ],
+  includeContractAgenda: true,
 });
 test("customer reviews persist across store restart, retain dashboard edits, and remain customer-specific", async (t) => {
   const dir = await mkdtemp(path.join(tmpdir(), "kam-review-"));
@@ -31,6 +42,8 @@ test("customer reviews persist across store restart, retain dashboard edits, and
   const loaded = await restarted.read("CUST001");
   assert.deepEqual(loaded, saved);
   assert.equal(loaded.workspace.savings, 40000);
+  assert.deepEqual(loaded.workspace.contractKpis, workspace().contractKpis);
+  assert.equal(loaded.workspace.includeContractAgenda, true);
   assert.deepEqual(loaded.workspace.dashboardLayout.sections, ["savings", "metrics"]);
   assert.equal((await restarted.read("CUST002")).workspace, null);
   await restarted.save("CUST002", { revision: 0, workspace: workspace("CUST002") });

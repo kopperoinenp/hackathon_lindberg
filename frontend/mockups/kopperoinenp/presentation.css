@@ -76,7 +76,7 @@ main {
   box-shadow: 0 12px 45px #003f7210;
   display: flex;
   flex-direction: column;
-  overflow: auto;
+  overflow: visible;
 }
 .slide-brand {
   position: absolute;
@@ -270,7 +270,7 @@ main {
 }
 
 .slide-body {
-  overflow: auto;
+  overflow: visible;
 }
 .overview h1 {
   margin: 2% 0;
@@ -303,4 +303,32 @@ main {
   border-radius: 50%;
   flex-shrink: 0;
   border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+/* The slide body must never create a nested scrolling surface. */
+.presentation-slide {
+  container-type: inline-size;
+}
+.presentation-slide h1 {
+  font-size: clamp(18px, 3cqw, 38px);
+  margin: 2.5% 0 2%;
+}
+.slide-body {
+  font-size: clamp(11px, 1.65cqw, 21px);
+  line-height: 1.4;
+}
+.cover .slide-body {
+  font-size: clamp(12px, 1.8cqw, 23px);
+}
+.cover .slide-body p {
+  margin-bottom: 0.65em;
+}
+@media (max-width: 700px) {
+  .presentation-slide h1 {
+    font-size: 25px;
+  }
+  .slide-body,
+  .cover .slide-body {
+    font-size: 15px;
+  }
 }

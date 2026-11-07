@@ -24,7 +24,7 @@ The review keeps a common evidence structure across customers. Use **Manage
 contract KPIs** to add or edit up to 12 customer-specific measures with an
 optional actual, target and source or reporting period. Highlight up to three
 for the meeting agenda. Entries are scoped to the selected customer and kept
-in the current page session. Enable **Include highlighted KPIs in the
+in the customer’s saved review, including after reload. Enable **Include highlighted KPIs in the
 presentation** to append the current agenda to the existing presentation
 note. Measures are entered by the KAM, and missing actuals show as unavailable.
 
@@ -52,7 +52,7 @@ The top menu switches two panels in the same page:
 
 Both panels and exported reviews use the same selected scope. The summary always
 shows its geography and period. Switching views preserves the selection and notes.
-Changing the customer, time, geography or baseline clears scope-specific notes.
+Changing time, geography or baseline preserves customer-specific KAM commentary and estimates; selecting another customer loads that customer’s own saved material.
 Invalid periods and empty selections display a missing-data state and disable export.
 
 Chat examples: `Näytä Suomen tammi–maaliskuu 2025 ja painota päästöjä`,

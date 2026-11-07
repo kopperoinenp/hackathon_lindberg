@@ -2,6 +2,10 @@
 (function (root) {
   "use strict";
   const finnish = {
+    "KAM estimates are customer-specific and do not change with filters.":
+      "KAM:in arviot ovat asiakaskohtaisia eivätkä muutu rajausten mukana.",
+    "Textile use by product": "Tekstiilien käyttö tuotteittain",
+    "Allocation and scan coverage for": "Allokointi ja skannausosuus kuukaudelta",
     "Dashboard view": "Dashboard-näkymä",
     "Saved customer review": "Asiakkaan tallennettu katsaus",
     "Original template": "Alkuperäinen pohja",
@@ -406,8 +410,8 @@
       '</tbody></table></div><p class="quiet">Avaa toimipaikka nähdäksesi sen oman katsauksen. Palaa kokonaisuuteen pyytämällä apurilta ”näytä kaikki toimipaikat”.</p></details></section><section class="story-section" aria-labelledby="next-title"><div class="section-heading"><span class="section-number">03</span><h2 id="next-title">Yhteinen suunta ensi vuodelle</h2></div><div class="next-chapter"><div><h3>Yksi hyvä parannus<br />kerrallaan.</h3><p>Ota palaveriin mukaan selkeä keskustelunavaus. Nämä ovat ehdotuksia, joista sovitaan asiakkaan kanssa.</p></div><ol class="next-steps">',
     '><summary>Add a note to the presentation</summary><label for="meeting-note" class="sr-only">Meeting note</label><textarea id="meeting-note" maxlength="2000" placeholder="E.g. a customer goal or an agreed next step…">':
       '><summary>Lisää oma muistiinpano esitykseen</summary><label for="meeting-note" class="sr-only">Oma palaverimuistiinpano</label><textarea id="meeting-note" maxlength="2000" placeholder="E.g. a customer goal or an agreed next step…">',
-    '</textarea><p class="quiet">The note stays in this tab until you change the customer, site or baseline.</p></details></section>':
-      '</textarea><p class="quiet">Muistiinpano säilyy tässä välilehdessä. Asiakkaan, toimipaikan tai vertailun vaihtaminen tyhjentää sen.</p></details></section>',
+    '</textarea><p class="quiet">The note is saved for this customer and retained when filters change.</p></details></section>':
+      '</textarea><p class="quiet">Muistiinpano tallentuu tälle asiakkaalle ja säilyy myös rajauksia vaihtaessa.</p></details></section>',
     '</p><div class="relevance"><strong>Why this matters</strong><p>':
       '</p><div class="relevance"><strong>Miksi tämä nostetaan?</strong><p>',
     "<p>No data matches the filters. Adjust them to view the calculation.</p>":

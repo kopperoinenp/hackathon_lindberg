@@ -39,7 +39,7 @@ instruction (null preserves, empty string clears). Text is added as labeled KAM
 commentary; source calculations and mandatory limitations remain intact.
 
 Workspace and presentation requests preserve optional `savings:number|null` and
-`managerTexts:{slideId:string}`. Customer/data-scope changes clear scoped estimates
+`managerTexts:{slideId:string}`. Customer changes clear customer-specific estimates
 and commentary before applying new instructions. These backward-compatible tools
 extend the user-authorized KAM editing workflow, without new external endpoints.
 
@@ -72,7 +72,7 @@ JSON success: `{workspace, changed, reply}`. `changed` is the list of modified
 field paths. `reply` is exactly `Done` or `No changes.`. The browser displays
 only that status. It renders all user text as escaped text and recalculates the
 charts through deterministic models. Customer changes clear customer-specific
-notes/titles/selections; other data-scope changes clear notes and edited titles.
+notes/titles/selections; other data-scope changes preserve KAM material.
 A country follow-up preserves the period and priority. Site/customer membership
 and nonempty data are checked before the entire patch is applied.
 
@@ -132,3 +132,5 @@ The regenerated browser deck showed the common overview as slide 1/9 and the
 customer cover as slide 2/9. The HTTP test separately checked the actual generated
 PPTX slide1.xml and slide2.xml contents. kopperoinenp Codex owns integration and
 merge after successful review/CI under the updated AGENTS.md authorization.
+
+Validated workspace snapshots also include contractKpis (up to 12, at most three prioritized) and includeContractAgenda. Chat cannot author these fields; it preserves the current customer’s validated selections. See REVIEW_STORAGE.md.

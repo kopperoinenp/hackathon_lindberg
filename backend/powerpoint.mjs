@@ -2,6 +2,8 @@ import pptxgen from "pptxgenjs";
 import { applyLindstromTemplate, templateStandard } from "./lindstrom-template.mjs";
 export async function renderPowerPoint(deck, provenance) {
   const t = globalThis.ReviewLanguage.translator(deck.request.language);
+  const number = (value) =>
+    new Intl.NumberFormat(t("en-GB"), { maximumFractionDigits: 1 }).format(value);
   const pptx = new pptxgen();
   pptx.defineLayout({
     name: "LINDSTROM",
@@ -175,7 +177,19 @@ export async function renderPowerPoint(deck, provenance) {
       });
       slide.addChart(
         pptx.ChartType.bar,
-        [{ name: item.chart.unit, labels: item.chart.labels, values: item.chart.values }],
+        [
+          {
+            name: t(item.chart.unit),
+            labels:
+              item.kind === "repairs"
+                ? item.chart.labels
+                : item.chart.labels.map(
+                    (label, i) =>
+                      `${label} · ${number(item.chart.values[i])} ${t(item.chart.unit)}`,
+                  ),
+            values: item.chart.values,
+          },
+        ],
         {
           x: 5.6,
           y: 2.05,
@@ -185,12 +199,18 @@ export async function renderPowerPoint(deck, provenance) {
           catAxisLabelFontSize: 12,
           valAxisLabelFontSize: 10,
           showLegend: false,
-          showValue: true,
+          showValue: false,
+          lang: t("en-GB"),
+          catAxisOrientation: item.kind === "repairs" ? "minMax" : "maxMin",
+          catAxisLabelFontFace: templateStandard.bodyFont,
+          valAxisLabelFontFace: templateStandard.bodyFont,
+          valAxisLabelFormatCode: "0",
+          valAxisHidden: item.kind !== "repairs",
           dataLabelFormatCode: item.chart.unit === "items" ? "#,##0" : "#,##0.0",
           chartColors:
             item.kind === "repairs" ? [templateStandard.green] : [templateStandard.blue, "A9C1D4"],
           showTitle: true,
-          title: item.chart.unit,
+          title: t(item.chart.unit),
           titleFontSize: 11,
           showCatName: false,
           showBorder: false,

@@ -154,6 +154,38 @@ function boundedText(value, maximum) {
     throw new PresentationError("Invalid text field.");
   return value;
 }
+const kpiAreas = [
+  "scorecard",
+  "experience",
+  "performance",
+  "adoption",
+  "operations",
+  "financial",
+  "sustainability",
+  "improvement",
+  "future",
+];
+function validateContractKpis(input) {
+  if (!Array.isArray(input) || input.length > 12)
+    throw new PresentationError("Invalid contract KPIs.");
+  const result = input.map((kpi) => {
+    if (!object(kpi) || !kpiAreas.includes(kpi.area) || typeof kpi.priority !== "boolean")
+      throw new PresentationError("Invalid contract KPI.");
+    const label = boundedText(kpi.label, 80).trim();
+    if (!label) throw new PresentationError("Enter a KPI name.");
+    return {
+      label,
+      area: kpi.area,
+      actual: boundedText(kpi.actual, 40),
+      target: boundedText(kpi.target, 40),
+      source: boundedText(kpi.source, 100),
+      priority: kpi.priority,
+    };
+  });
+  if (result.filter((kpi) => kpi.priority).length > 3)
+    throw new PresentationError("Highlight up to three KPIs.");
+  return result;
+}
 export function normalizeWorkspace(input, { allowEmpty = false } = {}) {
   if (!object(input) || !object(input.scope)) throw new PresentationError("Invalid review state.");
   const reversed =
@@ -185,8 +217,12 @@ export function normalizeWorkspace(input, { allowEmpty = false } = {}) {
     summaryMetric,
     visibleInsights: selectedIds(input.visibleInsights ?? insightIds),
     heading: boundedText(input.heading ?? "", 150),
+    contractKpis: validateContractKpis(input.contractKpis ?? []),
+    includeContractAgenda: input.includeContractAgenda ?? false,
     dashboardLayout: input.dashboardLayout ?? globalThis.WorkspaceModel.defaultDashboardLayout(),
   };
+  if (typeof result.includeContractAgenda !== "boolean")
+    throw new PresentationError("Invalid agenda selection.");
   const layout = result.dashboardLayout;
   if (
     !object(layout) ||
@@ -251,9 +287,6 @@ export function applyChatPatch(current, patch, message) {
   let next = { ...current, scope: { ...current.scope }, titleEdits: { ...current.titleEdits } };
   const customerChanged =
     patch.scope.customer !== null && patch.scope.customer !== current.scope.customer;
-  const scopeChanged = scopeKeys
-    .filter((k) => k !== "priority")
-    .some((k) => patch.scope[k] !== null && patch.scope[k] !== current.scope[k]);
   if (customerChanged)
     next = {
       ...next,
@@ -265,17 +298,12 @@ export function applyChatPatch(current, patch, message) {
       slideOrder: [],
       titleEdits: {},
       heading: "",
+      contractKpis: [],
+      includeContractAgenda: false,
       summaryMetric: "auto",
       visibleInsights: [...insightIds],
       included: [...insightIds],
     };
-  else if (scopeChanged) {
-    next.note = "";
-    next.savings = null;
-    next.managerTexts = {};
-    next.titleEdits = {};
-    next.heading = "";
-  }
   if (patch.scope.country !== null || patch.scope.continent !== null) next.scope.site = "all";
   if (patch.scope.site !== null && patch.scope.site !== "all") {
     next.scope.country = "all";

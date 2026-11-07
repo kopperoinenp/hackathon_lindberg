@@ -198,3 +198,24 @@ test("cooperation lights survive AI planning and appear as native colors and tex
     assert.ok(last.includes(`val="${color}"`));
   }
 });
+
+test("Finnish charts use localized editable category labels without crowded numeric point labels", async () => {
+  const base = buildPresentation({ scope: {}, language: "fi" });
+  const deck = applyPlan(base, defaultPlan(base));
+  const zip = await JSZip.loadAsync(
+    await renderPowerPoint(deck, { provider: "deterministic", model: null }),
+  );
+  const entries = Object.keys(zip.files).filter((name) =>
+    /^ppt\/charts\/chart\d+\.xml$/.test(name),
+  );
+  const charts = await Promise.all(entries.map((name) => zip.file(name).async("string")));
+  assert.ok(charts.length >= 4);
+  assert.ok(
+    charts.some(
+      (xml) => xml.includes("maxMin") && xml.includes("Lindström · 3") && xml.includes("m³"),
+    ),
+  );
+  assert.ok(charts.some((xml) => xml.includes("kpl")));
+  assert.ok(charts.every((xml) => !xml.includes('showVal val="1"')));
+  assert.ok(charts.every((xml) => !xml.includes("items")));
+});

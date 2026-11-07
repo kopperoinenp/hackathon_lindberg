@@ -74,6 +74,8 @@
     managerTexts: {},
     dashboardLayout: globalThis.WorkspaceModel.defaultDashboardLayout(),
     chat: [],
+    contractKpis: [],
+    includeContractAgenda: false,
   };
   const defaultReviewState = structuredClone(state);
   let storageLoading = true,
@@ -86,7 +88,9 @@
   let switchingReview = false;
   let profileMode = "original";
   let customerDraft = null;
+  let storageMessage;
   function storageStatus(fi, en) {
+    storageMessage = { fi, en };
     $("#review-storage-status").textContent = language === "fi" ? fi : en;
   }
   function scheduleReviewSave() {
@@ -177,6 +181,8 @@
           "savings",
           "managerTexts",
           "dashboardLayout",
+          "contractKpis",
+          "includeContractAgenda",
         ])
           state[key] = record.workspace[key];
       }
@@ -186,7 +192,7 @@
       savedSignature = JSON.stringify(chatWorkspace());
       storageReady = true;
       storageBlocked = false;
-      localStorage.setItem("lindstrom-review-customer", customer);
+      sessionStorage.setItem("lindstrom-review-customer", customer);
       storageStatus(
         record.workspace
           ? "Tallennettu katsaus ladattu"
@@ -271,8 +277,6 @@
   window.addEventListener("pagehide", () => {
     flushReviewSave().catch(() => {});
   });
-  const contractKpis = new Map();
-  const includedAgendas = new Set();
   const kpiForm = $("#contract-kpi-form");
   const evidenceAreas = [
     ["scorecard", "Customer success scorecard", "Review the overall picture with the customer."],
@@ -442,8 +446,8 @@
         <p class="quiet">${t("These are questions for discussion. SLA, unique wearers and verified savings require separate evidence.")}</p>
       </section>
       <section class="analysis-card">
-        <h2>Textile use by product</h2>
-        <p class="quiet">Allocation and scan coverage for ${esc(detail.snapshotMonth ?? "–")}.
+        <h2>${t("Textile use by product")}</h2>
+        <p class="quiet">${t("Allocation and scan coverage for")} ${esc(detail.snapshotMonth ?? "–")}.
         Wash frequency divides washes in the period by the sum of monthly allocations.
         Repair frequency counts events per 100 washes. Sources: Service_Activity, Products, Repairs and Customer_Impacts.</p>
         ${table(
@@ -459,7 +463,7 @@
           ],
           detail.products.map((product) => [
             product.name,
-            number(product.allocated, "items", 0),
+            number(product.allocated, t("items"), 0),
             number(product.scannedPct, "%"),
             number(product.washed, "", 0),
             number(product.washesPerPieceMonth),
@@ -539,7 +543,7 @@
     const definitions = {
       water: { label: t("Water consumption"), unit: "m³", divisor: 1000 },
       emissions: { label: t("Laundry and delivery emissions"), unit: "t CO₂e", divisor: 1000 },
-      repairs: { label: t("Repairs"), unit: "items", divisor: 1 },
+      repairs: { label: t("Repairs"), unit: t("items"), divisor: 1 },
     };
     const def = definitions[state.metric],
       points = globalThis.WorkspaceModel.series(ctx, state.metric),
@@ -550,8 +554,8 @@
       t`<div class="analysis-scope"><strong>${esc(scopeLabel())}</strong><span>${periodName()} · ${ctx.rows.length} monthly site records</span></div><div class="analysis-kpis">${[
         [t("Water used for washing"), f(m.water / 1000) + " m³"],
         [t("Laundry and delivery"), f(m.emissions / 1000, 1) + " t CO₂e"],
-        [t("Repairs"), f(m.repairs) + " items"],
-        [t("Allocated textiles"), f(m.allocated) + " items"],
+        [t("Repairs"), f(m.repairs) + " " + t("items")],
+        [t("Allocated textiles"), f(m.allocated) + " " + t("items")],
       ]
         .map(
           ([label, value]) => `<article><span>${label}</span><strong>${value}</strong></article>`,
@@ -601,7 +605,7 @@
       $("#" + id).value = state[id];
     $("#summary-panel").hidden = state.view !== "summary";
     $("#analysis-panel").hidden = state.view !== "analysis";
-    $("#composer").hidden = state.view !== "summary";
+    $("#composer").hidden = profileMode === "original";
     for (const view of ["summary", "analysis"]) {
       const tab = $("#" + view + "-tab");
       tab.setAttribute("aria-selected", String(state.view === view));
@@ -635,6 +639,9 @@
           ? "Original template preview. Your saved review is unchanged. Select Saved customer review to edit."
           : "Edits are saved to this customer’s review.",
     )}`;
+    if (!original && state.savings !== null)
+      $("#profile-mode-help").textContent +=
+        " " + t("KAM estimates are customer-specific and do not change with filters.");
     $("#reset-dashboard").disabled = original;
     $("#customer-profile-kpis").hidden = original;
     $("#composer").inert = original || switchingReview || storageLoading;
@@ -644,7 +651,7 @@
     scheduleReviewSave();
   }
   function customerKpis() {
-    return contractKpis.get(state.customer) ?? [];
+    return state.contractKpis;
   }
   function kpiDescription(kpi) {
     return [
@@ -689,7 +696,7 @@
       .join("");
     const includeAgenda = $("#include-contract-agenda");
     includeAgenda.disabled = agenda.length === 0;
-    includeAgenda.checked = agenda.length > 0 && includedAgendas.has(state.customer);
+    includeAgenda.checked = agenda.length > 0 && state.includeContractAgenda;
 
     const difference = f(lowerPct);
     $("#industry-benchmark-summary").textContent =
@@ -726,10 +733,11 @@
       return;
     }
     kpis[editedKpi < 0 ? kpis.length : editedKpi] = kpi;
-    contractKpis.set(state.customer, kpis);
+    state.contractKpis = kpis;
     resetKpiForm();
     renderReviewEvidence();
     invalidatePowerPoint();
+    scheduleReviewSave();
     status(t("Contract KPI saved."));
   });
   $("#cancel-contract-kpi").addEventListener("click", () => {
@@ -752,13 +760,14 @@
       resetKpiForm();
       renderReviewEvidence();
       invalidatePowerPoint();
+      scheduleReviewSave();
       status(t("Contract KPI removed."));
     }
     kpiForm.elements.label.focus();
   });
   $("#include-contract-agenda").addEventListener("change", (event) => {
-    if (event.target.checked) includedAgendas.add(state.customer);
-    else includedAgendas.delete(state.customer);
+    state.includeContractAgenda = event.target.checked;
+    scheduleReviewSave();
     invalidatePowerPoint();
   });
   function renderCustomerOverview() {
@@ -955,7 +964,7 @@
         .map(([title, note]) => `<li>${esc(title)}<small>${esc(note)}</small></li>`)
         .join(
           "",
-        )}</ol></div><details class="notes-details" ${state.note ? "open" : ""}><summary>Add a note to the presentation</summary><label for="meeting-note" class="sr-only">Meeting note</label><textarea id="meeting-note" maxlength="2000" placeholder="E.g. a customer goal or an agreed next step…">${esc(state.note)}</textarea><p class="quiet">The note stays in this tab until you change the customer, site or baseline.</p></details></section>`;
+        )}</ol></div><details class="notes-details" ${state.note ? "open" : ""}><summary>Add a note to the presentation</summary><label for="meeting-note" class="sr-only">Meeting note</label><textarea id="meeting-note" maxlength="2000" placeholder="E.g. a customer goal or an agreed next step…">${esc(state.note)}</textarea><p class="quiet">The note is saved for this customer and retained when filters change.</p></details></section>`;
   }
   function renderDashboardEdits() {
     const targets = {
@@ -1071,13 +1080,7 @@
     return t`<p class="quiet">${esc(customer.customer_name)} · ${esc(scopeName())} · ${periodName()}</p><p class="quiet">All customer figures are synthetic. Water and emissions are calculated estimates allocated from laundry-level data.</p><section class="method-section"><h3>Baseline: ${baselineName()}</h3><p>The baselines apply different water and emissions factors to the same washed weight. They represent illustrative laundry models.</p><div class="formula">Water difference: ${f(m.kg, 1)} kg × ${f(b.water_l_per_kg, 2)} l/kg − ${f(m.water)} l = ${f(c.waterDifference)} l<br />Emissions difference: ${f(m.kg, 1)} kg × ${f(b.process_kgco2e_per_kg + b.delivery_kgco2e_per_kg, 3)} kg CO₂e/kg − ${f(m.emissions)} kg CO₂e = ${f(c.emissionsDifference)} kg CO₂e</div><p>The scope covers water used in washing and laundry and delivery emissions. Figures in the review are rounded.</p></section><section class="method-section"><h3>Sources and calculations</h3><p>${esc(data.source)}</p><ul><li>Customers and Sites: synthetic customer and site records.</li><li>Service_Activity: washed kilograms in the period and allocations and scans for ${snapshotName()}.</li><li>Customer_Impacts: allocated_water_l, allocated_process_kgco2e and allocated_delivery_kgco2e, summed over the period.</li><li>Repairs: number of repair events in the selected period.</li><li>Baselines: factors for the selected comparison.</li></ul></section><section class="method-section"><h3>Interpretation limits</h3><ul><li>Scan coverage highlights where to investigate actual textile use.</li><li>Repair scenarios depend on assumptions about delayed purchases. Their estimated impact is shown separately from laundry emissions.</li><li>Unique wearer counts require person identifiers.</li><li>Cost savings, request resolution and regulatory claims require further evidence.</li><li>Industry focus is an editable suggestion.</li></ul></section>`;
   }
   function clearScope() {
-    state.note = "";
-    state.savings = null;
-    state.managerTexts = {};
-    state.titleEdits = {};
-    state.slideOrder = [];
-    state.chat = [];
-    state.heading = "";
+    // KAM material belongs to the customer; browsing filters must not delete it.
     state.chatRevision += 1;
   }
   function chatWorkspace() {
@@ -1089,6 +1092,8 @@
       visibleInsights: state.visibleInsights,
       heading: state.heading,
       dashboardLayout: state.dashboardLayout,
+      contractKpis: state.contractKpis,
+      includeContractAgenda: state.includeContractAgenda,
     };
   }
   function renderChat() {
@@ -1168,6 +1173,8 @@
         "savings",
         "managerTexts",
         "dashboardLayout",
+        "contractKpis",
+        "includeContractAgenda",
       ])
         state[key] = next[key];
       render();
@@ -1225,6 +1232,7 @@
     if (event.target.id === "metric") {
       state.metric = event.target.value;
       renderAnalysis();
+      scheduleReviewSave();
     }
   });
   document.querySelector(".view-tabs").addEventListener("keydown", (event) => {
@@ -1260,6 +1268,7 @@
       switchingReview = false;
       $("#workspace").inert = false;
       $("#composer").inert = profileMode === "original";
+      render();
     }
   });
   for (const id of ["site", "baseline", "priority", "from", "to", "country", "continent"])
@@ -1323,8 +1332,13 @@
       ready &&
       ready.request === JSON.stringify(presentationRequest()) &&
       Date.now() < ready.expires
-    )
+    ) {
+      const link = $("#download-powerpoint");
+      link.href = ready.downloadUrl;
+      link.setAttribute("aria-disabled", "false");
+      link.title = t("Download PowerPoint");
       return;
+    }
     state.readyPresentation = null;
     const link = $("#download-powerpoint");
     link.removeAttribute("href");
@@ -1338,7 +1352,7 @@
       ),
     );
     const agenda =
-      includeAgenda && includedAgendas.has(state.customer)
+      includeAgenda && state.includeContractAgenda
         ? customerKpis().filter((kpi) => kpi.priority)
         : [];
     const agendaNote = agenda.length
@@ -1402,9 +1416,11 @@
           ),
         );
       state.slideOrder = result.slides.map((slide) => slide.id);
+      scheduleReviewSave();
       const viewUrl = `/kopperoinenp/presentation.html?id=${encodeURIComponent(result.id)}&lang=${language}`;
       state.readyPresentation = {
         id: result.id,
+        downloadUrl: result.downloadUrl,
         viewUrl,
         request: JSON.stringify(presentationRequest()),
         expires: Date.now() + result.expiresInSeconds * 1000,
@@ -1429,12 +1445,13 @@
         );
     } finally {
       state.generating = false;
-      button.innerHTML = 'Open presentation <span aria-hidden="true">↗</span>';
+      button.innerHTML = `${t("Open presentation")} <span aria-hidden="true">↗</span>`;
       button.disabled = !context().metrics.hasData || !state.included.length;
     }
   });
   function applyLanguage() {
     updateLanguage();
+    if (storageMessage) storageStatus(storageMessage.fi, storageMessage.en);
     updateChatToggle();
     render();
     $("#download-powerpoint").title = t(
@@ -1443,7 +1460,9 @@
   }
   bindLanguageControls(applyLanguage);
   applyLanguage();
-  const previousCustomer = localStorage.getItem("lindstrom-review-customer");
+  const previousCustomer =
+    sessionStorage.getItem("lindstrom-review-customer") ||
+    localStorage.getItem("lindstrom-review-customer");
   loadCustomerReview(
     data.customers.some((row) => row.customer_id === previousCustomer)
       ? previousCustomer

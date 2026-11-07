@@ -1691,3 +1691,14 @@ main {
   white-space: normal;
   text-align: left;
 }
+
+/* Keep the assistant clear of the customer controls and navigation. */
+#composer:not(:has(#chat[hidden])) {
+  max-height: calc(100dvh - 240px);
+}
+@media (max-width: 760px) {
+  #composer:not(:has(#chat[hidden])) {
+    height: min(480px, 55dvh);
+    max-height: calc(100dvh - 240px);
+  }
+}

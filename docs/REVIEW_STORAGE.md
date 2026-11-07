@@ -5,7 +5,7 @@ The local single-user backend saves one current review per customer under
 tests/deployment. Data is independent of the synthetic source fixture and survives
 service restarts. Only validated workspace settings are stored: scope, dashboard
 layout, visible metrics, headings, manager commentary, notes, estimates, relationship
-color and presentation choices. API keys, generated files and chat history are not
+color, contract KPIs, agenda inclusion and presentation choices. API keys, generated files and chat history are not
 stored here. Language remains a browser preference.
 
 - `GET /api/reviews/{customer}` returns `{customer,revision,updatedAt,workspace}`.
@@ -21,7 +21,7 @@ hosting. Production needs authenticated ownership and shared transactional stora
 
 The UI loads the saved review on startup/customer selection, saves edits after a
 short debounce, and waits for assistant-edit saves before completion. The browser
-remembers only the last customer ID. The persistent storage indicator reports
+remembers the selected customer ID separately in each tab (sessionStorage). The persistent storage indicator reports
 loading/saving/saved/errors. On conflicts, reload rather than overwriting another
 window. Switching customers flushes pending changes and loads that customer's
 saved review (or defaults when none exists); assistant customer switches also load
@@ -56,3 +56,16 @@ that the saved review's monetary estimate and filters remain unchanged.
 
 Tests cover disk persistence across a new store instance, customer isolation,
 concurrent/stale revisions, validation/corruption, and actual HTTP PUT/GET/409.
+
+Contract KPIs are part of the validated workspace: `contractKpis` contains up to
+12 entries (label, evidence area, actual, target, source, priority), of which up to
+three may be highlighted. `includeContractAgenda` persists the export selection.
+Older records default to an empty list and false. Creating/editing/removing a KPI
+or changing agenda inclusion triggers the same autosave queue as dashboard edits.
+
+KAM commentary, savings estimates, custom headings and slide choices belong to the
+customer and survive date/country/site/baseline filtering and clearing filters.
+They remain manually supplied material, not recalculated evidence. Selecting a
+different customer loads that customer's profile. The AI patch validator also
+preserves KAM material for same-customer scope changes and clears it on a customer
+change. The assistant stays available in both workspace tabs.
