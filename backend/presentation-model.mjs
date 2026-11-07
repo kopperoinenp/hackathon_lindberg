@@ -1,3 +1,4 @@
+import "../frontend/mockups/kopperoinenp/language.js";
 import "../frontend/mockups/kopperoinenp/data.js";
 import "../frontend/mockups/kopperoinenp/model.js";
 import "../frontend/mockups/kopperoinenp/story-model.js";
@@ -11,12 +12,16 @@ export class PresentationError extends Error {
   }
 }
 const data = globalThis.REVIEW_DATA;
-const f = (value, digits = 0) =>
-  new Intl.NumberFormat("fi-FI", { maximumFractionDigits: digits }).format(value);
 export const evidenceIds = ["water", "emissions", "repairs"];
 export const insightIds = [...evidenceIds, "opportunity"];
 export const slideIds = ["cover", "overview", ...insightIds, "plan", "sources", "limits"];
 export const storyVersion = "customer-value-story-v2";
+export const cooperationStates = {
+  unrated: { label: "Ei arvioitu", color: "667580" },
+  green: { label: "Vihreä – yhteistyö sujuu hyvin", color: "578200" },
+  yellow: { label: "Keltainen – vaatii huomiota", color: "F4C542" },
+  red: { label: "Punainen – vaatii toimenpiteitä", color: "E52330" },
+};
 const defaults = {
   customer: "CUST001",
   from: "2025-01",
@@ -29,34 +34,34 @@ const defaults = {
 };
 export function validateRequest(input) {
   if (!input || typeof input !== "object" || Array.isArray(input))
-    throw new PresentationError("Virheellinen esityspyyntö.");
+    throw new PresentationError("Invalid presentation request.");
   const scope = {};
   for (const [key, fallback] of Object.entries(defaults)) {
     scope[key] = input.scope?.[key] ?? fallback;
     if (typeof scope[key] !== "string" || scope[key].length > 80)
-      throw new PresentationError("Virheellinen rajaus.");
+      throw new PresentationError("Invalid filters.");
   }
   if (
     !data.customers.some((c) => c.customer_id === scope.customer) ||
     !data.baselines.some((b) => b.baseline_id === scope.baseline)
   )
-    throw new PresentationError("Tuntematon asiakas tai vertailumalli.");
+    throw new PresentationError("Unknown customer or baseline.");
   if (
     ![scope.from, scope.to].every((m) => /^2025-(0[1-9]|1[0-2])$/.test(m)) ||
     scope.from > scope.to
   )
-    throw new PresentationError("Tarkista esityksen ajanjakso.");
+    throw new PresentationError("Check the presentation date range.");
   if (
     !["all", "Finland", "Sweden", "Poland"].includes(scope.country) ||
     !["all", "Europe"].includes(scope.continent) ||
     !["neutral", "water", "emissions", "circularity", "efficiency"].includes(scope.priority)
   )
-    throw new PresentationError("Tuntematon rajaus.");
+    throw new PresentationError("Unknown filter.");
   if (
     scope.site !== "all" &&
     !data.sites.some((s) => s.site_id === scope.site && s.customer_id === scope.customer)
   )
-    throw new PresentationError("Toimipaikka ei kuulu asiakkaalle.");
+    throw new PresentationError("The site does not belong to this customer.");
   const included = input.included ?? insightIds;
   if (
     !Array.isArray(included) ||
@@ -65,23 +70,23 @@ export function validateRequest(input) {
     new Set(included).size !== included.length ||
     included.some((id) => !insightIds.includes(id))
   )
-    throw new PresentationError("Valitse vähintään yksi tunnettu nosto.");
+    throw new PresentationError("Select at least one available insight.");
   const note = input.note ?? "";
   if (typeof note !== "string" || note.length > 2000)
-    throw new PresentationError("Muistiinpano on liian pitkä.");
+    throw new PresentationError("The note is too long.");
   const titleEdits = {};
   if (
     input.titleEdits != null &&
     (typeof input.titleEdits !== "object" || Array.isArray(input.titleEdits))
   )
-    throw new PresentationError("Virheelliset diaotsikot.");
+    throw new PresentationError("Invalid slide titles.");
   for (const [id, title] of Object.entries(input.titleEdits || {})) {
     if (
       !["cover", "overview", ...insightIds, "plan", "sources", "limits"].includes(id) ||
       typeof title !== "string" ||
       title.length > 150
     )
-      throw new PresentationError("Virheellinen diaotsikko.");
+      throw new PresentationError("Invalid slide title.");
     if (title.trim()) titleEdits[id] = title.trim();
   }
   const slideOrder = input.slideOrder ?? [];
@@ -91,27 +96,59 @@ export function validateRequest(input) {
     new Set(slideOrder).size !== slideOrder.length ||
     slideOrder.some((id) => !slideIds.includes(id))
   )
-    throw new PresentationError("Virheellinen managerin diajärjestys.");
-  return { scope, included, note, titleEdits, slideOrder: [...slideOrder] };
+    throw new PresentationError("Invalid custom slide order.");
+  const cooperation = input.cooperation ?? "unrated";
+  if (typeof cooperation !== "string" || !Object.hasOwn(cooperationStates, cooperation))
+    throw new PresentationError("Tuntematon yhteistyön tila.");
+  const savings = input.savings ?? null;
+  if (
+    savings !== null &&
+    (typeof savings !== "number" || !Number.isFinite(savings) || savings < 0 || savings > 1e12)
+  )
+    throw new PresentationError("Virheellinen KAM:in säästöarvio.");
+  const managerTexts = input.managerTexts ?? {};
+  if (
+    !managerTexts ||
+    typeof managerTexts !== "object" ||
+    Array.isArray(managerTexts) ||
+    Object.entries(managerTexts).some(
+      ([id, text]) => !slideIds.includes(id) || typeof text !== "string" || text.length > 2000,
+    )
+  )
+    throw new PresentationError("Virheellinen KAM:in diateksti.");
+  return {
+    scope,
+    included,
+    note,
+    titleEdits,
+    slideOrder: [...slideOrder],
+    language: input.language === "fi" ? "fi" : "en",
+    cooperation,
+    savings,
+    managerTexts: { ...managerTexts },
+  };
 }
 export function buildPresentation(input) {
   const request = validateRequest(input);
+  const t = globalThis.ReviewLanguage.translator(request.language);
+  const f = (value, digits = 0) =>
+    new Intl.NumberFormat(t("en-GB"), { maximumFractionDigits: digits }).format(value);
   const ctx = globalThis.WorkspaceModel.buildContext(data, request.scope);
   const { metrics: m, compare: c, baseline: b, focus, customer } = ctx;
-  if (!m.hasData) throw new PresentationError("Nykyisellä rajauksella ei ole dataa.");
+  if (!m.hasData) throw new PresentationError("No data matches the filters.");
   const period = `${request.scope.from} – ${request.scope.to}`;
   const baseline = {
-    B_LOCAL: "paikallinen ulkoistettu pesula",
-    B_HOME: "kotipesu",
-    B_INHOUSE: "asiakkaan oma pesula",
+    B_LOCAL: t("local outsourced laundry"),
+    B_HOME: t("home laundering"),
+    B_INHOUSE: t("in-house laundry"),
   }[request.scope.baseline];
   const scopeName =
     request.scope.site !== "all"
       ? focus.site_name
       : request.scope.country !== "all"
-        ? globalThis.WorkspaceModel.countryNames[request.scope.country]
-        : "Kaikki toimipaikat";
-  const footer = `Synteettinen aineisto · ${scopeName} · ${period} · Vertailu: ${baseline}`;
+        ? t(globalThis.WorkspaceModel.countryNames[request.scope.country])
+        : t("All sites");
+  const footer = t`Synthetic data · ${scopeName} · ${period} · Baseline: ${baseline}`;
   const difference = (delta, pct) => `${delta >= 0 ? "−" : "+"}${f(Math.abs(pct))} %`;
   const slides = {
     cover: {
@@ -119,158 +156,186 @@ export function buildPresentation(input) {
       kind: "cover",
       title: customer.customer_name,
       paragraphs: [
-        "Jakson tärkeimmät tulokset ja yhteinen suunta vuodelle 2026.",
-        `${m.sites} ${m.sites === 1 ? "toimipaikka" : "toimipaikkaa"}`,
-        "Vedenkäyttö, pesun ja toimitusten päästöt, tekstiilien huolto sekä yhteinen kehitysehdotus.",
+        t("Key results and shared priorities for 2026."),
+        `${m.sites} ${t(m.sites === 1 ? "site" : "sites")}`,
+        t("Water use, laundry and delivery emissions, textile care, and a proposed improvement."),
       ],
     },
     overview: {
       id: "overview",
       kind: "overview",
-      title: "Palvelun käyttö ja huolto yhdellä silmäyksellä",
+      title: t("Service use and care at a glance"),
       facts: [
-        { label: "Toimipaikkoja", value: f(m.sites) },
-        { label: "Allokoituja tekstiilejä", value: f(m.allocated) },
-        { label: "Aktiivisessa skannauksessa", value: f(m.scanned) },
-        { label: "Pestyjä kiloja", value: f(m.kg) },
-        { label: "Korjaustapahtumia", value: f(m.repairs) },
+        { label: t("Sites"), value: f(m.sites) },
+        { label: t("Allocated textiles"), value: f(m.allocated) },
+        { label: t("Actively scanned"), value: f(m.scanned) },
+        { label: t("Kilograms washed"), value: f(m.kg) },
+        { label: t("Repair events"), value: f(m.repairs) },
         {
-          label: "Skannausosuus",
-          value: m.utilization == null ? "Ei tietoa" : f(m.utilization, 1) + " %",
+          label: t("Scan coverage"),
+          value: m.utilization == null ? t("Unavailable") : f(m.utilization, 1) + " %",
         },
       ],
       paragraphs: [
-        `Tekstiilimäärät ja skannausosuus: tilanne ${m.snapshotMonth}. Pestyt kilot ja korjaukset: koko valittu jakso. Skannausosuus ei yksin osoita todellista käyttöastetta.`,
-        "Yksilöllinen käyttäjämäärä, palvelutaso ja tuotekohtainen erittely eivät kuulu tähän esitysversioon.",
+        t`Textile counts and scan coverage reflect ${m.snapshotMonth}. Washed weight and repairs cover the full period. Scan coverage helps identify where to investigate actual use.`,
+        t(
+          "For service and product breakdowns, see Explore data in the workspace. Unique wearer counts require person identifiers.",
+        ),
       ],
       source: "Sites, Service_Activity, Repairs",
-      boundary: "Yhteinen tietopohja · varannot ja tapahtumamäärät eroteltu",
+      boundary: t("Shared evidence · inventory snapshots and period totals"),
     },
     water: {
       id: "water",
       kind: "comparison",
       title:
         c.waterDifference >= 0
-          ? "Vähemmän vettä samaan pesumäärään"
-          : "Vedenkulutus ylittää vertailumallin",
+          ? t("Less water for the same wash volume")
+          : t("Water consumption exceeds the baseline"),
       headlineOptions: [
         c.waterDifference >= 0
-          ? "Vähemmän vettä samaan pesumäärään"
-          : "Vedenkulutus ylittää vertailumallin",
-        "Vedenkäyttö valitulla jaksolla",
+          ? t("Less water for the same wash volume")
+          : t("Water consumption exceeds the baseline"),
+        t("Water use in the selected period"),
       ],
       value: difference(c.waterDifference, c.waterPercent),
       paragraphs: [
-        `Pesuun kohdistettu vedenkulutus oli ${f(m.water / 1000)} m³. Ero valittuun vaihtoehtoon on ${f(Math.abs(c.waterDifference) / 1000)} m³.`,
+        t`Allocated water consumption was ${f(m.water / 1000)} m³. The difference versus the baseline is ${f(Math.abs(c.waterDifference) / 1000)} m³.`,
       ],
       chart: {
-        labels: ["Lindström", "Vertailumalli"],
+        labels: ["Lindström", t("Baseline")],
         values: [m.water / 1000, c.baselineWater / 1000],
         unit: "m³",
       },
       source: "Customer_Impacts, Baselines",
-      boundary: "Laskennallinen arvio · pesun vedenkulutus",
+      boundary: t("Calculated estimate · water used for washing"),
     },
     emissions: {
       id: "emissions",
       kind: "comparison",
       title:
         c.emissionsDifference >= 0
-          ? "Pienempi pesun ja toimitusten jalanjälki"
-          : "Pesun ja toimitusten päästöt ylittävät vertailun",
+          ? t("Lower laundry and delivery footprint")
+          : t("Laundry and delivery emissions exceed the baseline"),
       headlineOptions: [
         c.emissionsDifference >= 0
-          ? "Pienempi pesun ja toimitusten jalanjälki"
-          : "Pesun ja toimitusten päästöt ylittävät vertailun",
-        "Pesun ja toimitusten ilmastovaikutus",
+          ? t("Lower laundry and delivery footprint")
+          : t("Laundry and delivery emissions exceed the baseline"),
+        t("Climate impact of laundry and delivery"),
       ],
       value: difference(c.emissionsDifference, c.emissionsPercent),
       paragraphs: [
-        `Pesun ja toimitusten päästöarvio on ${f(m.emissions / 1000, 1)} t CO₂e. Ero vertailumalliin on ${f(Math.abs(c.emissionsDifference) / 1000, 1)} t CO₂e.`,
+        t`Estimated laundry and delivery emissions were ${f(m.emissions / 1000, 1)} t CO₂e. The difference versus the baseline is ${f(Math.abs(c.emissionsDifference) / 1000, 1)} t CO₂e.`,
       ],
       chart: {
-        labels: ["Lindström", "Vertailumalli"],
+        labels: ["Lindström", t("Baseline")],
         values: [m.emissions / 1000, c.baselineEmissions / 1000],
         unit: "t CO₂e",
       },
       source: "Customer_Impacts, Baselines",
-      boundary: "Laskennallinen arvio · pesu ja toimitukset",
+      boundary: t("Calculated estimate · laundry and delivery"),
     },
     repairs: {
       id: "repairs",
       kind: "repairs",
-      title: "Korjaaminen tukee pidempää käyttöä",
+      title: t("Repairs help textiles last longer"),
       headlineOptions: [
-        "Korjaaminen tukee pidempää käyttöä",
-        "Tekstiilien korjaustoiminta valitulla jaksolla",
+        t("Repairs help textiles last longer"),
+        t("Repair activity in the selected period"),
       ],
       value: f(m.repairs),
       paragraphs: [
-        "Tekstiilejä huollettiin korjaamalla. Määrä kertoo korjaustoiminnasta; vältettyjä hankintoja tai päästöjä siitä ei suoraan päätellä.",
+        t(
+          "The count shows recorded repairs. Avoided purchases and emissions require separate evidence.",
+        ),
       ],
       chart: {
         labels: globalThis.WorkspaceModel.series(ctx, "repairs").map((p) => p.month.slice(5)),
         values: globalThis.WorkspaceModel.series(ctx, "repairs").map((p) => p.value),
-        unit: "kpl",
+        unit: "items",
       },
       source: "Repairs",
-      boundary: "Synteettinen tapahtumamäärä · ei yksilöllisiä tekstiilejä",
+      boundary: t("Synthetic count of repair events"),
     },
     opportunity: {
       id: "opportunity",
       kind: "opportunity",
-      title: "Tarkistetaan tekstiilien todellinen tarve",
+      title: t("Check actual textile demand"),
       headlineOptions: [
-        "Tarkistetaan tekstiilien todellinen tarve",
-        "Skannausosuus on yhteisen selvityksen lähtökohta",
+        t("Check actual textile demand"),
+        t("Use scan coverage to guide a joint review"),
       ],
       paragraphs: [
-        `${focus.site_name}: ${f(focus.utilization, 1)} % ${m.snapshotMonth} tilanteen allokoiduista tekstiileistä näkyy aktiivisissa skannauksissa. ${f(focus.unscanned)} tekstiiliä jää ilman skannausta.`,
-        "Selvitetään varatekstiilien ja sesongin tarve sekä skannausdatan kattavuus. Havainto ei yksin todista vajaakäyttöä.",
+        request.language === "fi"
+          ? `${focus.site_name}: ${f(focus.utilization, 1)} % allokoiduista tekstiileistä skannattiin kuussa ${m.snapshotMonth}. Skannaamatta jäi ${f(focus.unscanned)} tekstiiliä.`
+          : `${focus.site_name}: ${f(focus.utilization, 1)}% of allocated textiles had an active scan in ${m.snapshotMonth}. ${f(focus.unscanned)} textiles had no scan.`,
+        t("Check reserve stock, seasonal demand and scan data coverage to understand actual use."),
       ],
       chart: {
-        labels: ["Skannattu", "Ilman skannausta"],
+        labels: [t("Scanned"), t("Unscanned")],
         values: [focus.scanned, focus.unscanned],
-        unit: "kpl",
+        unit: "items",
       },
       source: `Service_Activity, ${m.snapshotMonth}`,
-      boundary: "Tilannekuva, ei todistettu vajaakäyttö",
+      boundary: t("Snapshot for investigation"),
     },
     plan: {
       id: "plan",
       kind: "text",
-      title: "Yhteinen suunta vuodelle 2026",
+      title: t("Shared priorities for 2026"),
       paragraphs: [
-        `Tarkistetaan ${focus.site_name} yhdessä asiakkaan kanssa. Varmistetaan varatekstiilien tarve ja skannausten kattavuus.`,
-        "Sovitaan yksi konkreettinen parannus ja sen vastuuhenkilö. Mitoitusta muutetaan vasta tarkistetun tarpeen perusteella.",
-        "Palataan tuloksiin seuraavassa seurantapalaverissa. Mahdollinen säästö arvioidaan vasta hyväksytyillä lähtötiedoilla.",
+        t`Review ${focus.site_name} with the customer. Check reserve stock needs and scan coverage.`,
+        t(
+          "Agree on one improvement and assign an owner. Confirm demand before changing allocations.",
+        ),
+        t(
+          "Review progress at the next meeting. Estimate potential savings once the inputs have been agreed.",
+        ),
       ],
-      boundary: "Keskusteluehdotuksia, eivät vielä sovittuja toimenpiteitä.",
+      boundary: t("Proposals for discussion."),
     },
     sources: {
       id: "sources",
       kind: "text",
-      title: "Mihin luvut perustuvat?",
+      title: t("Sources and calculations"),
       paragraphs: [
-        "Lähde: Lindstrom_SinceAI_Customer_Value_Synthetic_Data_Pack.xlsx. Customers, Sites, Service_Activity, Customer_Impacts, Repairs ja Baselines.",
-        `Virrat summataan valitulta jaksolta. Allokointi ja aktiiviset skannaukset ovat ${m.snapshotMonth} lopun tilanne. Korjausten määrä ei tarkoita yksilöllisiä korjattuja tekstiilejä.`,
-        `Vesiero: ${f(m.kg, 1)} pestyä kg × ${f(b.water_l_per_kg, 2)} l/kg − ${f(m.water)} l = ${f(c.waterDifference)} l. Päästöero: samat pestyt kilot × ${f(b.process_kgco2e_per_kg + b.delivery_kgco2e_per_kg, 3)} kg CO₂e/kg − ${f(m.emissions)} kg CO₂e = ${f(c.emissionsDifference)} kg CO₂e.`,
+        "Source: Lindstrom_SinceAI_Customer_Value_Synthetic_Data_Pack.xlsx. Customers, Sites, Service_Activity, Customer_Impacts, Repairs and Baselines.",
+        t`Period totals sum activity across the selected months. Allocations and scans reflect the end of ${m.snapshotMonth}. Repairs count events.`,
+        t`Water difference: ${f(m.kg, 1)} kg washed × ${f(b.water_l_per_kg, 2)} l/kg − ${f(m.water)} l = ${f(c.waterDifference)} l. Emissions difference: the same washed weight × ${f(b.process_kgco2e_per_kg + b.delivery_kgco2e_per_kg, 3)} kg CO₂e/kg − ${f(m.emissions)} kg CO₂e = ${f(c.emissionsDifference)} kg CO₂e.`,
       ],
     },
     limits: {
       id: "limits",
       kind: "text",
-      title: "Tulkinnan rajat",
+      title: t("Interpretation limits"),
       paragraphs: [
-        "Kaikki asiakasluvut ovat synteettisiä. Vesi ja päästöt ovat lisäksi pesulatasolta allokoituja arvioita. Vertailumalli on havainnollistava vaihtoehto, ei nimetty kilpailija.",
-        "Rajaus kattaa pesun vedenkulutuksen sekä pesun ja toimitusten päästöt, ei koko elinkaarta. Korjausten oletettua kädenjälkeä ei lisätä päästöeroon. Herkkyysväliä ei vielä lasketa.",
-        "Skannausosuus ei todista vajaakäyttöä. Käyttäjämääriä tai euromääräisiä säästöjä ei lasketa puutteellisista lähtötiedoista. Toimialapainotus ei ole compliance-arvio.",
+        t(
+          "All customer figures are synthetic. Water and emissions are allocated estimates from laundry-level data. The baseline represents an illustrative laundry model.",
+        ),
+        t(
+          "The comparison covers water used in washing and laundry and delivery emissions. Repair impact estimates are separate. Baseline factors are fixed for each scenario.",
+        ),
+        t(
+          "Scan coverage guides investigation. Unique wearer counts and financial savings require more data. Industry focus is a discussion aid.",
+        ),
       ],
     },
   };
-  if (request.note) slides.plan.paragraphs.push(`Account managerin muistiinpano: ${request.note}`);
+  if (request.note) slides.plan.paragraphs.push(t`Account manager's note: ${request.note}`);
+  if (request.savings !== null) {
+    const estimate = t`Säästetty raha: ${f(request.savings)} € · KAM:in antama arvio, ei aineistosta laskettu tai todennettu säästö.`;
+    slides.cover.paragraphs.unshift(estimate);
+    slides.plan.paragraphs.push(estimate);
+  }
+  for (const [id, text] of Object.entries(request.managerTexts))
+    if (text.trim()) slides[id].paragraphs.push(t`KAM:in lisäys: ${text}`);
   for (const id of insightIds)
-    slides[id].relevance = globalThis.MeetingModel.relevance(id, request.scope.priority, false);
+    slides[id].relevance = globalThis.MeetingModel.relevance(
+      id,
+      request.scope.priority,
+      false,
+      request.language,
+    );
   const order = orderedSlides(
     globalThis.MeetingModel.slideIds(ctx.order, request.included),
     request.slideOrder,
@@ -280,7 +345,14 @@ export function buildPresentation(input) {
     customer: { name: customer.customer_name, industry: customer.industry },
     period,
     footer,
-    slides: order.map((id) => slides[id]),
+    slides: order.map((id) => ({
+      ...slides[id],
+      cooperation: {
+        status: request.cooperation,
+        ...cooperationStates[request.cooperation],
+        label: t(cooperationStates[request.cooperation].label),
+      },
+    })),
   };
 }
 function orderedSlides(defaultIds, override = []) {
@@ -302,7 +374,7 @@ export function applyPlan(deck, plan) {
     !Array.isArray(plan.headlines) ||
     plan.headlines.length !== allowed.length
   )
-    throw new PresentationError("AI palautti virheellisen diajärjestyksen.", 502);
+    throw new PresentationError("The AI service returned an invalid slide order.", 502);
   const choices = new Map();
   for (const choice of plan.headlines) {
     if (
@@ -310,7 +382,7 @@ export function applyPlan(deck, plan) {
       typeof choice !== "object" ||
       Object.keys(choice).some((key) => !["id", "choice"].includes(key))
     )
-      throw new PresentationError("AI palautti virheellisen otsikkovalinnan.", 502);
+      throw new PresentationError("The AI service returned an invalid headline choice.", 502);
     const slide = deck.slides.find((s) => s.id === choice.id);
     if (
       !allowed.includes(choice.id) ||
@@ -318,7 +390,7 @@ export function applyPlan(deck, plan) {
       !Number.isInteger(choice.choice) ||
       !slide.headlineOptions[choice.choice]
     )
-      throw new PresentationError("AI palautti tuntemattoman otsikkovalinnan.", 502);
+      throw new PresentationError("The AI service returned an unknown headline choice.", 502);
     choices.set(choice.id, choice.choice);
   }
   const byId = new Map(deck.slides.map((s) => [s.id, s]));

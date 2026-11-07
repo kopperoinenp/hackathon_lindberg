@@ -1,6 +1,7 @@
 import pptxgen from "pptxgenjs";
 import { applyLindstromTemplate, templateStandard } from "./lindstrom-template.mjs";
 export async function renderPowerPoint(deck, provenance) {
+  const t = globalThis.ReviewLanguage.translator(deck.request.language);
   const pptx = new pptxgen();
   pptx.defineLayout({
     name: "LINDSTROM",
@@ -9,14 +10,14 @@ export async function renderPowerPoint(deck, provenance) {
   });
   pptx.layout = "LINDSTROM";
   pptx.author = "Lindström customer review prototype";
-  pptx.subject = "Synthetic customer annual review";
+  pptx.subject = t("Synthetic customer annual review");
   pptx.title = `${deck.customer.name} · ${deck.period}`;
   pptx.company = "Hackathon prototype";
-  pptx.lang = "fi-FI";
+  pptx.lang = t("en-GB");
   pptx.theme = {
     headFontFace: templateStandard.headingFont,
     bodyFontFace: templateStandard.bodyFont,
-    lang: "fi-FI",
+    lang: t("en-GB"),
   };
   for (const [index, item] of deck.slides.entries()) {
     const slide = pptx.addSlide();
@@ -54,6 +55,26 @@ export async function renderPowerPoint(deck, provenance) {
     const cover = item.kind === "cover";
     slide.background = { color: cover ? "003F72" : "FFFFFF" };
     const ink = cover ? "FFFFFF" : "003F72";
+    if (item.cooperation) {
+      slide.addShape(pptx.ShapeType.ellipse, {
+        x: 8.6,
+        y: 0.3,
+        w: 0.2,
+        h: 0.2,
+        fill: { color: item.cooperation.color },
+        line: { color: item.cooperation.color },
+      });
+      slide.addText(t`Yhteistyö: ${item.cooperation.label}`, {
+        x: 8.9,
+        y: 0.28,
+        w: 3.8,
+        h: 0.3,
+        fontSize: 10,
+        color: ink,
+        margin: 0,
+        fit: "shrink",
+      });
+    }
     slide.addShape(pptx.ShapeType.rect, {
       x: 0,
       y: 0,
@@ -62,7 +83,7 @@ export async function renderPowerPoint(deck, provenance) {
       line: { color: templateStandard.magenta },
       fill: { color: templateStandard.magenta },
     });
-    slide.addText("ASIAKASKATSAUS", {
+    slide.addText(t("CUSTOMER REVIEW"), {
       x: 2.25,
       y: 0.68,
       w: 10,
@@ -165,7 +186,7 @@ export async function renderPowerPoint(deck, provenance) {
           valAxisLabelFontSize: 10,
           showLegend: false,
           showValue: true,
-          dataLabelFormatCode: item.chart.unit === "kpl" ? "#,##0" : "#,##0.0",
+          dataLabelFormatCode: item.chart.unit === "items" ? "#,##0" : "#,##0.0",
           chartColors:
             item.kind === "repairs" ? [templateStandard.green] : [templateStandard.blue, "A9C1D4"],
           showTitle: true,
@@ -208,7 +229,7 @@ export async function renderPowerPoint(deck, provenance) {
     }
     if (item.boundary || item.source)
       slide.addText(
-        [item.boundary, item.source ? `Lähde: ${item.source}` : ""].filter(Boolean).join(" · "),
+        [item.boundary, item.source ? t`Source: ${item.source}` : ""].filter(Boolean).join(" · "),
         {
           x: 0.6,
           y: 6.25,
@@ -241,7 +262,7 @@ export async function renderPowerPoint(deck, provenance) {
       align: "right",
     });
     slide.addNotes(
-      `${deck.footer}\n${item.paragraphs.join("\n\n")}\n${item.relevance || ""}\n${item.source || ""}\nSisällön valinta: ${provenance.provider}${provenance.model ? ` / ${provenance.model}` : ""}. Laskenta ja tiedoston generointi ovat deterministisiä. AI valitsee vain hyväksyttyjä otsikoita ja diojen järjestyksen.`,
+      t`${deck.footer}\n${item.paragraphs.join("\n\n")}\n${item.relevance || ""}\n${item.source || ""}\nContent selection: ${provenance.provider}${provenance.model ? ` / ${provenance.model}` : ""}. Calculations and file generation are deterministic. AI selects from approved headlines and slide orders.`,
     );
   }
   return applyLindstromTemplate(

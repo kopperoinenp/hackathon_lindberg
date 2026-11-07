@@ -1,5 +1,48 @@
 # Review editing API
 
+## POST /api/cooperation
+
+Input `{description}` is a nonempty manager-authored relationship description,
+maximum 2000 characters. The configured AI provider returns a validated
+`{status:"green"|"yellow"|"red"|"unrated",reason}` with a Finnish explanation
+(maximum 400 characters). Green means smooth cooperation, yellow concerns needing
+follow-up, red serious unresolved issues/risk, unrated insufficient information.
+The response is a suggestion, not source-data evidence. The dashboard has no
+assessment controls. The relationship rating can be set through review chat and
+is passed to the presentation request.
+Same-origin checks, request limits and the shared chat concurrency lock apply.
+
+## KAM editing tools
+
+`dashboardLayout` changes actual dashboard structure, not meeting notes. Null
+preserves it; otherwise `{sections,metrics}` selects visible modules in order and
+KPI cards in order. Modules: overview, intro, savings, metrics, results, charts,
+opportunity, plan. KPI IDs: allocated, sites, scanned, unscanned, washed, water,
+emissions, repairs. Both lists must be nonempty, unique and use known IDs.
+Omitted modules are hidden. The frontend moves the existing sections and charts,
+recalculates selected cards from the current scope, and retains both navigation
+tabs and chat. Layout is included in workspace snapshots and returned after edits.
+It does not alter PowerPoint selections or computed source data. The user can
+restore defaults with the dashboard button or a chat request.
+
+The structured patch also supports `savingsText`, `cooperation` and `slideEdit`.
+`savingsText` is an exact substring of the current instruction, for example
+`40000EUroa` or `40 000 euroa`; it sets an EUR estimate shown on the dashboard
+and cover/plan slides. An empty string removes it, null preserves it. The server
+validates the amount, never computes or invents savings, and labels it as a KAM
+estimate rather than verified source evidence.
+
+`cooperation` sets the KAM traffic light: green/yellow/red/unrated, or null to
+preserve it. `slideEdit` is null or `{id,title,text}`; resolve the ID from the
+current presentationSlides. Title/text are exact substrings from the current
+instruction (null preserves, empty string clears). Text is added as labeled KAM
+commentary; source calculations and mandatory limitations remain intact.
+
+Workspace and presentation requests preserve optional `savings:number|null` and
+`managerTexts:{slideId:string}`. Customer/data-scope changes clear scoped estimates
+and commentary before applying new instructions. These backward-compatible tools
+extend the user-authorized KAM editing workflow, without new external endpoints.
+
 Owner: Paulus Kopperoinen. User-approved scope, 2026-11-07: connect the existing
 summary chat to the AI provider to edit the current page. The user subsequently
 required action-only behavior, with a short completion acknowledgement.
@@ -26,7 +69,7 @@ accepted. At least one insight must remain selected. Mandatory deck chapters sta
 Unsupported, ambiguous or question-only requests return an empty patch.
 
 JSON success: `{workspace, changed, reply}`. `changed` is the list of modified
-field paths. `reply` is exactly `Valmis` or `Ei muutoksia.`. The browser displays
+field paths. `reply` is exactly `Done` or `No changes.`. The browser displays
 only that status. It renders all user text as escaped text and recalculates the
 charts through deterministic models. Customer changes clear customer-specific
 notes/titles/selections; other data-scope changes clear notes and edited titles.
@@ -73,7 +116,7 @@ The model patch now requires `supported:boolean` and nullable `slideSwap` with
 validates the resulting deck, and stores its order for both native and browser
 export. Invalid, equal or out-of-range positions fail without changes. Model
 output cannot silently substitute priority or insight selection for a requested
-slide swap. Unsupported requests return 422 with a short message, never `Valmis`.
+slide swap. Unsupported requests return 422 with a short message, never `Done`.
 The rest of the strict nullable patch contract remains unchanged.
 
 The extension passed all 34 tests plus Ruff/ESLint/Prettier. A real OpenAI browser

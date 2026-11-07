@@ -1,12 +1,16 @@
 (function () {
   "use strict";
+  const language = new URLSearchParams(location.search).get("lang") === "fi" ? "fi" : "en";
+  const t = globalThis.ReviewLanguage.translator(language);
+  globalThis.ReviewLanguage.page()(language);
   const $ = (query) => document.querySelector(query);
   const esc = (value) =>
     String(value).replace(
       /[&<>"']/g,
       (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char],
     );
-  const f = (value) => new Intl.NumberFormat("fi-FI", { maximumFractionDigits: 1 }).format(value);
+  const f = (value) =>
+    new Intl.NumberFormat(t("en-GB"), { maximumFractionDigits: 1 }).format(value);
   let deck,
     index = 0;
   function chart(item) {
@@ -37,7 +41,7 @@
   function render() {
     const item = deck.slides[index];
     $("#slide-stage").innerHTML =
-      `<article class="presentation-slide ${esc(item.kind)}"><div class="slide-brand"><img src="assets/lindstrom-logo.webp" alt="Lindström"></div><span class="chapter">ASIAKASKATSAUS</span><h1>${esc(item.title)}</h1><div class="slide-body"><div>${item.value ? `<div class="slide-value">${esc(item.value)}</div>` : ""}${item.facts ? `<div class="fact-grid">${item.facts.map((fact) => `<div><span>${esc(fact.label)}</span><strong>${esc(fact.value)}</strong></div>`).join("")}</div>` : ""}${item.paragraphs.map((p) => `<p>${esc(p)}</p>`).join("")}</div>${item.chart ? `<div>${chart(item)}</div>` : ""}</div>${item.boundary || item.source ? `<p class="slide-source">${esc([item.boundary, item.source ? "Lähde: " + item.source : ""].filter(Boolean).join(" · "))}</p>` : ""}<p class="slide-footer">${esc(deck.footer)}</p></article>`;
+      t`<article class="presentation-slide ${esc(item.kind)}"><div class="slide-brand"><img src="assets/lindstrom-logo.webp" alt="Lindström"></div><span class="chapter">CUSTOMER REVIEW</span>${item.cooperation ? t`<div class="cooperation-badge"><i style="background:#${{ green: "578200", yellow: "F4C542", red: "E52330", unrated: "667580" }[item.cooperation.status] || "667580"}"></i><span>Yhteistyö: ${esc(item.cooperation.label)} · KAM:in arvio</span></div>` : ""}<h1>${esc(item.title)}</h1><div class="slide-body"><div>${item.value ? `<div class="slide-value">${esc(item.value)}</div>` : ""}${item.facts ? `<div class="fact-grid">${item.facts.map((fact) => `<div><span>${esc(fact.label)}</span><strong>${esc(fact.value)}</strong></div>`).join("")}</div>` : ""}${item.paragraphs.map((p) => `<p>${esc(p)}</p>`).join("")}</div>${item.chart ? `<div>${chart(item)}</div>` : ""}</div>${item.boundary || item.source ? `<p class="slide-source">${esc([item.boundary, item.source ? t("Source: ") + item.source : ""].filter(Boolean).join(" · "))}</p>` : ""}<p class="slide-footer">${esc(deck.footer)}</p></article>`;
     $("#page-number").textContent = `${index + 1} / ${deck.slides.length}`;
     $("#previous").disabled = index === 0;
     $("#next").disabled = index === deck.slides.length - 1;
@@ -48,7 +52,7 @@
     render();
   }
   function fail(message) {
-    $("#loading").innerHTML = `<h1>Esitystä ei voitu avata</h1><p>${esc(message)}</p>`;
+    $("#loading").innerHTML = t`<h1>Could not open the presentation</h1><p>${esc(message)}</p>`;
   }
   $("#previous").addEventListener("click", () => move(-1));
   $("#next").addEventListener("click", () => move(1));
@@ -70,17 +74,17 @@
   const id = query.get("id");
   if (!id) return;
   if (!/^[a-f0-9-]{36}$/.test(id)) {
-    fail("Avaa esitys uudelleen asiakaskatsauksesta.");
+    fail(t("Reopen the presentation from the customer review."));
     return;
   }
   (async () => {
     try {
-      const response = await fetch(`/api/presentations/${id}`);
+      const response = await fetch(`/api/presentations/${id}?lang=${language}`);
       const result = await response.json();
       if (!response.ok)
-        throw new Error(result.error || "Avaa esitys uudelleen asiakaskatsauksesta.");
+        throw new Error(result.error || t("Reopen the presentation from the customer review."));
       deck = result;
-      document.title = `${deck.customer.name} · Asiakasesitys`;
+      document.title = t`${deck.customer.name} · Customer presentation`;
       $("#customer-name").textContent = deck.customer.name;
       $("#save-presentation").href = deck.downloadUrl;
       $("#save-presentation").hidden = false;

@@ -90,3 +90,65 @@ test("empty geography and reversed periods remain explicit missing-data cases", 
   assert.equal(invalid.metrics.hasData, false);
   assert.equal(model.select(data, { ...base, continent: "Asia" }).length, 0);
 });
+
+test("detailed models reconcile to the Finland Q1 workbook rows", () => {
+  const selection = { ...base, country: "Finland", to: "2025-03" };
+  const result = model.analyzeDetails(data, selection);
+  const scoped = model.buildContext(data, selection).metrics;
+  assert.equal(result.snapshotMonth, "2025-03");
+  assert.equal(result.service.count, 2264);
+  assert.equal(result.service.medianHours, 83);
+  assert.equal(result.service.p90Hours, 108);
+  close(result.service.latePct, (35 * 100) / 2264);
+  assert.equal(result.service.requests, 55);
+  close(result.energy, 53114.7);
+  close(result.waste, 1945.23);
+  close(result.energyPerKg, result.energy / scoped.kg);
+  close(result.baselineEnergy, scoped.kg * 1.05);
+  close(
+    result.wasteRoutes.reduce((sum, route) => sum + route.kg, 0),
+    result.waste,
+  );
+  close(
+    result.wasteRoutes.reduce((sum, route) => sum + route.share, 0),
+    1,
+  );
+  assert.equal(
+    result.products.reduce((sum, product) => sum + product.allocated, 0),
+    scoped.allocated,
+  );
+  assert.equal(
+    result.products.reduce((sum, product) => sum + product.washed, 0),
+    scoped.washed,
+  );
+  assert.equal(
+    result.products.reduce((sum, product) => sum + product.repairs, 0),
+    scoped.repairs,
+  );
+  assert.equal(
+    result.serviceBySite.reduce((sum, site) => sum + site.count, 0),
+    result.service.count,
+  );
+  close(result.repairScenarios[1].replacements, scoped.repairs * 0.5);
+  close(result.repairScenarios[1].emissions, result.repairScenarios[2].emissions * 0.5);
+});
+
+test("unavailable detail and zero denominators remain distinct from measured zero", () => {
+  const empty = model.analyzeDetails(data, { ...base, from: "2025-10", to: "2025-01" });
+  assert.equal(empty.energy, null);
+  assert.equal(empty.wasteRoutes[0].kg, null);
+  assert.equal(empty.service.medianHours, null);
+  assert.equal(empty.service.latePct, null);
+  const first = data.detail.find((row) => row.customer === base.customer);
+  const zero = model.analyzeDetails(
+    {
+      ...data,
+      detail: [{ ...first, allocated_pieces: 0, customer_washed_kg: 0, allocated_energy_kwh: 0 }],
+      cycleGroups: [],
+    },
+    base,
+  );
+  assert.equal(zero.energy, 0);
+  assert.equal(zero.energyPerKg, null);
+  assert.equal(zero.products[0].washesPerPieceMonth, null);
+});

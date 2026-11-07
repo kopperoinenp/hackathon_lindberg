@@ -75,5 +75,5 @@ test("single-month and empty selections produce valid, accessible chart output",
   assert.match(svg, /2025-02/);
   assert.doesNotMatch(svg, /NaN|Infinity/);
   const empty = workspace.buildContext(data, { ...base, from: "2025-11", to: "2025-01" });
-  assert.match(charts.lineChart(empty, "water"), /ei ole kaaviodataa/);
+  assert.match(charts.lineChart(empty, "water"), /No chart data/);
 });

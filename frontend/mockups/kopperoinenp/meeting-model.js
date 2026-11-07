@@ -2,24 +2,35 @@
 (function (root) {
   "use strict";
   const insightIds = ["water", "emissions", "repairs", "opportunity"];
-  function relevance(id, priority, hasGoal) {
+  function relevance(id, priority, hasGoal, language = "en") {
+    const t =
+      root.ReviewLanguage?.translator(language) ??
+      ((text, ...values) =>
+        typeof text === "string" ? text : String.raw({ raw: text }, ...values));
     const lead = hasGoal
-      ? "Palaverin tavoitteen ja valitun painotuksen perusteella"
-      : "Asiakkaan nykyisen painotuksen perusteella";
+      ? t("Given the meeting goal and chosen focus,")
+      : t("Given the current focus,");
     return {
       water:
         priority === "water"
-          ? `${lead} vedenkäytön vertailu on keskeinen keskustelukohta. Sama pesty määrä tekee vertailun rajauksesta ymmärrettävän.`
-          : "Vedenkäyttö täydentää asiakkaan saaman ympäristöarvon kuvaa. Vertailumallin oletukset on hyvä käydä yhdessä läpi.",
+          ? t`${lead} water use is a key discussion point. The comparison uses the same washed weight.`
+          : t(
+              "Water use adds context to the environmental results. Review the baseline assumptions together.",
+            ),
       emissions:
         priority === "emissions"
-          ? `${lead} pesun ja toimitusten ilmastovaikutus nostetaan esiin ensin. Tuloksen rajaus auttaa välttämään liian laajoja päästöväitteitä.`
-          : "Pesun ja toimitusten päästöt tuovat toisen näkökulman ympäristöarvoon. Tulos koskee tätä rajausta, ei koko tekstiilin elinkaarta.",
+          ? t`${lead} laundry and delivery emissions come first. Use the comparison scope when discussing the results.`
+          : t(
+              "Laundry and delivery emissions add another view of environmental impact within the selected scope.",
+            ),
       repairs: ["circularity", "efficiency"].includes(priority)
-        ? `${lead} korjaustoiminta tekee tekstiilien huollon näkyväksi. Se tukee keskustelua käyttöiästä ilman oletusta vältetyistä hankinnoista.`
-        : "Korjaukset näyttävät konkreettista huoltotoimintaa ympäristöarvioiden rinnalla. Määrä kannattaa yhdistää keskusteluun tekstiilien jatkokäytöstä.",
-      opportunity:
-        "Tällä toimipaikalla on rajauksen pienin skannausosuus. Siksi siitä kannattaa aloittaa tarpeen ja datan kattavuuden yhteinen tarkistus.",
+        ? t`${lead} repair activity shows how textiles are maintained and supports a discussion about service life.`
+        : t(
+            "Repair counts show maintenance activity alongside environmental estimates and help discuss continued use.",
+          ),
+      opportunity: t(
+        "This site has the lowest scan coverage in the selection. Start here when checking demand and data coverage.",
+      ),
     }[id];
   }
   function slideIds(order, included) {

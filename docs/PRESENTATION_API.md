@@ -32,12 +32,21 @@ Returns `{provider, model, configured}`. No credentials are returned.
 
 ## POST /api/presentations
 
-JSON request: `{scope, included, titleEdits, note, slideOrder?}`.
+JSON request: `{scope, included, titleEdits, note, slideOrder?, language?}`.
+
+Optional `cooperation`: `unrated` (default), `green`, `yellow` or `red`.
+This is the KAM's assessment of collaboration, not a calculation from the
+synthetic data. Its labeled traffic light is displayed on every preview/PPTX
+slide. Changing it invalidates an existing download. Customer changes reset it
+to `unrated`; AI planning cannot override the assessment. Existing callers may
+omit the field.
 
 `scope` fields: customer, from, to, country, continent, site, baseline, priority.
 Defaults are CUST001, 2025-01, 2025-12, all, all, all, B_LOCAL, neutral.
 Only known customers/sites, Finland/Sweden/Poland, Europe, 2025 months and known
 baselines/priorities are accepted. A site must belong to its customer.
+`language` accepts `en` (default) or `fi` and controls the generated slides and file.
+
 `included`: 1–4 distinct known insight IDs. `titleEdits`: known slide IDs to text,
 max 150 characters each. `note`: plain text, max 2000 characters. Body max 32 KiB.
 
@@ -62,7 +71,7 @@ are retained. Restarting the service removes them.
 
 ## Errors and operational limits
 
-JSON `{error: "Finnish user-facing explanation"}`. 400 invalid scope/content,
+JSON `{error: "User-facing explanation"}`. Pass `?lang=fi` for Finnish errors. 400 invalid scope/content,
 403 cross-origin/invalid host, 404 absent/expired download, 413 too large,
 415 non-JSON request, 429 another generation in progress, 502 provider/invalid AI
 output, 503 missing provider configuration, 504 timeout, 500 rendering failure.

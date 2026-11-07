@@ -7,7 +7,7 @@ pnpm install --frozen-lockfile
 node scripts/preview.mjs
 ```
 
-Open http://127.0.0.1:4173/kopperoinenp/index.html and press **Avaa esitys**.
+Open http://127.0.0.1:4173/kopperoinenp/index.html and press **Open presentation**.
 The current customer presentation opens in a new browser tab; the adjacent download
 icon saves the genuine editable PowerPoint. The viewer has slide arrows and a
 download icon. There is no separate generation dialog or technical export wizard.
@@ -89,7 +89,7 @@ response bytes and explicit response-shape checks. Restart after changing `.env`
 ## Review editing chat
 
 The summary chat now applies validated scope, chart, insight-selection and explicit
-text edits through `POST /api/chat`. It acknowledges only `Valmis` or `Ei muutoksia.`.
+text edits through `POST /api/chat`. It acknowledges only `Done` or `No changes.`.
 It cannot change calculations or execute generated page code. No fake keyword
 response is used when the API fails. `deterministic` mode disables this chat.
 See `docs/NEXT_STEPS.md` for the reference-deck-based project roadmap.

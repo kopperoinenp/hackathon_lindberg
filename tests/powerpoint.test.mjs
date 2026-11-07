@@ -89,14 +89,14 @@ test("OpenAI adapter uses strict Responses output without exposing credentials",
   assert.ok(
     !JSON.stringify(providerConfig({ OPENAI_API_KEY: "not-shared" })).includes("not-shared"),
   );
-  await assert.rejects(() => generatePlan(deck, { env: {} }), /avainta/);
+  await assert.rejects(() => generatePlan(deck, { env: {} }), /API key/);
   await assert.rejects(
     () =>
       generatePlan(deck, {
         env: { OPENAI_API_KEY: "test-key" },
         fetchImpl: async () => Response.json({}, { status: 401 }),
       }),
-    /tunnistautuminen/,
+    /authentication failed/,
   );
 });
 test("Copilot adapter returns the same plan shape and disables web grounding", async () => {
@@ -130,9 +130,9 @@ test("PowerPoint export contains editable chart data, sources, notes and scope",
   assert.equal(charts.length, 3);
   const xml = (await Promise.all(slides.map((name) => zip.file(name).async("string")))).join("\n");
   assert.match(xml, /Oma otsikko/);
-  assert.match(xml, /Synteettinen aineisto/);
+  assert.match(xml, /Synthetic data/);
   assert.match(xml, /2025-01/);
-  assert.match(xml, /Tulkinnan rajat/);
+  assert.match(xml, /Interpretation limits/);
   assert.match(xml, /Sovitaan seuranta/);
   const types = await zip.file("[Content_Types].xml").async("string");
   for (const match of types.matchAll(/<Override\b[^>]*PartName="([^"]+)"/g))
@@ -166,7 +166,7 @@ test("provider rejects oversized payloads and unexpected tool calls without retr
           return new Response("x".repeat(270000));
         },
       }),
-    /sallitun koon/,
+    /size limit/,
   );
   assert.equal(calls, 1);
   await assert.rejects(
@@ -176,6 +176,25 @@ test("provider rejects oversized payloads and unexpected tool calls without retr
         fetchImpl: async () =>
           Response.json({ status: "completed", output: [{ type: "function_call" }] }),
       }),
-    /virheellisen/,
+    /invalid/,
   );
+});
+
+// Cooperation is a manager assessment, independent of synthetic performance figures.
+test("cooperation lights survive AI planning and appear as native colors and text on every slide", async () => {
+  const colors = { green: "578200", yellow: "F4C542", red: "E52330" };
+  assert.equal(validateRequest({ scope: {} }).cooperation, "unrated");
+  assert.throws(() => validateRequest({ scope: {}, cooperation: "excellent" }));
+  for (const [status, color] of Object.entries(colors)) {
+    const base = buildPresentation({ ...request, cooperation: status });
+    const deck = applyPlan(base, defaultPlan(base));
+    assert.ok(deck.slides.every((s) => s.cooperation.status === status));
+    const bytes = await renderPowerPoint(deck, { provider: "deterministic", model: null });
+    const zip = await JSZip.loadAsync(bytes);
+    const xml = await zip.file("ppt/slides/slide1.xml").async("string");
+    assert.ok(xml.includes(`val="${color}"`));
+    assert.ok(xml.includes("Relationship:"));
+    const last = await zip.file(`ppt/slides/slide${deck.slides.length}.xml`).async("string");
+    assert.ok(last.includes(`val="${color}"`));
+  }
 });

@@ -8,7 +8,7 @@ mock versions or replace the layout without a new product request.
 
 The baseline is the UI merged to main in PR #2 (merge `85c2961`). It opens a
 customer summary immediately with neutral default analysis. The second tab is
-for detailed exploration. The summary chat remains visible, and the presentation
+for detailed exploration. The summary chat opens from a launcher in the lower-right corner, and the presentation
 opens in a browser viewer. No onboarding or required goal form is part of this UI.
 
 The user subsequently simplified presentation access: **Avaa esitys** opens a

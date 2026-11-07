@@ -1186,6 +1186,32 @@ button:disabled {
   white-space: pre-wrap;
 }
 
+.header-options {
+  margin-inline-start: auto;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.language-switch {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+}
+.language-switch button {
+  background: transparent;
+  color: var(--brand-blue);
+  border: 0;
+  border-radius: 20px;
+  font-weight: 700;
+  padding: 5px 9px;
+}
+.language-switch button[aria-pressed="true"] {
+  color: white;
+  background: var(--brand-blue);
+}
+
 /* Chat as a corner widget. Same controls and behaviour; #toggle-chat opens and closes it. */
 main {
   padding-bottom: 96px;
@@ -1377,4 +1403,208 @@ main {
   #composer:has(#chat[hidden]) .chat-dock-heading::after {
     content: none;
   }
+}
+
+:root:lang(en) #composer #chat:empty::before {
+  content: "Tell me what you want to change in the review.";
+}
+@media (min-width: 761px) {
+  :root:lang(en) #composer:has(#chat[hidden]) .chat-dock-heading::after {
+    content: "Ask the assistant";
+  }
+}
+
+/* Whole-customer snapshot above both dashboard views. */
+#customer-overview {
+  margin: 0 0 32px;
+  padding: 28px;
+  border: 1px solid #dce2e7;
+  border-radius: 12px;
+  background: #f5f8fa;
+}
+.customer-overview-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: start;
+}
+.customer-overview-heading h2 {
+  margin: 8px 0;
+  font-size: 26px;
+  color: #003f72;
+}
+.customer-overview-heading p,
+.customer-snapshot {
+  font-size: 13px;
+  color: #52616b;
+}
+.customer-overview-kpis {
+  display: grid;
+  grid-template-columns: 2fr 1fr 2fr;
+  gap: 24px;
+  margin: 24px 0;
+}
+.customer-overview-kpis > div {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.customer-overview-kpis strong {
+  font-size: 34px;
+  color: #003f72;
+  line-height: 1.1;
+}
+.customer-overview-kpis span {
+  font-size: 13px;
+}
+.customer-locations summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 700;
+  color: #003f72;
+}
+.customer-locations ul {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.customer-locations li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 6px;
+  background: white;
+  font-size: 12px;
+}
+.customer-locations li div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.customer-locations li > span {
+  white-space: nowrap;
+  font-weight: 700;
+  color: #003f72;
+}
+#customer-overview > .quiet {
+  margin: 18px 0 0;
+  font-size: 11px;
+}
+@media (max-width: 800px) {
+  .customer-locations ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  #customer-overview {
+    padding: 20px;
+  }
+  .customer-overview-heading {
+    flex-direction: column;
+    gap: 0;
+  }
+  .customer-overview-kpis {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+  .customer-locations ul {
+    grid-template-columns: 1fr;
+  }
+}
+.kam-savings {
+  background: white;
+  border-left: 4px solid #003f72;
+  border-radius: 6px;
+  padding: 18px;
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.kam-savings > span {
+  font-size: 13px;
+  font-weight: 700;
+  color: #003f72;
+}
+.kam-savings strong {
+  font-size: 32px;
+  color: #003f72;
+}
+.kam-savings small {
+  font-size: 11px;
+  color: #52616b;
+}
+.kam-dashboard-note {
+  padding: 16px;
+  margin: 16px 0;
+  border-left: 4px solid #003f72;
+  background: #f0f6fa;
+  border-radius: 6px;
+}
+.kam-dashboard-note strong {
+  font-size: 12px;
+  color: #003f72;
+}
+.kam-dashboard-note p {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+}
+#customer-overview,
+#story {
+  scroll-margin-top: 110px;
+}
+.dashboard-updated {
+  animation: dashboard-update-flash 2s ease-out;
+}
+@keyframes dashboard-update-flash {
+  from {
+    outline: 3px solid #0094b3;
+    outline-offset: 5px;
+  }
+  to {
+    outline: 3px solid transparent;
+    outline-offset: 5px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-updated {
+    animation: none;
+  }
+}
+#story > [data-dashboard-module][hidden] {
+  display: none !important;
+}
+#story > [data-dashboard-module] {
+  margin-bottom: 32px;
+}
+.dashboard-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px;
+}
+.dashboard-metric-grid article {
+  padding: 24px;
+  background: #f4f8fb;
+  border: 1px solid #dce2e7;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.dashboard-metric-grid article > span {
+  font-size: 13px;
+  color: #52616b;
+}
+.dashboard-metric-grid strong {
+  font-size: 32px;
+  color: #003f72;
+}
+.dashboard-metric-grid small {
+  font-size: 11px;
+  color: #52616b;
 }
