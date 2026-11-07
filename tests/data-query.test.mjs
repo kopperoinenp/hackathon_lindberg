@@ -14,6 +14,8 @@ import {
   queryComparisons,
 } from "../backend/data-query.mjs";
 
+import { replyLanguage, smallTalk, writeReply } from "../backend/assistant-writer.mjs";
+
 const workspace = (scope = {}) => normalizeWorkspace({ scope, language: "fi" });
 const emptyPatch = (changes = {}) => ({
   ...Object.fromEntries(chatSchema.required.map((key) => [key, null])),
@@ -212,4 +214,64 @@ test("a ranked answer names the rows it shows and a total is explained as a tota
   const last = q({ topic: "repairs", measure: "total", lastMonths: 2 });
   const explained = runDataQuery(q({ topic: "explain", subject: "repairs" }), workspace(), last);
   assert.match(explained.text, /kokonaismäärä/);
+});
+
+test("a written reply is kept only when its figures come from the facts", async () => {
+  const input = { message: "Korjaukset", history: [], fallback: "Varavastaus", options: [] };
+  const facts = { rows: [{ display: "2 598 kpl" }, { display: "0,355 kg" }] };
+  const write = (reply) => writeReply({ ...input, facts }, async () => ({ reply }), {});
+  assert.equal(await write("Korjauksia oli yhteensä 2 598."), "Korjauksia oli yhteensä 2 598.");
+  assert.equal(await write("There were 2,598 repairs."), "There were 2,598 repairs.");
+  assert.equal(await write("Säästö oli 9 000 euroa."), "Varavastaus");
+  assert.equal(await write(""), "Varavastaus");
+  const failed = await writeReply({ ...input, facts }, () => Promise.reject(new Error("x")), {});
+  assert.equal(failed, "Varavastaus");
+});
+
+test("a clarifying question is passed on without touching the workspace", async () => {
+  const current = workspace();
+  const result = await runReviewChat(
+    { message: "Paljonko korjauksia?", workspace: current },
+    {
+      generate: async () =>
+        emptyPatch({
+          analysisTools: null,
+          dataQuery: { ...q({ topic: "repairs" }), clarify: "Kokonaismäärä vai suhdeluku?" },
+        }),
+    },
+  );
+  assert.equal(result.answer, "Kokonaismäärä vai suhdeluku?");
+  assert.deepEqual(result.workspace.scope, current.scope);
+});
+
+test("a filter the question never named is removed", () => {
+  const invented = refineQuery(q({ topic: "meeting", site: "S001" }), "What should we raise?");
+  assert.equal(invented.site, null);
+  assert.equal(refineQuery(q({ site: "S002" }), "Miten Turussa menee?").site, "S002");
+  assert.equal(refineQuery(q({ country: "Sweden" }), "and in Sweden?").country, "Sweden");
+  const inherited = refineQuery(q({ country: "Sweden" }), "by month", q({ country: "Sweden" }));
+  assert.equal(inherited.country, "Sweden");
+});
+
+test("the reply stays in Finnish or English and small talk needs no model", () => {
+  assert.equal(replyLanguage("and in Sweden?", "fi"), "en");
+  assert.equal(replyLanguage("Mikä on veden tilanne?", "en"), "fi");
+  assert.equal(replyLanguage("Q3", "fi"), "fi");
+  assert.match(smallTalk("thanks!", "fi"), /welcome/);
+  assert.match(smallTalk("Kiitos", "en"), /Ole hyvä/);
+  assert.equal(smallTalk("Kiitos, mikä on vesi?", "fi"), null);
+});
+
+test("comparisons use rates unless a total is asked for", () => {
+  const compared = refineQuery(q({ compareBy: "quarter", measure: "total" }), "Vertaa vettä");
+  assert.equal(compared.measure, "rate");
+  const asked = refineQuery(q({ compareBy: "quarter" }), "Paljonko vettä kului kvartaaleittain?");
+  assert.equal(asked.measure, "total");
+  const last = q({ topic: "repairs", measure: "total" });
+  const followed = refineQuery(
+    q({ topic: "repairs", compareBy: "month" }),
+    "show that by month",
+    last,
+  );
+  assert.equal(followed.measure, "total");
 });

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile, readdir } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createReviewStore } from "../backend/review-store.mjs";
@@ -61,4 +61,26 @@ test("stale or simultaneous writes cannot overwrite newer edits; invalid data an
     store.save("CUST001", { revision: 1, workspace: workspace() }),
     (e) => e.status === 500,
   );
+});
+
+test("a customer's default view is stored once and later edits stay on top of it", async (t) => {
+  const dir = await mkdtemp(path.join(tmpdir(), "kam-review-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const store = createReviewStore(dir);
+  const first = await store.save("CUST002", { revision: 0, workspace: workspace("CUST002") });
+  assert.equal(first.revision, 1);
+  const edited = { ...first.workspace, heading: "Water focus" };
+  await store.save("CUST002", { revision: first.revision, workspace: edited });
+  const reopened = await createReviewStore(dir).read("CUST002");
+  assert.equal(reopened.revision, 2);
+  assert.equal(reopened.workspace.heading, "Water focus");
+});
+
+test("the workspace has no mode that keeps the assistant from editing", async () => {
+  const root = new URL("../frontend/mockups/kopperoinenp/", import.meta.url);
+  const page = await readFile(new URL("index.html", root), "utf8");
+  const app = await readFile(new URL("app.js", root), "utf8");
+  assert.doesNotMatch(page, /review-profile-mode|create-customer-review/);
+  assert.doesNotMatch(app, /profileMode/);
+  assert.equal(page.match(/id="query-result"/g).length, 1);
 });
