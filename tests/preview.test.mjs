@@ -167,6 +167,7 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
     "story-model.js",
     "styles.css",
     "summary-charts.js",
+    "upsell-model.js",
   ]);
   for (const asset of assets) {
     const response = await fetch(new URL(asset, page.url));

@@ -2747,3 +2747,21 @@ main {
   flex: 0 0 100%;
   font-size: 12px;
 }
+
+.upsell-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 20px;
+}
+.upsell-card {
+  border: 1px solid #d6dfe4;
+  border-radius: 8px;
+  padding: 24px;
+  background: #fff;
+}
+.upsell-card h3 {
+  margin-top: 0;
+}
+.upsell-card .kpi-checkbox {
+  margin-top: 20px;
+}

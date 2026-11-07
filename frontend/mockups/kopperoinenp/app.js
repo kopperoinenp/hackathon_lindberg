@@ -70,6 +70,8 @@
     readyPresentation: null,
     note: "",
     cooperation: "unrated",
+    cooperationDescription: "",
+    cooperationReason: "",
     savings: null,
     managerTexts: {},
     dashboardLayout: globalThis.WorkspaceModel.defaultDashboardLayout(),
@@ -84,6 +86,7 @@
     chat: [],
     contractKpis: [],
     includeContractAgenda: false,
+    approvedUpsells: [],
     chatTool: "data",
     lastQuery: null,
     queryResult: null,
@@ -190,11 +193,14 @@
           "titleEdits",
           "slideOrder",
           "cooperation",
+          "cooperationDescription",
+          "cooperationReason",
           "savings",
           "managerTexts",
           "dashboardLayout",
           "contractKpis",
           "includeContractAgenda",
+          "approvedUpsells",
         ])
           state[key] = record.workspace[key];
         // Evidence blocks, customer basics and next steps, when the backend stores them.
@@ -685,14 +691,99 @@
     $("#customer-overview").hidden = false;
     renderCustomerOverview();
     renderReviewEvidence();
+    renderRelationship();
     renderReviewContent();
     renderStory();
+    renderUpsells();
     renderDashboardEdits();
     renderDashboardLayout();
     if (state.view === "analysis") renderAnalysis();
     $("#composer").inert = switchingReview || storageLoading || !storageReady;
     scheduleReviewSave();
   }
+  let assessingRelationship = false;
+  function renderRelationship() {
+    $("#relationship-description").value = state.cooperationDescription;
+    $("#relationship-status").value = state.cooperation;
+    $("#relationship-result").textContent = state.cooperationReason;
+    $("#relationship-status").style.borderLeft =
+      `8px solid ${{ green: "#578200", yellow: "#F4C542", red: "#E52330", unrated: "#667580" }[state.cooperation]}`;
+    $("#assess-relationship").disabled =
+      assessingRelationship || !state.cooperationDescription.trim();
+  }
+  $("#relationship-description").addEventListener("input", (event) => {
+    state.cooperationDescription = event.target.value;
+    state.cooperationReason = "";
+    $("#relationship-result").textContent = "";
+    $("#assess-relationship").disabled = assessingRelationship || !event.target.value.trim();
+    scheduleReviewSave();
+  });
+  $("#relationship-status").addEventListener("change", (event) => {
+    state.cooperation = event.target.value;
+    state.cooperationReason = "";
+    render();
+  });
+  $("#assess-relationship").addEventListener("click", async () => {
+    if (assessingRelationship) return;
+    const customer = state.customer,
+      description = state.cooperationDescription,
+      previous = state.cooperation;
+    assessingRelationship = true;
+    renderRelationship();
+    try {
+      const response = await fetch("/api/cooperation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description, language }),
+        signal: AbortSignal.timeout(95000),
+      });
+      const result = await response.json();
+      if (
+        customer !== state.customer ||
+        description !== state.cooperationDescription ||
+        previous !== state.cooperation
+      )
+        return;
+      if (!response.ok) throw new Error(result.error || t("The assistant request failed."));
+      state.cooperation = result.status;
+      state.cooperationReason = result.reason;
+      render();
+    } catch (error) {
+      if (
+        customer === state.customer &&
+        description === state.cooperationDescription &&
+        previous === state.cooperation
+      )
+        $("#relationship-result").textContent = error.message;
+    } finally {
+      assessingRelationship = false;
+      // Preserve an error message until the next edit.
+      $("#assess-relationship").disabled = !state.cooperationDescription.trim();
+    }
+  });
+  function renderUpsells() {
+    const proposals = globalThis.UpsellModel.proposals(data, state, language);
+    const accepted = globalThis.UpsellModel.approved(proposals, state.approvedUpsells);
+    const stale = state.approvedUpsells.length - accepted.length;
+    $("#upsell-proposals").innerHTML =
+      `<span class="section-kicker">${esc(t("NEXT OPPORTUNITIES"))}</span><h2 id="upsell-title">${esc(t("Customer-specific service opportunities"))}</h2><p>${esc(t("Approve proposals for the end of the presentation. Approvals are saved for this customer. Changed source data or filters require a new approval."))}</p><p role="status">${esc(t("Approved for this presentation"))}: ${accepted.length}${stale ? ` · ${esc(t("Saved approvals outside the current evidence"))}: ${stale}` : ""}</p><div class="upsell-grid">${proposals.map((proposal) => `<article class="upsell-card"><h3>${esc(proposal.title)}</h3><p><strong>${esc(t("Observation"))}:</strong> ${esc(proposal.observation)}</p><p><strong>${esc(t("Sites"))}:</strong> ${esc(proposal.siteSummary)}</p><p><strong>${esc(t("Potential benefit"))}:</strong> ${esc(proposal.benefit)}</p><p><strong>${esc(t("Next step"))}:</strong> ${esc(proposal.nextStep)}</p><p class="quiet">${esc(proposal.boundary)}</p><details><summary>${esc(t("Source"))}</summary><p class="quiet">${esc(proposal.source)}</p><p>${esc(proposal.sites)}</p></details><label class="kpi-checkbox"><input type="checkbox" data-upsell-id="${esc(proposal.id)}" aria-label="${esc(t("Include at the end of the presentation"))}: ${esc(proposal.title)}" ${accepted.some((item) => item.id === proposal.id) ? "checked" : ""} ${state.asking || state.generating ? "disabled" : ""}/><span>${esc(t("Include at the end of the presentation"))}</span></label></article>`).join("")}</div>${!proposals.length ? `<p>${esc(t("No service proposals are supported by the selected data."))}</p>` : ""}${state.approvedUpsells.length ? `<button type="button" id="clear-upsell-approvals" class="text-button">${esc(t("Clear all opportunity approvals for this customer"))}</button>` : ""}`;
+  }
+  $("#upsell-proposals").addEventListener("change", (event) => {
+    const id = event.target.dataset.upsellId;
+    if (!id || state.asking || state.generating) return;
+    const proposal = globalThis.UpsellModel.proposals(data, state, language).find(
+      (row) => row.id === id,
+    );
+    if (!proposal) return;
+    state.approvedUpsells = state.approvedUpsells.filter((row) => row.id !== id);
+    if (event.target.checked) state.approvedUpsells.push({ id, evidenceKey: proposal.evidenceKey });
+    render();
+  });
+  $("#upsell-proposals").addEventListener("click", (event) => {
+    if (event.target.id !== "clear-upsell-approvals" || state.asking || state.generating) return;
+    state.approvedUpsells = [];
+    render();
+  });
   function customerKpis() {
     return state.contractKpis;
   }
@@ -2235,6 +2326,8 @@
       heading: state.heading,
       dashboardLayout: state.dashboardLayout,
       contractKpis: state.contractKpis,
+      cooperationDescription: state.cooperationDescription,
+      cooperationReason: state.cooperationReason,
       includeContractAgenda: state.includeContractAgenda,
       evidenceAreas: customerAreas(),
       customerBasics: customerBasics(),
@@ -2344,11 +2437,14 @@
         "titleEdits",
         "slideOrder",
         "cooperation",
+        "cooperationDescription",
+        "cooperationReason",
         "savings",
         "managerTexts",
         "dashboardLayout",
         "contractKpis",
         "includeContractAgenda",
+        "approvedUpsells",
       ])
         state[key] = next[key];
       if (result.query !== undefined) state.lastQuery = result.query;
@@ -2653,6 +2749,7 @@
       cooperation: state.cooperation,
       savings: state.savings,
       managerTexts: state.managerTexts,
+      approvedUpsells: state.approvedUpsells,
       slideOrder: state.slideOrder,
       language,
     };
@@ -2699,7 +2796,10 @@
             "The review changed during preparation. Open the presentation again with the current selection.",
           ),
         );
-      state.slideOrder = result.slides.map((slide) => slide.id);
+      // Approved service proposals always remain at the end, outside the editable review order.
+      state.slideOrder = result.slides
+        .filter((slide) => !slide.id.startsWith("upsell-"))
+        .map((slide) => slide.id);
       scheduleReviewSave();
       const viewUrl = `/kopperoinenp/presentation.html?id=${encodeURIComponent(result.id)}&lang=${language}`;
       state.readyPresentation = {

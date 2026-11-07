@@ -10,6 +10,8 @@ const workspace = (customer = "CUST001") => ({
   heading: "KAM view",
   note: "Follow up",
   cooperation: "yellow",
+  cooperationDescription: "Delivery concerns under review",
+  cooperationReason: "KAM follow-up needed",
   dashboardLayout: { sections: ["savings", "metrics"], metrics: ["allocated"] },
   managerTexts: { plan: "Meet next month" },
   contractKpis: [
@@ -42,6 +44,8 @@ test("customer reviews persist across store restart, retain dashboard edits, and
   const loaded = await restarted.read("CUST001");
   assert.deepEqual(loaded, saved);
   assert.equal(loaded.workspace.savings, 40000);
+  assert.equal(loaded.workspace.cooperationDescription, workspace().cooperationDescription);
+  assert.equal(loaded.workspace.cooperationReason, workspace().cooperationReason);
   assert.deepEqual(loaded.workspace.contractKpis, workspace().contractKpis);
   assert.equal(loaded.workspace.includeContractAgenda, true);
   assert.deepEqual(loaded.workspace.dashboardLayout.sections, ["savings", "metrics"]);

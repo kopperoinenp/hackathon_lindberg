@@ -180,22 +180,25 @@ test("provider rejects oversized payloads and unexpected tool calls without retr
   );
 });
 
-// Cooperation is a manager assessment, independent of synthetic performance figures.
-test("cooperation lights survive AI planning and appear as native colors and text on every slide", async () => {
-  const colors = { green: "578200", yellow: "F4C542", red: "E52330" };
+test("internal relationship assessments stay out of preview and PowerPoint slides", async () => {
   assert.equal(validateRequest({ scope: {} }).cooperation, "unrated");
   assert.throws(() => validateRequest({ scope: {}, cooperation: "excellent" }));
-  for (const [status, color] of Object.entries(colors)) {
+  for (const status of ["green", "yellow", "red", "unrated"]) {
     const base = buildPresentation({ ...request, cooperation: status });
     const deck = applyPlan(base, defaultPlan(base));
-    assert.ok(deck.slides.every((s) => s.cooperation.status === status));
-    const bytes = await renderPowerPoint(deck, { provider: "deterministic", model: null });
-    const zip = await JSZip.loadAsync(bytes);
-    const xml = await zip.file("ppt/slides/slide1.xml").async("string");
-    assert.ok(xml.includes(`val="${color}"`));
-    assert.ok(xml.includes("Relationship:"));
-    const last = await zip.file(`ppt/slides/slide${deck.slides.length}.xml`).async("string");
-    assert.ok(last.includes(`val="${color}"`));
+    assert.ok(deck.slides.every((slide) => !Object.hasOwn(slide, "cooperation")));
+    // The exporter must also ignore previously cached decks carrying the old badge.
+    deck.slides.forEach((slide) => {
+      slide.cooperation = { status, color: "E52330", label: "INTERNAL_RELATIONSHIP" };
+    });
+    const zip = await JSZip.loadAsync(await renderPowerPoint(deck, { provider: "deterministic" }));
+    for (const file of Object.keys(zip.files).filter((name) =>
+      /^ppt\/slides\/slide\d+\.xml$/.test(name),
+    )) {
+      const xml = await zip.file(file).async("string");
+      assert.ok(!xml.includes("INTERNAL_RELATIONSHIP"));
+      assert.ok(!xml.includes("Relationship:"));
+    }
   }
 });
 

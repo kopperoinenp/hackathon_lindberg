@@ -4,6 +4,7 @@ import "../frontend/mockups/kopperoinenp/model.js";
 import "../frontend/mockups/kopperoinenp/story-model.js";
 import "../frontend/mockups/kopperoinenp/analysis-model.js";
 import "../frontend/mockups/kopperoinenp/meeting-model.js";
+import "../frontend/mockups/kopperoinenp/upsell-model.js";
 
 export class PresentationError extends Error {
   constructor(message, status = 400) {
@@ -117,8 +118,12 @@ export function validateRequest(input) {
     )
   )
     throw new PresentationError("Virheellinen KAM:in diateksti.");
+  const approvedUpsells = input.approvedUpsells ?? [];
+  if (!globalThis.UpsellModel.validApprovals(approvedUpsells, scope.customer))
+    throw new PresentationError("Invalid customer opportunity approvals.");
   return {
     scope,
+    approvedUpsells: approvedUpsells.map((approval) => ({ ...approval })),
     included,
     note,
     titleEdits,
@@ -349,14 +354,25 @@ export function buildPresentation(input) {
     customer: { name: customer.customer_name, industry: customer.industry },
     period,
     footer,
-    slides: order.map((id) => ({
-      ...slides[id],
-      cooperation: {
-        status: request.cooperation,
-        ...cooperationStates[request.cooperation],
-        label: t(cooperationStates[request.cooperation].label),
-      },
-    })),
+    slides: [
+      ...order.map((id) => ({ ...slides[id] })),
+      ...globalThis.UpsellModel.approved(
+        globalThis.UpsellModel.proposals(data, request.scope, request.language),
+        request.approvedUpsells,
+      ).map((proposal) => ({
+        id: `upsell-${proposal.id}`,
+        kind: "text",
+        title: proposal.title,
+        paragraphs: [
+          proposal.observation,
+          proposal.siteSummary,
+          proposal.benefit,
+          proposal.nextStep,
+          proposal.boundary,
+        ],
+        source: proposal.source,
+      })),
+    ],
   };
 }
 function orderedSlides(defaultIds, override = []) {
@@ -410,15 +426,18 @@ export function applyPlan(deck, plan) {
   ];
   return {
     ...deck,
-    slides: orderedSlides(ids, deck.request.slideOrder).map((id) => {
-      const slide = byId.get(id);
-      return {
-        ...slide,
-        title:
-          deck.request.titleEdits[id] ||
-          (choices.has(id) ? slide.headlineOptions[choices.get(id)] : slide.title),
-      };
-    }),
+    slides: [
+      ...orderedSlides(ids, deck.request.slideOrder).map((id) => {
+        const slide = byId.get(id);
+        return {
+          ...slide,
+          title:
+            deck.request.titleEdits[id] ||
+            (choices.has(id) ? slide.headlineOptions[choices.get(id)] : slide.title),
+        };
+      }),
+      ...deck.slides.filter((slide) => slide.id.startsWith("upsell-")),
+    ],
   };
 }
 export function defaultPlan(deck) {
