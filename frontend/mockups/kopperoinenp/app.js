@@ -565,7 +565,7 @@
         )}
       </section>
       <section class="analysis-card">
-        <h2>Service cycles</h2>
+        <h2 id="service-cycles" tabindex="-1">Service cycles</h2>
         <p><strong>${number(service.count, t("recorded cycles"), 0)}</strong> ·
         Median ${number(service.medianHours, "h")} · 90% of cycles within ${number(service.p90Hours, "h")} ·
         Flagged late ${number(service.latePct, "%")} · Service requests ${number(service.requests, "", 0)}</p>
@@ -706,6 +706,7 @@
     $("#composer").hidden = !preparing;
     renderQueryResult();
     renderDataImport();
+    renderSteeringFinding(preparing && !analyzing);
     for (const view of ["summary", "analysis"]) {
       const tab = $("#" + view + "-tab");
       tab.setAttribute("aria-selected", String(state.view === view));
@@ -728,6 +729,71 @@
     scheduleReviewSave();
     scheduleDeck();
   }
+  function steeringEvidence() {
+    const finding = globalThis.WorkspaceModel.serviceCycleFinding(data, state);
+    if (!finding) return null;
+    const { site, actual, reference, gap, count, monthsAbove, monthly, peerCount } = finding;
+    const fi = language === "fi";
+    const title = fi
+      ? "Missä tarvitaan ohjausryhmän apua"
+      : "Where steering committee input is needed";
+    const headline = fi
+      ? `${site}: palvelukierron P90 on ${f(gap, 1)} h pidempi kuin vertailutoimipaikoissa.`
+      : `${site}: service cycle P90 is ${f(gap, 1)} h longer than at peer sites.`;
+    const comparison = fi
+      ? `Kohteen P90 ${f(actual, 1)} h (${f(count)} kiertoa). Muiden ${f(peerCount)} toimipaikan P90-mediaani ${f(reference, 1)} h.`
+      : `Site P90 ${f(actual, 1)} h (${f(count)} cycles). Median P90 of ${f(peerCount)} other sites ${f(reference, 1)} h.`;
+    const recurrence = fi
+      ? `Kohde oli vertailua hitaampi ${monthsAbove}/${monthly.length} kuukaudessa. Vertailujakso ${state.from} – ${state.to}.`
+      : `The site was slower than its peers in ${monthsAbove}/${monthly.length} months. Period ${state.from} – ${state.to}.`;
+    const boundary = fi
+      ? "P90 kertoo, missä ajassa 90 % kirjatuista kierroista valmistui. Vertailu ei osoita sopimustason alitusta tai eron syytä."
+      : "P90 is the time within which 90% of recorded cycles finished. The comparison does not establish an SLA breach or a cause.";
+    const action = fi
+      ? `Selvitä pitkien palvelukiertojen syyt kohteessa ${site} ja sovi korjauskokeilu, jonka vaikutusta seurataan P90-mittarilla.`
+      : `Investigate long service cycles at ${site} and agree a pilot to track its effect on P90.`;
+    return { title, headline, comparison, recurrence, boundary, action, finding };
+  }
+  function renderSteeringFinding(visible) {
+    const card = $("#steering-finding");
+    const evidence = visible ? steeringEvidence() : null;
+    card.hidden = !evidence;
+    if (!evidence) return;
+    const { title, headline, comparison, recurrence, boundary, action } = evidence;
+    const added = state.nextSteps.some((step) => step.title === action.slice(0, stepLimits.title));
+    card.innerHTML = `<h2 id="steering-title">${esc(title)}</h2>
+      <h3>${esc(headline)}</h3><p>${esc(comparison)}</p><p>${esc(recurrence)}</p>
+      <p class="quiet">${esc(boundary)} · Service_Cycles</p><p>${esc(action)}</p>
+      <div class="kpi-actions">
+        <button type="button" class="secondary" data-steering-analysis>${t("Open analysis")}</button>
+        <button type="button" class="secondary" data-steering-plan ${added || state.nextSteps.length >= 5 ? "disabled" : ""}>${t(added ? "Added to plan" : "Add to plan")}</button>
+      </div>`;
+  }
+  $("#steering-finding").addEventListener("click", (event) => {
+    if (event.target.closest("[data-steering-analysis]")) {
+      state.view = "analysis";
+      render();
+      $("#service-cycles").focus();
+    }
+    if (event.target.closest("[data-steering-plan]")) {
+      const evidence = steeringEvidence();
+      if (!evidence || state.nextSteps.length >= 5) return;
+      state.nextSteps.push({
+        title: evidence.action.slice(0, stepLimits.title),
+        owner: "",
+        due: "",
+      });
+      state.evidenceAreas = areaOrder(new Set([...customerAreas(), "performance"]));
+      state.chatRevision += 1;
+      render();
+      const editor = $("#review-next-steps");
+      editor.closest("details").open = true;
+      editor
+        .querySelectorAll('[data-step-field="owner"]')
+        .item(state.nextSteps.length - 1)
+        ?.focus();
+    }
+  });
   let assessingRelationship = false;
   function renderRelationship() {
     $("#relationship-description").value = state.cooperationDescription;
@@ -1815,6 +1881,7 @@
     const monthly = monthlyEvidence();
     const previous = previousYear();
     const kpis = customerKpis();
+    const steering = steeringEvidence();
     const plain = (value) =>
       String(value)
         .replace(/<[^>]*>/g, "")
@@ -1823,6 +1890,28 @@
       .filter((id) => id !== "scorecard")
       .filter((id) => !evidence[id]?.missing || kpis.some((kpi) => kpi.area === id && kpi.actual))
       .map((id) => {
+        if (id === "performance" && steering) {
+          const { title, headline, comparison, recurrence, boundary, finding } = steering;
+          return {
+            id,
+            title: state.areaTitles[id] || title,
+            headline,
+            points: [comparison, recurrence, boundary].map((text) => text.slice(0, 160)),
+            stats: [
+              { value: `${f(finding.actual, 1)} h`, label: t("Site service cycle P90") },
+              { value: `${f(finding.reference, 1)} h`, label: t("Peer site P90 median") },
+            ],
+            note: (state.areaNotes[id] ?? "").slice(0, 2000),
+            chart: {
+              type: "line",
+              name: t("Site service cycle P90"),
+              labels: finding.monthly.map(({ month }) => month),
+              values: finding.monthly.map(({ actual }) => actual),
+              reference: finding.monthly.map(({ reference }) => reference),
+              referenceName: t("Peer site P90 median"),
+            },
+          };
+        }
         const block = evidence[id] ?? {};
         const kpi = kpis.find((item) => item.area === id && item.actual);
         const stats = (block.stats ?? []).slice(0, 3).map(([value, label]) => ({

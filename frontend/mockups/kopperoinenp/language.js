@@ -233,6 +233,11 @@
     "Add step": "Lisää toimenpide",
     "Start from suggestions": "Aloita ehdotuksista",
     "E.g. Q2 2026": "Esim. Q2 2026",
+    "Open analysis": "Avaa analyysi",
+    "Add to plan": "Lisää suunnitelmaan",
+    "Added to plan": "Lisätty suunnitelmaan",
+    "Site service cycle P90": "Toimipaikan palvelukierron P90",
+    "Peer site P90 median": "Vertailutoimipaikkojen P90-mediaani",
     "Agreed next steps": "Sovitut jatkotoimet",
     "Next steps shown in section 03": "Osiossa 03 näytettävät jatkotoimet",
     "Only the steps written here are shown to the customer. Keep to one to three.":
@@ -585,7 +590,7 @@
       '\n      <section class="analysis-card">\n        <h2>Tekstiilien käyttö tuotteittain</h2>\n        <p class="quiet">Allokointi ja skannausosuus kuukaudelta ',
     ".\n        Wash frequency divides washes in the period by the sum of monthly allocations.\n        Repair frequency counts events per 100 washes. Sources: Service_Activity, Products, Repairs and Customer_Impacts.</p>\n        ":
       ".\n        Pesutiheys saadaan jakamalla jakson pesut kuukausittaisten allokointien summalla.\n        Korjaustiheys kuvaa tapahtumia sataa pesua kohden. Lähteet: Service_Activity, Products, Repairs ja Customer_Impacts.</p>\n        ",
-    '\n      </section>\n      <section class="analysis-card">\n        <h2>Service cycles</h2>\n        <p><strong>':
+    '\n      </section>\n      <section class="analysis-card">\n        <h2 id="service-cycles" tabindex="-1">Service cycles</h2>\n        <p><strong>':
       '\n      </section>\n      <section class="analysis-card">\n        <h2>Palvelukierrot</h2>\n        <p><strong>',
     "</strong> ·\n        Median ": "</strong> ·\n        Mediaani ",
     " · 90% of cycles within ": " · 90 % kierroista enintään ",
