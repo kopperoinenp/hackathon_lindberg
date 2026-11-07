@@ -16,8 +16,6 @@ export const figuresIn = (text) => (String(text).match(groups) ?? []).map(parse)
 export function supportedByFacts(reply, facts) {
   const known = figuresIn(JSON.stringify(facts));
   return figuresIn(reply).every((value) => {
-    if (Number.isInteger(value) && value <= 12) return true;
-    if (Number.isInteger(value) && value >= 2000 && value <= 2100) return true;
     return known.some((fact) => Math.abs(fact - value) < 0.001 || Math.round(fact) === value);
   });
 }

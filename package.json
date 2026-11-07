@@ -9,6 +9,8 @@
     "format:check": "prettier --check frontend/mockups backend scripts tests package.json eslint.config.mjs .prettierrc.json .github/workflows/quality.yml",
     "format": "prettier --write frontend/mockups backend scripts tests package.json eslint.config.mjs .prettierrc.json .github/workflows/quality.yml",
     "test": "node --test tests/*.test.mjs",
+    "test:kam": "node --test tests/kam-workflows.test.mjs",
+    "test:kam:live": "node scripts/test-kam-assistant.mjs --live --repeat=2",
     "preview": "node scripts/preview.mjs"
   },
   "engines": {
