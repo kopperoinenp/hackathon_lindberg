@@ -150,3 +150,62 @@ The regenerated browser deck showed the common overview as slide 1/9 and the
 customer cover as slide 2/9. The HTTP test separately checked the actual generated
 PPTX slide1.xml and slide2.xml contents. kopperoinenp Codex owns integration and
 merge after successful review/CI under the updated AGENTS.md authorization.
+
+## Proposed extension: evidence blocks (awaiting owner approval)
+
+Status: proposal from branch `feature/evidence-blocks`. The frontend part is
+implemented and backward compatible; the backend part is not implemented. This
+section does not change the approved contract until the owner approves it.
+
+The Customer review section 01 now shows evidence blocks for nine areas. The KAM
+chooses the areas per customer; the default comes from the customer's
+`priority_topics`. The previous water/emissions/repairs cards and charts moved
+into the Sustainability and Operational blocks' "Show more" and keep their
+`data-insight` ids, so existing `titleEdits`, `managerTexts` and `visibleInsights`
+edits still apply to them.
+
+Area IDs: `scorecard`, `experience`, `performance`, `adoption`, `operations`,
+`financial`, `sustainability`, `improvement`, `future`.
+
+The browser already sends these optional workspace fields to `POST /api/chat`.
+The current backend ignores them, which is safe:
+
+- `evidenceAreas`: ordered list of selected area IDs (the resolved current
+  selection, including the customer default).
+- `areaTitles`: `{areaId: string}` replacing a block heading.
+- `areaNotes`: `{areaId: string}` shown as labeled KAM commentary in the block.
+- `customerBasics`: ordered list of customer basics shown before the figures:
+  `scope`, `year`, `siteTypes`, `countries`, `products`, `locations`. An empty list
+  shows only the always-visible name, industry, textiles, sites and countries.
+  Presets in Explore data: Brief `[]`, Standard `["scope","year"]`, Full (all).
+- `nextSteps`: at most five `{title, owner, due}` strings (160/80/40 characters)
+  written by the KAM. Section 03 shows only steps with a title; the browser
+  appends them to the presentation note as "Agreed next steps". Chat text must
+  follow the exact-substring provenance rule.
+
+The browser applies these fields from the response `workspace` only when they
+are present and valid: `evidenceAreas` nonempty, unique and known IDs;
+`customerBasics` unique known IDs (may be empty);
+`nextSteps` at most five valid entries;
+`areaTitles`/`areaNotes` known area keys and strings of at most 2,000
+characters. Missing or invalid fields preserve the current state. A customer
+change resets the selection to the customer default; any data-scope change
+clears area titles and notes, like `titleEdits`. A block edited by chat is
+added to the selection and opened automatically.
+
+Backend work proposed for the chat owner (`backend/review-chat.mjs`):
+
+1. Accept and return `evidenceAreas`, `areaTitles` and `areaNotes` in
+   `normalizeWorkspace`, with the validation above.
+2. Add a nullable `evidenceAreas` patch field (enum of the nine IDs) and an
+   `areaEdit` `{id,title,text}` tool, or extend `slideEdit` IDs with area IDs.
+   Title/text follow the existing exact-substring provenance rule.
+3. Update the model instructions: `results` is now the evidence block module;
+   describe the areas in English and Finnish, for example
+   "näytä vain vastuullisuus ja palvelu" →
+   `["scorecard","performance","sustainability"]`.
+4. Report the changed paths in `changed` and add tests in
+   `tests/review-chat.test.mjs`.
+
+PowerPoint does not yet use `evidenceAreas`; passing it to the presentation
+request is a separate, later change to `docs/PRESENTATION_API.md`.
