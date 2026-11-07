@@ -862,21 +862,68 @@
     }[state.priority];
   }
   function plan() {
-    const { focus } = context();
-    return [
-      [
-        t`Review ${focus.site_name} with the customer.`,
-        t("Check reserve stock needs and scan coverage."),
-      ],
-      [
-        t("Agree on one improvement and assign an owner."),
-        t("Confirm demand before changing allocations."),
-      ],
-      [
-        t("Review progress at the next meeting."),
-        t("Estimate potential savings once the inputs have been agreed."),
-      ],
-    ];
+    const { scope } = presentationRequest(false);
+    const [result] = analysisTools.run(data, scope, ["actions"]);
+    const { wash, stock, repair } = globalThis.WorkspaceModel.usageFindings(data, scope);
+    const proposals = [];
+    if (wash) {
+      proposals.push([
+        t("Investigate lower wash frequency") + " · " + wash.product,
+        `${wash.site}: ${f(wash.rate, 2)} · ${wash.peer}: ${f(wash.peerRate, 2)} ` +
+          t("washes per allocated item per month") +
+          ` · ${wash.from}–${wash.to} · ` +
+          t`Difference repeated in ${wash.lowerMonths} of ${wash.months} matched months.`,
+        t(
+          "Compare shift patterns, change routines and reserve stock before piloting a change to allocations. Track garment availability during the pilot.",
+        ),
+      ]);
+    }
+    if (stock) {
+      proposals.push([
+        t("Check stock against lower wash volumes") + " · " + stock.site + " · " + stock.product,
+        `${stock.before.from}–${stock.before.to} → ${stock.after.from}–${stock.after.to} · ` +
+          t("Average washes per month") +
+          ` ${f(stock.beforeWashes, 1)} → ${f(stock.afterWashes, 1)} · ` +
+          t("Average allocated items") +
+          ` ${f(stock.beforeStock, 1)} → ${f(stock.afterStock, 1)}`,
+        t(
+          "Check whether lower demand is seasonal. Agree on stock levels for quiet and peak months, then track garment availability.",
+        ),
+      ]);
+    }
+    if (repair) {
+      proposals.push([
+        t("Investigate higher repair frequency") + " · " + repair.product,
+        `${repair.site}: ${f(repair.rate, 2)} (${f(repair.washes)}) · ${repair.peer}: ${f(repair.peerRate, 2)} (${f(repair.peerWashes)}) · ` +
+          t("Repairs per 100 washes (total washes)") +
+          ` · ${repair.from}–${repair.to} · ` +
+          t`${repair.months} matched months`,
+        t(
+          "Check whether tasks, garment suitability or repair practices explain the gap. Test one change and compare repairs per 100 washes at the next review.",
+        ),
+      ]);
+    }
+    const serviceProposals = (result.values ?? []).map((action) =>
+      action.scanPct != null
+        ? [
+            t("Review textile stock and scanning together") + " · " + action.site,
+            t`Scan coverage was ${f(action.scanPct, 1)}% in ${result.snapshotMonth}.`,
+            t(
+              "Compare local stock and scanning records together before changing allocations. Repeat the coverage check after the next inventory count.",
+            ),
+          ]
+        : [
+            t("Investigate the longest service cycles together") + " · " + action.site,
+            t`At least 90% of recorded cycles finished within ${f(action.p90Hours, 1)} hours (${f(action.recordedCycles)} records, ${periodName()}).`,
+            t(
+              "Review handoffs and delays together, agree on one change, and compare cycle times at the next review.",
+            ),
+          ],
+    );
+    const allProposals = [...proposals, ...serviceProposals];
+    return allProposals.length
+      ? allProposals.slice(0, 3)
+      : [[t("There is insufficient data for a proposal in this selection.")]];
   }
   function summaryGraphics() {
     const ctx = context();
@@ -951,7 +998,10 @@
         .join(
           "",
         )}</div><p class="quiet">Synthetic data. The baseline models an alternative laundry service at the same wash volume.</p>${summaryGraphics()}</section><section class="story-section" aria-labelledby="opportunity-title"${state.visibleInsights.includes("opportunity") ? "" : " hidden"}><div class="section-heading"><span class="section-number">02</span><h2 id="opportunity-title">What to investigate first</h2></div><div class="opportunity"><div><span class="section-kicker">${esc(focus.site_name)}</span><h3>Do textile allocations match demand?</h3><p>${f(focus.unscanned)} allocated textiles had no active scan in ${snapshotName()}. Start by reviewing this site with the customer.</p></div><div class="opportunity-visual">${snapshotGraphic(focus)}</div></div><p class="relevance">${esc(globalThis.MeetingModel.relevance("opportunity", state.priority, false, language))}</p>${siteBenchmark()}<details class="site-details"><summary>See other sites</summary><div class="table-wrap"><table><thead><tr><th>Site</th><th>Scanned ${snapshotName()}</th><th>Allocated textiles</th></tr></thead><tbody>${sites.map((site) => t`<tr><td><button class="site-link" data-site="${site.site_id}">${esc(site.site_name)}</button></td><td>${f(site.utilization, 1)} %</td><td>${f(site.allocated)}</td></tr>`).join("")}</tbody></table></div><p class="quiet">Open a site to see its review. Ask the assistant to “show all sites” to return to the full review.</p></details></section><section class="story-section" aria-labelledby="next-title"><div class="section-heading"><span class="section-number">03</span><h2 id="next-title">Next year's priorities</h2></div><div class="next-chapter"><div><h3>One improvement<br />at a time</h3><p>Use these proposals to start a discussion and agree on next steps with the customer.</p></div><ol class="next-steps">${plan()
-        .map(([title, note]) => `<li>${esc(title)}<small>${esc(note)}</small></li>`)
+        .map(
+          ([title, ...details]) =>
+            `<li>${esc(title)}${details.map((detail) => `<small>${esc(detail)}</small>`).join("")}</li>`,
+        )
         .join(
           "",
         )}</ol></div><details class="notes-details" ${state.note ? "open" : ""}><summary>Add a note to the presentation</summary><label for="meeting-note" class="sr-only">Meeting note</label><textarea id="meeting-note" maxlength="2000" placeholder="E.g. a customer goal or an agreed next step…">${esc(state.note)}</textarea><p class="quiet">The note stays in this tab until you change the customer, site or baseline.</p></details></section>`;
