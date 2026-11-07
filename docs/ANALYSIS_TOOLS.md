@@ -45,6 +45,7 @@ hygieniaa, turvallisuutta tai sääntelyn noudattamista.
 | `footprint` | Vesi, energia, prosessi- ja toimituspäästöt, pestyä kiloa kohti lasketut intensiteetit sekä jätereitit. |
 | `baselines` | Kolme pesumallia samalla pestyllä kilomäärällä. Ero on vertailumalli miinus toteuma. |
 | `period` | Samanpituinen edeltävä jakso samoilla toimipaikka- ja maarajauksilla. Skannausosuuden muutos on prosenttiyksikköinä. |
+| `yoy` | Samat kuukaudet vuotta aiemmin, samalla asiakas- ja toimipaikkarajauksella. Vertailu vaatii täsmäävät toimipaikkakuukaudet. |
 | `drivers` | Kuukausipäästöt, maakohtaiset vesi-, päästö- ja korjaussummat sekä enintään kuusi suurinta päästöosuutta. |
 | `laundry` | Asiakkaalle kohdistettu volyymi ja jalanjälki pesuloittain. Enintään kuusi suurinta pesulaa pestyn kilomäärän mukaan. |
 | `actions` | Skannausvajeesta ja pitkistä kirjatuista kierroista johdetut tarkistuskysymykset. |
@@ -54,6 +55,12 @@ Työkalut palauttavat rajauksen, lähteen, taulut, tilan, mahdollisen
 varantokuukauden ja tulkintarajan. Puuttuva tulos ja nollanimittäjä näkyvät
 puuttuvina. Kattavuuden läpäisy osoittaa rakenteen ja sisäisen täsmäytyksen.
 Se ei varmista aineiston ulkopuolisia väitteitä.
+
+KPI-kortit ja analyysin vertailutaulukko käyttävät ensisijaisesti vuosivertailua.
+Jos vastaavaa edellisvuoden jaksoa ei ole, ne käyttävät vertailukelpoista
+samanpituista edeltävää jaksoa ja näyttävät sen päivämäärät. Varanto ja
+skannauskattavuus kuvaavat kummankin jakson loppua. Demon vuoden 2024 luvut
+ovat 2025:n synteettisestä työkirja-aineistosta simuloituja toimipaikkakoosteita.
 
 NorthStarin kontrolliluvut täsmäävät lähdetyökirjan `Sample_Output`-tauluun.
 Paikallispesun vesiero on lähteessä 1 406 482,60 litraa. Laskenta antaa

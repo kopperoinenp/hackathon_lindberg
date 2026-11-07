@@ -9,7 +9,7 @@ const original = globalThis.REVIEW_DATA;
 test("validates the full dataset and earlier summary-only datasets", () => {
   const current = inspect(JSON.stringify(original));
   assert.equal(current.issue, null);
-  assert.equal(current.data.records.length, 408);
+  assert.equal(current.data.records.length, 816);
   const summary = { ...original, products: undefined, detail: undefined, cycleGroups: undefined };
   const earlier = inspect(JSON.stringify(summary));
   assert.equal(earlier.issue, null);

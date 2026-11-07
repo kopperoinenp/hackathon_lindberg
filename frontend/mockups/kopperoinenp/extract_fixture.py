@@ -202,6 +202,38 @@ def build_detail(tables):
     }
 
 
+def mock_prior_year(records):
+    """Create demo-only 2024 site-month summaries, preserving seasonality."""
+    result = []
+    for row in records:
+        site_seed = sum(ord(char) for char in row["site"])
+        month = int(row["month"][-2:])
+        volume = (84 + (site_seed + 3 * month) % 29) / 100
+        stock = (88 + site_seed % 25) / 100
+        allocated = round(row["allocated_pieces"] * stock)
+        result.append(
+            {
+                **row,
+                "month": f"2024-{month:02d}",
+                "allocated_pieces": allocated,
+                "active_assets_scanned": min(
+                    allocated, round(row["active_assets_scanned"] * stock * 0.96)
+                ),
+                "washed_pieces": round(row["washed_pieces"] * volume),
+                "customer_washed_kg": round(row["customer_washed_kg"] * volume, 3),
+                "allocated_water_l": round(row["allocated_water_l"] * volume * 1.06, 3),
+                "allocated_process_kgco2e": round(
+                    row["allocated_process_kgco2e"] * volume * 1.04, 3
+                ),
+                "allocated_delivery_kgco2e": round(
+                    row["allocated_delivery_kgco2e"] * volume * 1.03, 3
+                ),
+                "repair_count": round(row["repair_count"] * volume * 0.98),
+            }
+        )
+    return result
+
+
 def build_fixture(tables):
     detail = build_detail(tables)
     customers = tables["Customers"]
@@ -217,6 +249,10 @@ def build_fixture(tables):
             "repair_count",
         ):
             monthly[key][field] += row[field]
+    records = [
+        {"customer": customer, "site": site, "month": month, **dict(values)}
+        for (customer, site, month), values in sorted(monthly.items())
+    ]
     # Wearer counts have no person identifier and cannot be deduplicated.
     return {
         "source": "Lindstrom_SinceAI_Customer_Value_Synthetic_Data_Pack.xlsx",
@@ -226,10 +262,7 @@ def build_fixture(tables):
         "sites": sites,
         "baselines": tables["Baselines"],
         **detail,
-        "records": [
-            {"customer": customer, "site": site, "month": month, **dict(values)}
-            for (customer, site, month), values in sorted(monthly.items())
-        ],
+        "records": records + mock_prior_year(records),
     }
 
 
@@ -240,7 +273,7 @@ def main():
     fixture = build_fixture(read_workbook(args.workbook))
     output = Path(__file__).with_name("data.js")
     output.write_text(
-        "// Generated from the supplied SYNTHETIC workbook. See README.md.\n"
+        "// 2025 from the synthetic workbook; 2024 simulated for comparison. See README.md.\n"
         "globalThis.REVIEW_DATA = " + json.dumps(fixture, ensure_ascii=False, indent=2) + ";\n",
         encoding="utf-8",
     )

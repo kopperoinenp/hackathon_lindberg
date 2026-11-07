@@ -4,6 +4,7 @@
     { length: 12 },
     (_, index) => "2025-" + String(index + 1).padStart(2, "0"),
   );
+  const historicalMonth = /^2024-(0[1-9]|1[0-2])$/;
   const countries = ["Finland", "Sweden", "Poland"];
   const baselineIds = ["B_LOCAL", "B_HOME", "B_INHOUSE"];
   const countFields = [
@@ -110,7 +111,7 @@
         object(row) &&
           sites.has(row.site) &&
           sites.get(row.site).customer_id === row.customer &&
-          months.includes(row.month),
+          (months.includes(row.month) || historicalMonth.test(row.month)),
         "A record has an invalid customer, site or month.",
         location,
       );
@@ -141,7 +142,8 @@
       records.set(key, row);
     });
     requireValid(
-      records.size === sites.size * months.length,
+      data.records.filter((row) => months.includes(row.month)).length ===
+        sites.size * months.length,
       "Monthly site coverage is incomplete.",
       "records",
     );
@@ -163,7 +165,7 @@
         const key = rowKey(row);
         const detailKey = key + "/" + row.product;
         requireValid(
-          products.has(row.product) && id(row.laundry),
+          records.has(key) && products.has(row.product) && id(row.laundry),
           "A product or laundry reference is invalid.",
           location,
         );
@@ -201,6 +203,7 @@
       });
       for (const [key, row] of records) {
         const total = sums.get(key);
+        if (!total && historicalMonth.test(row.month)) continue;
         requireValid(
           total &&
             recordFields.every((field) =>
@@ -226,7 +229,8 @@
         const detailKey = rowKey(row) + "/" + row.product;
         const key = detailKey + "/" + row.laundry;
         requireValid(
-          products.has(row.product) &&
+          records.has(rowKey(row)) &&
+            products.has(row.product) &&
             id(row.laundry) &&
             (data.detail === undefined || details.get(detailKey) === row.laundry) &&
             Array.isArray(row.hours) &&
