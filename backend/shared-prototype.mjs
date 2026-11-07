@@ -34,6 +34,7 @@ export function sharedPrototype(env = process.env) {
         return json(response, 403, { error: "Unknown prototype user." });
       const context = await store.context(id, {
         metadataOnly: url.pathname.startsWith("/api/v1/") || url.pathname.startsWith("/api/demo/"),
+        catalogOnly: url.pathname === "/api/chat" || url.pathname.startsWith("/api/presentations"),
       });
       const dashboard = dashboardApi(store, context.user);
       if (url.pathname === "/api/v1/customers" && request.method === "GET")
@@ -88,8 +89,9 @@ export function sharedPrototype(env = process.env) {
         response.setHeader("Set-Cookie", `demo_user=${next}; HttpOnly; SameSite=Strict; Path=/`);
         return json(response, 200, { ok: true });
       }
-      return await requestContext.run({ ...context, reviews: store.reviews(context.user) }, () =>
-        handle(request, response, url),
+      return await requestContext.run(
+        { ...context, dashboard, reviews: store.reviews(context.user) },
+        () => handle(request, response, url),
       );
     } catch (error) {
       if (!response.headersSent)

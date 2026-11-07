@@ -17,6 +17,7 @@ import { analyzeImport } from "./import-analysis.mjs";
 import { importFormats, importLimit, readImportFile } from "./import-file.mjs";
 import { fileURLToPath } from "node:url";
 import { requestContext } from "./request-context.mjs";
+import { withPreparedDashboard } from "./prepared-dashboard.mjs";
 let reviewStore;
 const files = new Map();
 const ttl = 10 * 60 * 1000;
@@ -36,6 +37,7 @@ function receipt(id, file) {
     id,
     provider: file.config.provider,
     model: file.config.model,
+    ...(file.deck.dashboard ? { dashboard: file.deck.dashboard } : {}),
     slides: file.deck.slides.map(({ id, title }) => ({ id, title })),
     downloadUrl: `/api/presentations/${id}/download`,
     expiresInSeconds: Math.max(1, Math.floor((file.expires - Date.now()) / 1000)),
@@ -177,7 +179,17 @@ export async function handlePresentationApi(request, response, url) {
         );
       chatBusy = true;
       try {
-        json(response, 200, await runReviewChat(await readJson(request)));
+        const input = await readJson(request);
+        const result = await withPreparedDashboard(
+          input?.workspace,
+          async () => {
+            const reply = await runReviewChat(input);
+            const dashboard = requestContext.getStore()?.prepared?.reference;
+            return dashboard ? { ...reply, dashboard } : reply;
+          },
+          { write: true },
+        );
+        json(response, 200, result);
       } finally {
         chatBusy = false;
       }
@@ -196,6 +208,7 @@ export async function handlePresentationApi(request, response, url) {
           period: file.deck.period,
           footer: file.deck.footer,
           slides: file.deck.slides,
+          ...(file.deck.dashboard ? { dashboard: file.deck.dashboard } : {}),
           downloadUrl: `/api/presentations/${match[1]}/download`,
           standard: { story: storyVersion, template: templateStandard.version },
         });
@@ -212,10 +225,15 @@ export async function handlePresentationApi(request, response, url) {
       return true;
     }
     if (url.pathname === "/api/presentations/preview" && request.method === "POST") {
-      const base = buildPresentation(await readJson(request));
+      const input = await readJson(request);
+      const base = await withPreparedDashboard(input, () => buildPresentation(input));
       assertAccess(base.request.scope.customer);
       const deck = applyPlan(base, defaultPlan(base));
-      json(response, 200, { slides: deck.slides, footer: deck.footer });
+      json(response, 200, {
+        slides: deck.slides,
+        footer: deck.footer,
+        ...(deck.dashboard ? { dashboard: deck.dashboard } : {}),
+      });
       return true;
     }
     if (url.pathname !== "/api/presentations" || request.method !== "POST")
@@ -225,7 +243,7 @@ export async function handlePresentationApi(request, response, url) {
     busy = true;
     try {
       const input = await readJson(request);
-      const base = buildPresentation(input);
+      const base = await withPreparedDashboard(input, () => buildPresentation(input));
       assertAccess(base.request.scope.customer);
       const config = providerConfig();
       const normalized = {
@@ -238,6 +256,7 @@ export async function handlePresentationApi(request, response, url) {
         .update(
           JSON.stringify({
             request: normalized,
+            dashboard: base.dashboard,
             owner,
             locked: input.locked === true,
             provider: config.provider,

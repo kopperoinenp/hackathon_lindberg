@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { PresentationError } from "./presentation-model.mjs";
+import { dashboardCalculationVersion as calculationVersion } from "./dashboard-model.mjs";
 
-export const calculationVersion = "dashboard-v1";
 export const versionSql = "COALESCE(active_import_id::text,'bootstrap-'||updated_at::text)";
 const fields = ["customer", "from", "to", "site", "country", "continent", "baseline"];
+export const dashboardScopeKey = (scope) => JSON.stringify(fields.map((field) => scope[field]));
 export function dashboardScope(customer, params) {
   const scope = {
     customer,
@@ -27,6 +28,33 @@ export function dashboardScope(customer, params) {
 }
 export function dashboardApi(store, user) {
   return {
+    snapshot: (id, scope) =>
+      store.transaction(user, async (client) => {
+        if (typeof id !== "string" || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(id))
+          throw new PresentationError("Load the dashboard metrics before continuing.", 409);
+        const row = (
+          await client.query(
+            "SELECT id,customer_id,dataset_version,calculation_version,scope_key,result FROM dashboard_jobs WHERE id=$1 AND status='ready'",
+            [id],
+          )
+        ).rows[0];
+        if (
+          !row ||
+          row.customer_id !== scope.customer ||
+          row.calculation_version !== calculationVersion ||
+          row.scope_key !== dashboardScopeKey(scope)
+        )
+          throw new PresentationError(
+            "Dashboard metrics do not match this selection. Reload the dashboard.",
+            409,
+          );
+        return {
+          id: row.id,
+          datasetVersion: row.dataset_version,
+          calculationVersion,
+          metrics: row.result,
+        };
+      }),
     catalog: () =>
       store.transaction(user, async (c) => {
         const customers = (
@@ -51,7 +79,7 @@ export function dashboardApi(store, user) {
           months: Array.from({ length: 12 }, (_, i) => `2025-${String(i + 1).padStart(2, "0")}`),
         };
       }),
-    get: (customer, params) =>
+    get: (customer, params, pinned = null) =>
       store.transaction(user, async (c) => {
         const scope = dashboardScope(customer, params);
         const current = (
@@ -61,11 +89,12 @@ export function dashboardApi(store, user) {
           )
         ).rows[0];
         if (!current) throw new PresentationError("No access to this customer.", 403);
-        if (scope.site !== "all" && !current.sites.some((s) => s.site_id === scope.site))
+        const sites = pinned?.metrics.metadata.sites ?? current.sites;
+        if (scope.site !== "all" && !sites.some((s) => s.site_id === scope.site))
           throw new PresentationError("Unknown customer site.");
         const version = params.get("version") ?? current.version;
         if (version.length > 100) throw new PresentationError("Invalid dataset version.");
-        const key = JSON.stringify(fields.map((f) => scope[f]));
+        const key = dashboardScopeKey(scope);
         const args = [user.tenant_id, customer, version, calculationVersion, key];
         const find = async () =>
           (
@@ -89,7 +118,9 @@ export function dashboardApi(store, user) {
         });
         const existing = await find();
         if (existing) return receipt(existing);
-        if (version !== current.version)
+        const archivedPublication =
+          pinned && pinned.datasetVersion === version && !version.startsWith("bootstrap-");
+        if (version !== current.version && !archivedPublication)
           throw new PresentationError(
             "New customer data is available. Reload to use its metrics.",
             409,

@@ -5,7 +5,9 @@ import { mkdtemp, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { once } from "node:events";
 import { spawn } from "node:child_process";
+import { setTimeout as wait } from "node:timers/promises";
 import pg from "pg";
+import JSZip from "jszip";
 import { fixtureDataset, dataset } from "../backend/dataset.mjs";
 import { requestContext, subsetDataset } from "../backend/request-context.mjs";
 import { createPostgresStore } from "../backend/postgres-store.mjs";
@@ -313,17 +315,27 @@ test(
     });
     await t.test(
       "presentation previews and downloads enforce selected customer and owner",
-      async () => {
+      async (t) => {
         const forbidden = await call("kam-b", "/api/presentations/preview", {
           scope: { customer: "CUST001" },
         });
-        assert.equal(forbidden.status, 400);
-        const created = await call("kam-a", "/api/presentations", { ...workspace, locked: true });
+        assert.equal(forbidden.status, 403);
+        const workerUrl = new URL(runtimeUrl);
+        workerUrl.username += "_worker";
+        workerUrl.password += "_worker";
+        const worker = createImportWorker(workerUrl.toString());
+        t.after(() => worker.close());
+        const dashboardUrl = "/api/v1/customers/CUST002/dashboard";
+        assert.equal((await call("kam-a", dashboardUrl)).status, 202);
+        await worker.runOnce();
+        const snapshot = await (await call("kam-a", dashboardUrl)).json();
+        const input = { ...workspace, dashboardSnapshotId: snapshot.id, locked: true };
+        const created = await call("kam-a", "/api/presentations", input);
         assert.equal(created.status, 201);
         const receipt = await created.json();
         assert.equal((await call("kam-b", receipt.downloadUrl)).status, 403);
         assert.equal((await call("kam-a", receipt.downloadUrl)).status, 200);
-        const own = await call("kam-b", "/api/presentations", { ...workspace, locked: true });
+        const own = await call("kam-b", "/api/presentations", input);
         assert.equal(own.status, 201);
         assert.notEqual((await own.json()).id, receipt.id);
       },
@@ -546,8 +558,9 @@ test(
         const admin = new pg.Client({ connectionString: adminUrl });
         await admin.connect();
         try {
-          const payload = subsetDataset(fixtureDataset, ["CUST002"]);
+          const payload = structuredClone(subsetDataset(fixtureDataset, ["CUST002"]));
           payload.customers[0].customer_name = "Apex new published version";
+          for (const row of [...payload.records, ...payload.detail]) row.allocated_water_l *= 1.1;
           await admin.query(
             "INSERT INTO data_imports(id,tenant_id,customer_id,requested_by,source_id,checksum,calculation_version,payload,expected_controls) VALUES($1,'demo','CUST002','kam-a','project-fixture',$2,'fixture-controls-v1',$3,$4)",
             [
@@ -578,6 +591,87 @@ test(
           const next = await (await call("kam-a", base)).json();
           assert.notEqual(next.datasetVersion, ready.datasetVersion);
           assert.equal(next.metrics.overview.customer.customer_name, "Apex new published version");
+          assert.notEqual(
+            next.metrics.contexts.neutral.metrics.water,
+            ready.metrics.contexts.neutral.metrics.water,
+          );
+
+          const input = { ...workspace, dashboardSnapshotId: ready.id, locked: true };
+          const reference = {
+            id: ready.id,
+            datasetVersion: ready.datasetVersion,
+            calculationVersion: ready.calculationVersion,
+          };
+          const preview = await call("kam-a", "/api/presentations/preview", input);
+          assert.equal(preview.status, 200);
+          const deck = await preview.json();
+          assert.deepEqual(deck.dashboard, reference);
+          assert.equal((await call("kam-a", "/api/presentations/preview", workspace)).status, 409);
+          assert.equal(
+            (
+              await call("kam-a", "/api/presentations/preview", {
+                ...input,
+                scope: quarter.metrics.scope,
+              })
+            ).status,
+            409,
+          );
+          const refreshed = await (
+            await call("kam-a", "/api/presentations/preview", {
+              ...input,
+              dashboardSnapshotId: next.id,
+            })
+          ).json();
+          assert.notEqual(
+            deck.slides.find((slide) => slide.id === "water").value,
+            refreshed.slides.find((slide) => slide.id === "water").value,
+          );
+          const created = await call("kam-a", "/api/presentations", input);
+          assert.equal(created.status, 201);
+          const receipt = await created.json();
+          assert.deepEqual(receipt.dashboard, reference);
+          const viewerDeck = await (await call("kam-a", "/api/presentations/" + receipt.id)).json();
+          assert.deepEqual(viewerDeck.slides, deck.slides);
+          assert.deepEqual(viewerDeck.dashboard, reference);
+          const download = await call("kam-a", receipt.downloadUrl);
+          const zip = await JSZip.loadAsync(await download.arrayBuffer());
+          const notes = await zip.file("ppt/notesSlides/notesSlide1.xml").async("string");
+          assert.ok(notes.includes(ready.datasetVersion));
+          const chat = await call("kam-a", "/api/chat", {
+            workspace: input,
+            message: "What should we raise in the meeting?",
+          });
+          assert.equal(chat.status, 200);
+          const answer = await chat.json();
+          assert.deepEqual(answer.dashboard, reference);
+          const expectedWater =
+            ready.metrics.contexts.neutral.metrics.water /
+            ready.metrics.contexts.neutral.metrics.kg;
+          assert.ok(
+            answer.view.rows[0].display.startsWith(
+              new Intl.NumberFormat("en-GB", { maximumFractionDigits: 1 }).format(expectedWater) +
+                " / ",
+            ),
+          );
+          // An archived publication can still supply a comparison that had never been calculated.
+          let completed = false;
+          const comparing = call("kam-a", "/api/chat", {
+            workspace: input,
+            message: "Compare water by quarter",
+          }).finally(() => {
+            completed = true;
+          });
+          const work = async () => {
+            while (!completed) {
+              await worker.runOnce();
+              await wait(50);
+            }
+          };
+          const [response] = await Promise.all([comparing, work()]);
+          assert.equal(response.status, 200);
+          const comparison = await response.json();
+          assert.deepEqual(comparison.dashboard, reference);
+          assert.equal(comparison.view.rows.length, 4);
         } finally {
           await admin.end();
         }

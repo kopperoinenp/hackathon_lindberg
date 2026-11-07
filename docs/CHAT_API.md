@@ -174,5 +174,11 @@ Chat can set the selected lists or edit one block through `areaEdit`.
 New text must come from the current user instruction. An existing next step can
 be retained as part of a list edit. Data queries cannot change these fields.
 Filter changes preserve the customer's material. Changing customer loads that
-customer's settings or the defaults. Evidence calculations and the PowerPoint
-request schema are unchanged.
+customer's settings or the defaults.
+
+## Dashboard version in shared mode
+
+Set `workspace.dashboardSnapshotId` to the dashboard's ready snapshot for the
+current selection. Responses include its `dashboard` reference. The assistant
+loads additional scopes through the same background worker and dataset version.
+See [dashboard metrics](DASHBOARD_METRICS.md).

@@ -20,7 +20,8 @@
   function create(data) {
     const cache = new Map(),
       pending = new Map(),
-      versions = new Map();
+      versions = new Map(),
+      references = new Map();
     const read = (scope) => {
       const value = cache.get(key(scope));
       if (!value) throw new Error("Dashboard metrics have not loaded for this selection.");
@@ -59,6 +60,7 @@
             if (body.datasetVersion !== versions.get(scope.customer))
               throw new Error("Dashboard dataset version changed. Reload the page.");
             cache.set(id, body.metrics);
+            references.set(id, body.id);
             data.sites = [
               ...data.sites.filter((s) => s.customer_id !== scope.customer),
               ...body.metrics.metadata.sites,
@@ -98,7 +100,7 @@
       read(scope).comparisons[kind];
     root.UpsellModel.proposals = (_data, scope, language = "en") => read(scope).proposals[language];
     root.SalesModel.salesSignals = (_data, scope, language = "en") => read(scope).sales[language];
-    return { ensure, ready, read };
+    return { ensure, ready, read, snapshotId: (scope) => references.get(key(scope)) };
   }
   root.DashboardClient = { create };
 })(globalThis);

@@ -2800,7 +2800,12 @@
       const response = await fetch(`/api/chat?lang=${language}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: question, history, workspace, lastQuery: state.lastQuery }),
+        body: JSON.stringify({
+          message: question,
+          history,
+          workspace: { ...workspace, dashboardSnapshotId: dashboardClient?.snapshotId(state) },
+          lastQuery: state.lastQuery,
+        }),
         signal: AbortSignal.timeout(95000),
       });
       const result = await response.json();
@@ -3166,6 +3171,9 @@
       : "";
     return {
       scope,
+      ...(includeAgenda && dashboardClient
+        ? { dashboardSnapshotId: dashboardClient.snapshotId(state) }
+        : {}),
       included: deckInsights(),
       titleEdits: state.titleEdits,
       note: [state.note, stepsNote, agendaNote].filter(Boolean).join("\n\n"),

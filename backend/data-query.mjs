@@ -1,4 +1,5 @@
 import { dataset as data } from "./dataset.mjs";
+import { requestContext } from "./request-context.mjs";
 import "../frontend/mockups/kopperoinenp/language.js";
 import "../frontend/mockups/kopperoinenp/analysis-model.js";
 
@@ -242,7 +243,18 @@ export function cleanQuery(value) {
   return clean;
 }
 const sumOf = (rows, field) => rows.reduce((total, row) => total + (row[field] || 0), 0);
+const preparedMetrics = (scope) => requestContext.getStore()?.prepared?.get(scope);
+
 function measure(metric, selection) {
+  const prepared = preparedMetrics(selection);
+  if (prepared)
+    return prepared.contexts.neutral.metrics.hasData
+      ? metric.read({
+          m: prepared.contexts.neutral.metrics,
+          d: prepared.detail,
+          late: prepared.lateCount,
+        })
+      : null;
   const rows = model.select(data, selection);
   if (!rows.length) return null;
   return metric.read({
@@ -260,50 +272,56 @@ function monthLabel(month, fi) {
     .replace("kuuta", "")
     .replace(".", "");
 }
-function comparison(query, metric, scope, language) {
+function breakdown(query, scope, language) {
   const translated = (value) => globalThis.ReviewLanguage.translate(language, value);
-  const fi = language === "fi";
-  const sites = data.sites.filter(
-    (site) =>
-      site.customer_id === scope.customer &&
-      (scope.country === "all" || site.country === scope.country),
-  );
   if (query.compareBy === "month")
     return monthIds
       .filter((month) => month >= scope.from && month <= scope.to)
       .map((month) => ({
         key: month,
-        label: monthLabel(month, fi),
-        value: measure(metric, { ...scope, from: month, to: month }),
+        label: monthLabel(month, language === "fi"),
+        scope: { ...scope, from: month, to: month },
       }));
   if (query.compareBy === "quarter")
     return Object.entries(quarters).map(([key, [from, to]]) => ({
       key,
       label: key,
-      value: measure(metric, { ...scope, from, to }),
+      scope: { ...scope, from, to },
     }));
-  if (query.compareBy === "country") {
-    const own = data.sites.filter((site) => site.customer_id === scope.customer);
-    return [...new Set(own.map((site) => site.country))].map((country) => ({
+  const sites = data.sites.filter((site) => site.customer_id === scope.customer);
+  if (query.compareBy === "country")
+    return [...new Set(sites.map((site) => site.country))].map((country) => ({
       key: country,
       label: translated(country),
-      value: measure(metric, { ...scope, country, site: "all" }),
+      scope: { ...scope, country, site: "all" },
     }));
-  }
   if (query.compareBy === "site")
     return sites
+      .filter((site) => scope.country === "all" || site.country === scope.country)
       .map((site) => ({
         key: site.site_id,
         label: site.site_name,
-        value: measure(metric, { ...scope, site: site.site_id }),
-      }))
-      .filter((row) => row.value !== null)
-      .sort((a, b) => b.value - a.value);
+        scope: { ...scope, site: site.site_id },
+      }));
+  return null;
+}
+function comparison(query, metric, scope, language) {
+  const translated = (value) => globalThis.ReviewLanguage.translate(language, value);
+  const selections = breakdown(query, scope, language);
+  if (selections) {
+    const rows = selections.map(({ key, label, scope }) => ({
+      key,
+      label,
+      value: measure(metric, scope),
+    }));
+    return query.compareBy === "site"
+      ? rows.filter((row) => row.value !== null).sort((a, b) => b.value - a.value)
+      : rows;
+  }
   if (query.compareBy === "product") {
     if (!metric.product || metric.total) return null;
-    return model
-      .analyzeDetails(data, scope)
-      .products.map((product) => ({
+    return (preparedMetrics(scope)?.detail ?? model.analyzeDetails(data, scope)).products
+      .map((product) => ({
         key: product.name,
         label: product.name,
         value: metric.product(product),
@@ -455,6 +473,30 @@ function followUps(query, fi) {
     .map(([, finnish, englishText]) => pick(finnish, englishText));
   return [meaning, ...options.slice(0, 2)];
 }
+// Prepare any comparison scopes through the same versioned queue before formatting the answer.
+export async function prepareDataQuery(query, workspace, lastQuery = null) {
+  const prepared = requestContext.getStore()?.prepared;
+  if (!prepared) return;
+  const selection =
+    query.topic === "explain"
+      ? lastQuery?.topic === (query.subject ?? lastQuery?.topic)
+        ? lastQuery
+        : null
+      : query;
+  if (
+    !selection ||
+    (!topics[selection.topic] && !["overview", "meeting"].includes(selection.topic))
+  )
+    return;
+  const scope = scopeFor(selection, workspace);
+  const site = data.sites.find((row) => row.site_id === scope.site);
+  if (site && site.customer_id !== scope.customer) return;
+  const result = await prepared.load(scope);
+  if (!result.contexts.neutral.metrics.hasData || !topics[selection.topic]) return;
+  const scopes = breakdown(selection, scope, workspace.language) ?? [];
+  for (let index = 0; index < scopes.length; index += 5)
+    await Promise.all(scopes.slice(index, index + 5).map(({ scope }) => prepared.load(scope)));
+}
 export function runDataQuery(query, workspace, lastQuery = null) {
   const language = workspace.language;
   const fi = language === "fi";
@@ -516,7 +558,8 @@ export function runDataQuery(query, workspace, lastQuery = null) {
         "This site does not belong to this customer.",
       ),
     );
-  if (!model.select(data, scope).length)
+  const prepared = preparedMetrics(scope);
+  if (!(prepared ? prepared.contexts.neutral.metrics.hasData : model.select(data, scope).length))
     return refuse(say("Tällä rajauksella ei ole dataa.", "This selection has no data."));
   const customer = data.customers.find((row) => row.customer_id === scope.customer);
   const place = site
@@ -548,8 +591,8 @@ export function runDataQuery(query, workspace, lastQuery = null) {
           value,
         );
   if (special) {
-    const m = model.summarize(model.select(data, scope));
-    const d = model.analyzeDetails(data, scope);
+    const m = prepared?.contexts.neutral.metrics ?? model.summarize(model.select(data, scope));
+    const d = prepared?.detail ?? model.analyzeDetails(data, scope);
     const onTime = d.service.latePct === null ? null : 100 - d.service.latePct;
     const baseline = data.baselines.find((row) => row.baseline_id === scope.baseline);
     const repairs = ratio(m.repairs, m.washed, 100);
