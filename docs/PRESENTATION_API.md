@@ -32,7 +32,7 @@ Returns `{provider, model, configured}`. No credentials are returned.
 
 ## POST /api/presentations
 
-JSON request: `{scope, included, titleEdits, note}`.
+JSON request: `{scope, included, titleEdits, note, slideOrder?}`.
 
 `scope` fields: customer, from, to, country, continent, site, baseline, priority.
 Defaults are CUST001, 2025-01, 2025-12, all, all, all, B_LOCAL, neutral.
@@ -87,3 +87,15 @@ slides 10–11. See `PRESENTATION_STANDARD.md` for enforced content and theme ru
 Identical validated requests reuse a ready file until its original expiry; scope,
 content, provider/model and standard versions participate in the cache key. This
 avoids charging another model call just because the main page was reloaded.
+
+## Explicit manager ordering override
+
+Approved by the task owner on 2026-11-07 after requesting that slides 1 and 2 swap.
+`slideOrder` is an optional ordered list of distinct known slide IDs, at most nine.
+It takes precedence over default narrative order and the AI evidence-ranking plan.
+Only selected existing IDs are used; remaining required slides are appended in
+default order. It never removes mandatory chapters or changes their facts.
+Chat `slideSwap` resolves 1-based positions against the current ordered deck and
+stores the resulting full order. The frontend retains generated slide IDs so a
+later edit refers to the actual displayed sequence. The next export and viewer
+use the same order and invalidate any older ready download link.

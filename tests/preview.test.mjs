@@ -83,6 +83,24 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
     body: JSON.stringify({ included: [] }),
   });
   assert.equal(invalid.status, 400);
+  const chatUnavailable = await fetch(`${origin}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ workspace: { scope: {} }, message: "Painota vettä" }),
+  });
+  assert.equal(chatUnavailable.status, 503);
+  const chatDenied = await fetch(`${origin}/api/chat`, {
+    method: "POST",
+    headers: { Origin: "https://untrusted.example", "Content-Type": "application/json" },
+    body: "{}",
+  });
+  assert.equal(chatDenied.status, 403);
+  const chatInvalid = await fetch(`${origin}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{",
+  });
+  assert.equal(chatInvalid.status, 400);
   const created = await fetch(`${origin}/api/presentations`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -94,6 +112,35 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
     presentation.slides.map((slide) => slide.id),
     ["cover", "overview", "repairs", "plan", "sources", "limits"],
   );
+  const reorderedResponse = await fetch(`${origin}/api/presentations`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      scope: { customer: "CUST003" },
+      included: ["repairs"],
+      slideOrder: ["overview", "cover"],
+    }),
+  });
+  assert.equal(reorderedResponse.status, 201);
+  const reordered = await reorderedResponse.json();
+  assert.deepEqual(
+    reordered.slides.slice(0, 2).map((s) => s.id),
+    ["overview", "cover"],
+  );
+  const reorderedViewer = await (await fetch(`${origin}/api/presentations/${reordered.id}`)).json();
+  assert.deepEqual(
+    reorderedViewer.slides.slice(0, 2).map((s) => s.id),
+    ["overview", "cover"],
+  );
+  const { default: JSZip } = await import("jszip");
+  const native = await JSZip.loadAsync(
+    await (await fetch(`${origin}${reordered.downloadUrl}`)).arrayBuffer(),
+  );
+  assert.match(
+    await native.file("ppt/slides/slide1.xml").async("string"),
+    /Palvelun käyttö ja huolto/,
+  );
+  assert.match(await native.file("ppt/slides/slide2.xml").async("string"), /Mediora/);
   const reused = await fetch(`${origin}/api/presentations`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -109,7 +156,7 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
     preview.slides.map((slide) => slide.id),
     presentation.slides.map((slide) => slide.id),
   );
-  assert.equal(preview.standard.story, "customer-value-story-v1");
+  assert.equal(preview.standard.story, "customer-value-story-v2");
   assert.equal(preview.standard.template, "lindstrom-reference-2026-11-06-v1");
   const download = await fetch(`${origin}${presentation.downloadUrl}`);
   assert.equal(download.status, 200);
