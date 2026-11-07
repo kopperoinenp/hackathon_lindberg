@@ -144,7 +144,6 @@
   }
   async function loadCustomerReview(customer) {
     storageLoading = true;
-    storageReady = false;
     state.chatRevision += 1;
     $("#workspace").inert = true;
     $("#composer").inert = true;
@@ -196,8 +195,8 @@
       return true;
     } catch {
       storageStatus(
-        "Katsausta ei voitu ladata. Tallennus estetty; lataa sivu uudelleen.",
-        "Could not load review. Saving is disabled; reload this page.",
+        "Valitun asiakkaan katsausta ei voitu ladata. Kokeile toista asiakasta.",
+        "Could not load the selected review. Try another customer.",
       );
       return false;
     } finally {
@@ -1253,7 +1252,7 @@
     $("#composer").inert = true;
     try {
       await flushReviewSave();
-      if (!storageBlocked && storageReady) await loadCustomerReview(customer);
+      await loadCustomerReview(customer);
     } catch {
       /* The persistent save status explains the error. */
     } finally {
