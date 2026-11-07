@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="brand.css" />
     <script src="language.js" defer></script>
-    <script src="data.js" defer></script>
+    <script src="dataset.js" defer></script>
     <script src="model.js" defer></script>
     <script src="story-model.js" defer></script>
     <script src="analysis-model.js" defer></script>
@@ -20,7 +20,7 @@
       <a class="brand" href="#" aria-label="Lindström — customer workspace"
         ><img src="assets/lindstrom-logo.webp" alt="Lindström" width="153" height="33"
       /></a>
-      <nav class="view-tabs" role="tablist" aria-label="Workspace view">
+      <nav class="view-tabs" role="tablist" aria-label="Workspace view" hidden>
         <button
           id="summary-tab"
           role="tab"
@@ -64,7 +64,14 @@
         </div>
       </div>
     </header>
-    <main>
+    <main id="dataset-status" role="status">
+      <section class="empty-state">
+        <h1 id="dataset-title">Checking the dataset…</h1>
+        <p id="dataset-issue"></p>
+        <p id="dataset-recovery" hidden>Activate a compatible dataset and reopen the workspace.</p>
+      </section>
+    </main>
+    <main id="workspace" hidden>
       <div class="toolbar">
         <span id="review-storage-status" role="status" aria-live="polite"></span>
         <button id="reset-dashboard" class="text-button" type="button">Reset dashboard</button>
@@ -86,7 +93,67 @@
       </div>
       <section id="customer-overview" aria-label="Customer overview" aria-live="polite"></section>
       <section id="summary-panel" role="tabpanel" aria-labelledby="summary-tab">
+        <section class="review-priorities" aria-labelledby="review-priorities-title">
+          <span class="section-kicker">CUSTOMER FOCUS</span>
+          <h2 id="review-priorities-title">Contract KPIs and meeting agenda</h2>
+          <p class="quiet">
+            Keep the shared review and highlight up to three KPIs agreed with this customer.
+          </p>
+          <div id="contract-agenda" aria-live="polite"></div>
+          <details id="manage-contract-kpis">
+            <summary>Manage contract KPIs</summary>
+            <form id="contract-kpi-form" class="contract-kpi-form">
+              <label for="contract-kpi-name"
+                >KPI name<input id="contract-kpi-name" name="label" maxlength="80" required
+              /></label>
+              <label for="contract-kpi-area"
+                >Evidence area<select id="contract-kpi-area" name="area"></select
+              ></label>
+              <label for="contract-kpi-actual"
+                >Actual and unit<input id="contract-kpi-actual" name="actual" maxlength="40"
+              /></label>
+              <label for="contract-kpi-target"
+                >Target and unit<input id="contract-kpi-target" name="target" maxlength="40"
+              /></label>
+              <label for="contract-kpi-source"
+                >Source or reporting period<input
+                  id="contract-kpi-source"
+                  name="source"
+                  maxlength="100"
+              /></label>
+              <label class="kpi-checkbox"
+                ><input type="checkbox" name="priority" /> Highlight on the meeting agenda</label
+              >
+              <div class="kpi-actions">
+                <button type="submit" class="secondary">Save KPI</button>
+                <button type="button" id="cancel-contract-kpi" class="text-button" hidden>
+                  Cancel edit
+                </button>
+              </div>
+            </form>
+            <ul id="contract-kpi-list" class="contract-kpi-list"></ul>
+          </details>
+          <label class="kpi-checkbox"
+            ><input id="include-contract-agenda" type="checkbox" /> Include highlighted KPIs in the
+            presentation</label
+          >
+        </section>
         <div id="story" aria-live="polite"></div>
+        <section class="review-priorities" aria-labelledby="review-evidence-title">
+          <span class="section-kicker">SHARED REVIEW</span>
+          <h2 id="review-evidence-title">Evidence and industry context</h2>
+          <details>
+            <summary>Evidence to review with the customer</summary>
+            <ul id="review-evidence-areas" class="contract-kpi-list"></ul>
+          </details>
+          <details>
+            <summary id="industry-benchmark-summary"></summary>
+            <p class="quiet">
+              Illustrative peer comparison. Reporting year and emissions scopes are unverified.
+            </p>
+            <div id="industry-benchmark" class="table-wrap"></div>
+          </details>
+        </section>
       </section>
       <section id="analysis-panel" role="tabpanel" aria-labelledby="analysis-tab" hidden>
         <div class="analysis-heading">
@@ -131,7 +198,7 @@
         ><span>Customer workspace · Synthetic data</span>
       </footer>
     </main>
-    <section id="composer" class="conversation chat-dock" aria-label="Edit review">
+    <section id="composer" class="conversation chat-dock" aria-label="Edit review" hidden>
       <div class="chat-dock-heading">
         <span>Lindström assistant</span
         ><button id="toggle-chat" class="text-button" aria-expanded="false" aria-controls="chat">

@@ -1,5 +1,5 @@
 import "../frontend/mockups/kopperoinenp/language.js";
-import "../frontend/mockups/kopperoinenp/data.js";
+import { dataset as data } from "./dataset.mjs";
 import "../frontend/mockups/kopperoinenp/model.js";
 import "../frontend/mockups/kopperoinenp/story-model.js";
 import "../frontend/mockups/kopperoinenp/analysis-model.js";
@@ -11,7 +11,6 @@ export class PresentationError extends Error {
     this.status = status;
   }
 }
-const data = globalThis.REVIEW_DATA;
 export const evidenceIds = ["water", "emissions", "repairs"];
 export const insightIds = [...evidenceIds, "opportunity"];
 export const slideIds = ["cover", "overview", ...insightIds, "plan", "sources", "limits"];
@@ -33,6 +32,8 @@ const defaults = {
   priority: "neutral",
 };
 export function validateRequest(input) {
+  if (!data)
+    throw new PresentationError("Analysis is unavailable until a valid dataset is loaded.", 503);
   if (!input || typeof input !== "object" || Array.isArray(input))
     throw new PresentationError("Invalid presentation request.");
   const scope = {};
@@ -299,7 +300,10 @@ export function buildPresentation(input) {
       kind: "text",
       title: t("Sources and calculations"),
       paragraphs: [
-        "Source: Lindstrom_SinceAI_Customer_Value_Synthetic_Data_Pack.xlsx. Customers, Sites, Service_Activity, Customer_Impacts, Repairs and Baselines.",
+        t("Source: ") +
+          data.source +
+          ". " +
+          t("Customers, Sites, Service_Activity, Customer_Impacts, Repairs and Baselines."),
         t`Period totals sum activity across the selected months. Allocations and scans reflect the end of ${m.snapshotMonth}. Repairs count events.`,
         t`Water difference: ${f(m.kg, 1)} kg washed × ${f(b.water_l_per_kg, 2)} l/kg − ${f(m.water)} l = ${f(c.waterDifference)} l. Emissions difference: the same washed weight × ${f(b.process_kgco2e_per_kg + b.delivery_kgco2e_per_kg, 3)} kg CO₂e/kg − ${f(m.emissions)} kg CO₂e = ${f(c.emissionsDifference)} kg CO₂e.`,
       ],

@@ -1,6 +1,5 @@
-(function () {
+(async function () {
   "use strict";
-  const data = globalThis.REVIEW_DATA;
   const { escapeHtml: esc } = globalThis.ReviewModel;
   const { storyContext } = globalThis.StoryModel;
   const $ = (query) => document.querySelector(query);
@@ -8,6 +7,43 @@
   let translate = globalThis.ReviewLanguage.translator(language);
   const t = (...args) => translate(...args);
   const localizePage = globalThis.ReviewLanguage.page();
+  function updateLanguage() {
+    translate = globalThis.ReviewLanguage.translator(language);
+    localizePage(language);
+    for (const button of document.querySelectorAll("[data-language]"))
+      button.setAttribute("aria-pressed", String(button.dataset.language === language));
+  }
+  function bindLanguageControls(update) {
+    for (const button of document.querySelectorAll("[data-language]"))
+      button.addEventListener("click", () => {
+        language = button.dataset.language;
+        localStorage.setItem("lindstrom-language", language);
+        update();
+      });
+  }
+  updateLanguage();
+  let source;
+  try {
+    const response = await fetch("data.js", { signal: AbortSignal.timeout(10000) });
+    if (response.ok) source = await response.text();
+  } catch {
+    // An unavailable source is handled like an empty dataset file.
+  }
+  const { data, issue } = globalThis.ReviewDataset.inspect(source);
+  if (issue) {
+    function showDatasetIssue() {
+      updateLanguage();
+      $("#dataset-title").textContent = t("Analysis unavailable");
+      $("#dataset-issue").textContent = [t(issue.message), issue.field].filter(Boolean).join(" · ");
+      $("#dataset-recovery").hidden = false;
+    }
+    bindLanguageControls(showDatasetIssue);
+    showDatasetIssue();
+    return;
+  }
+  $("#dataset-status").hidden = true;
+  $("#workspace").hidden = false;
+  $(".view-tabs").hidden = false;
   const countryName = (country) => t(globalThis.WorkspaceModel.countryNames[country]);
   const f = (number, digits = 0) =>
     new Intl.NumberFormat(t("en-GB"), { maximumFractionDigits: digits }).format(number);
@@ -168,6 +204,46 @@
   window.addEventListener("pagehide", () => {
     flushReviewSave().catch(() => {});
   });
+  const contractKpis = new Map();
+  const includedAgendas = new Set();
+  const kpiForm = $("#contract-kpi-form");
+  const evidenceAreas = [
+    ["scorecard", "Customer success scorecard", "Review the overall picture with the customer."],
+    ["experience", "Customer experience", "CSAT, NPS or feedback supplied by the customer."],
+    [
+      "performance",
+      "Service performance",
+      "Contract SLA, delivery reliability, requests or garment availability.",
+    ],
+    ["adoption", "Service adoption", "Active sites and textile scans from the workspace."],
+    ["operations", "Operational value", "Repair events and textile use from the workspace."],
+    [
+      "financial",
+      "Financial value",
+      "Cost, savings or avoided cost supported by customer records.",
+    ],
+    [
+      "sustainability",
+      "Sustainability value",
+      "Laundry and delivery emissions, water and circularity.",
+    ],
+    ["improvement", "Improvement", "Open actions, recurring issues and progress."],
+    [
+      "future",
+      "Relationship and future",
+      "Customer priorities, opportunities and agreed next actions.",
+    ],
+  ];
+  const peers = [
+    ["Elis", 0.4],
+    ["Cintas", 0.2],
+    ["Salesianer", 0.31],
+    ["Johnson Service Group", 0.38],
+  ];
+  const lindstromIntensity = 0.28;
+  const peerAverage = peers.reduce((sum, [, intensity]) => sum + intensity, 0) / peers.length;
+  let editedKpi = -1;
+  let formCustomer;
   let statusTimer;
   const context = () => storyContext(data, state);
   const baselineName = () =>
@@ -388,12 +464,131 @@
     $("#summary-panel").before($("#customer-overview"));
     $("#customer-overview").hidden = false;
     renderCustomerOverview();
+    renderReviewEvidence();
     renderStory();
     renderDashboardEdits();
     renderDashboardLayout();
     if (state.view === "analysis") renderAnalysis();
     scheduleReviewSave();
   }
+  function customerKpis() {
+    return contractKpis.get(state.customer) ?? [];
+  }
+  function kpiDescription(kpi) {
+    return [
+      t("Actual") + ": " + (kpi.actual || t("Unavailable")),
+      kpi.target && t("Target") + ": " + kpi.target,
+      kpi.source || t("KAM input without source"),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  }
+  function resetKpiForm() {
+    editedKpi = -1;
+    kpiForm.reset();
+    $("#cancel-contract-kpi").hidden = true;
+  }
+  function renderReviewEvidence() {
+    if (formCustomer !== state.customer) {
+      formCustomer = state.customer;
+      resetKpiForm();
+    }
+    const area = kpiForm.elements.area;
+    const selectedArea = area.value;
+    area.innerHTML = evidenceAreas
+      .map(([id, label]) => `<option value="${id}">${t(label)}</option>`)
+      .join("");
+    if (selectedArea) area.value = selectedArea;
+    $("#review-evidence-areas").innerHTML = evidenceAreas
+      .map(([, label, evidence]) => `<li><strong>${t(label)}</strong> · ${t(evidence)}</li>`)
+      .join("");
+    const kpis = customerKpis();
+    const agenda = kpis.filter((kpi) => kpi.priority);
+    $("#contract-agenda").innerHTML = agenda.length
+      ? `<ul class="contract-kpi-list">${agenda
+          .map((kpi) => `<li><strong>${esc(kpi.label)}</strong> · ${esc(kpiDescription(kpi))}</li>`)
+          .join("")}</ul>`
+      : `<p class="quiet">${t("No contract KPIs are highlighted for this customer.")}</p>`;
+    $("#contract-kpi-list").innerHTML = kpis
+      .map((kpi, index) => {
+        const label = evidenceAreas.find(([id]) => id === kpi.area)[1];
+        return `<li><strong>${esc(kpi.label)}</strong> · ${t(label)}<br />${esc(kpiDescription(kpi))}<div class="kpi-actions"><button type="button" class="text-button" data-edit-kpi="${index}">${t("Edit KPI")}</button><button type="button" class="text-button" data-remove-kpi="${index}">${t("Remove KPI")}</button></div></li>`;
+      })
+      .join("");
+    const includeAgenda = $("#include-contract-agenda");
+    includeAgenda.disabled = agenda.length === 0;
+    includeAgenda.checked = agenda.length > 0 && includedAgendas.has(state.customer);
+
+    const difference = f((1 - lindstromIntensity / peerAverage) * 100);
+    $("#industry-benchmark-summary").textContent =
+      `${difference} % · ${t("Lower emissions intensity than the four-peer average (illustrative)")}`;
+    const benchmarkRows = [
+      ...peers,
+      [t("Four-peer average"), peerAverage],
+      ["Lindström Group", lindstromIntensity],
+    ];
+    $("#industry-benchmark").innerHTML =
+      `<table><thead><tr><th scope="col">${t("Company")}</th><th scope="col">${t("kg emissions / € turnover")}</th></tr></thead><tbody>${benchmarkRows.map(([name, intensity]) => `<tr><th scope="row">${name}</th><td>${f(intensity, 4)}</td></tr>`).join("")}</tbody></table><p class="quiet">${t("Source: supplied project figures. The average is unweighted and excludes Lindström. This company comparison is separate from the customer's laundry and delivery estimates.")}</p>`;
+  }
+  kpiForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const fields = new FormData(kpiForm);
+    const kpi = Object.fromEntries(fields);
+    for (const field of ["label", "actual", "target", "source"]) kpi[field] = kpi[field].trim();
+    if (!kpi.label) {
+      status(t("Enter a KPI name."));
+      kpiForm.elements.label.focus();
+      return;
+    }
+    kpi.priority = fields.has("priority");
+    const kpis = customerKpis();
+    if (editedKpi < 0 && kpis.length >= 12) {
+      status(t("This customer can have up to 12 contract KPIs."));
+      return;
+    }
+    if (
+      kpi.priority &&
+      kpis.filter((item, index) => item.priority && index !== editedKpi).length >= 3
+    ) {
+      status(t("Highlight up to three KPIs. Unmark another KPI first."));
+      return;
+    }
+    kpis[editedKpi < 0 ? kpis.length : editedKpi] = kpi;
+    contractKpis.set(state.customer, kpis);
+    resetKpiForm();
+    renderReviewEvidence();
+    invalidatePowerPoint();
+    status(t("Contract KPI saved."));
+  });
+  $("#cancel-contract-kpi").addEventListener("click", () => {
+    resetKpiForm();
+    kpiForm.elements.label.focus();
+  });
+  $("#contract-kpi-list").addEventListener("click", (event) => {
+    const button = event.target.closest("button");
+    if (!button) return;
+    const kpis = customerKpis();
+    if (button.dataset.editKpi !== undefined) {
+      editedKpi = Number(button.dataset.editKpi);
+      const kpi = kpis[editedKpi];
+      for (const field of ["label", "area", "actual", "target", "source"])
+        kpiForm.elements[field].value = kpi[field];
+      kpiForm.elements.priority.checked = kpi.priority;
+      $("#cancel-contract-kpi").hidden = false;
+    } else {
+      kpis.splice(Number(button.dataset.removeKpi), 1);
+      resetKpiForm();
+      renderReviewEvidence();
+      invalidatePowerPoint();
+      status(t("Contract KPI removed."));
+    }
+    kpiForm.elements.label.focus();
+  });
+  $("#include-contract-agenda").addEventListener("change", (event) => {
+    if (event.target.checked) includedAgendas.add(state.customer);
+    else includedAgendas.delete(state.customer);
+    invalidatePowerPoint();
+  });
   function renderCustomerOverview() {
     const overview = globalThis.WorkspaceModel.customerOverview(data, state.customer);
     const industry =
@@ -555,19 +750,26 @@
     return t`<div class="site-benchmark"><div><h3>${shown.length === 1 ? t("Scan coverage at the selected site") : shown.length + t(" sites with the lowest scan coverage")}</h3><p class="quiet">${snapshotName()} · Starting point for a joint review.</p></div><div class="site-ranking">${shown.map((site) => `<div><span>${esc(site.site_name)}</span><div><i style="width:${Math.min(site.utilization, 100)}%"></i></div><strong>${f(site.utilization, 1)} %</strong></div>`).join("")}</div></div>`;
   }
   function renderStory() {
-    const { metrics: m, focus, sites, order } = context();
+    const { metrics: m, focus, sites, order, customer } = context();
     if (!m.hasData) {
       $("#story").innerHTML =
         t`<section class="intro"><h1>No data matches the filters.</h1><p>${context().invalidPeriod ? t("The start month is after the end month.") : t("Choose another date range or location in Explore data.")}</p></section>`;
       return;
     }
-    const shortName = { CUST001: "NorthStar", CUST002: "Apex", CUST003: "Mediora" }[state.customer];
+    const shortNames = {
+      "NorthStar Foods Group": "NorthStar",
+      "Apex Industrial Systems": "Apex",
+      "Mediora Health Network": "Mediora",
+    };
+    const displayName = Object.hasOwn(shortNames, customer.customer_name)
+      ? shortNames[customer.customer_name]
+      : customer.customer_name;
     const cards = results();
     const visibleOrder = order.filter((id) => state.visibleInsights.includes(id));
     const title =
       state.heading || state.titleEdits.cover
         ? esc(state.heading || state.titleEdits.cover)
-        : t`${shortName} · ${periodName()}<br />What did we achieve?`;
+        : t`${esc(displayName)} · ${periodName()}<br />What did we achieve?`;
 
     $("#story").innerHTML =
       t`<section class="intro"><span class="section-kicker">ANNUAL REVIEW PREPARATION</span><h1>${title}</h1><p>${opening()}</p><div class="scope"><strong>${esc(scopeName())}</strong> · ${m.sites} ${t(m.sites === 1 ? "site" : "sites")} · Baseline: ${baselineName()}</div></section><section class="story-section" aria-labelledby="results-title"${visibleOrder.length ? "" : " hidden"}><div class="section-heading"><span class="section-number">01</span><h2 id="results-title">Key results for the period</h2></div><div class="results">${visibleOrder
@@ -694,7 +896,7 @@
     if (!context().metrics.hasData)
       return t("<p>No data matches the filters. Adjust them to view the calculation.</p>");
     const { metrics: m, compare: c, baseline: b, customer } = context();
-    return t`<p class="quiet">${esc(customer.customer_name)} · ${esc(scopeName())} · ${periodName()}</p><p class="quiet">All customer figures are synthetic. Water and emissions are calculated estimates allocated from laundry-level data.</p><section class="method-section"><h3>Baseline: ${baselineName()}</h3><p>The baselines apply different water and emissions factors to the same washed weight. They represent illustrative laundry models.</p><div class="formula">Water difference: ${f(m.kg, 1)} kg × ${f(b.water_l_per_kg, 2)} l/kg − ${f(m.water)} l = ${f(c.waterDifference)} l<br />Emissions difference: ${f(m.kg, 1)} kg × ${f(b.process_kgco2e_per_kg + b.delivery_kgco2e_per_kg, 3)} kg CO₂e/kg − ${f(m.emissions)} kg CO₂e = ${f(c.emissionsDifference)} kg CO₂e</div><p>The scope covers water used in washing and laundry and delivery emissions. Figures in the review are rounded.</p></section><section class="method-section"><h3>Sources and calculations</h3><p>Lindstrom_SinceAI_Customer_Value_Synthetic_Data_Pack.xlsx, in the repository's data/source folder.</p><ul><li>Customers and Sites: synthetic customer and site records.</li><li>Service_Activity: washed kilograms in the period and allocations and scans for ${snapshotName()}.</li><li>Customer_Impacts: allocated_water_l, allocated_process_kgco2e and allocated_delivery_kgco2e, summed over the period.</li><li>Repairs: number of repair events in the selected period.</li><li>Baselines: factors for the selected comparison.</li></ul></section><section class="method-section"><h3>Interpretation limits</h3><ul><li>Scan coverage highlights where to investigate actual textile use.</li><li>Repair scenarios depend on assumptions about delayed purchases. Their estimated impact is shown separately from laundry emissions.</li><li>Unique wearer counts require person identifiers.</li><li>Cost savings, request resolution and regulatory claims require further evidence.</li><li>Industry focus is an editable suggestion.</li></ul></section>`;
+    return t`<p class="quiet">${esc(customer.customer_name)} · ${esc(scopeName())} · ${periodName()}</p><p class="quiet">All customer figures are synthetic. Water and emissions are calculated estimates allocated from laundry-level data.</p><section class="method-section"><h3>Baseline: ${baselineName()}</h3><p>The baselines apply different water and emissions factors to the same washed weight. They represent illustrative laundry models.</p><div class="formula">Water difference: ${f(m.kg, 1)} kg × ${f(b.water_l_per_kg, 2)} l/kg − ${f(m.water)} l = ${f(c.waterDifference)} l<br />Emissions difference: ${f(m.kg, 1)} kg × ${f(b.process_kgco2e_per_kg + b.delivery_kgco2e_per_kg, 3)} kg CO₂e/kg − ${f(m.emissions)} kg CO₂e = ${f(c.emissionsDifference)} kg CO₂e</div><p>The scope covers water used in washing and laundry and delivery emissions. Figures in the review are rounded.</p></section><section class="method-section"><h3>Sources and calculations</h3><p>${esc(data.source)}</p><ul><li>Customers and Sites: synthetic customer and site records.</li><li>Service_Activity: washed kilograms in the period and allocations and scans for ${snapshotName()}.</li><li>Customer_Impacts: allocated_water_l, allocated_process_kgco2e and allocated_delivery_kgco2e, summed over the period.</li><li>Repairs: number of repair events in the selected period.</li><li>Baselines: factors for the selected comparison.</li></ul></section><section class="method-section"><h3>Interpretation limits</h3><ul><li>Scan coverage highlights where to investigate actual textile use.</li><li>Repair scenarios depend on assumptions about delayed purchases. Their estimated impact is shown separately from laundry emissions.</li><li>Unique wearer counts require person identifiers.</li><li>Cost savings, request resolution and regulatory claims require further evidence.</li><li>Industry focus is an editable suggestion.</li></ul></section>`;
   }
   function clearScope() {
     state.note = "";
@@ -708,7 +910,7 @@
   }
   function chatWorkspace() {
     return {
-      ...presentationRequest(),
+      ...presentationRequest(false),
       view: state.view,
       metric: state.metric,
       summaryMetric: state.summaryMetric,
@@ -952,17 +1154,27 @@
     link.setAttribute("aria-disabled", "true");
     link.title = t("Generate the presentation first");
   }
-  function presentationRequest() {
+  function presentationRequest(includeAgenda = true) {
     const scope = Object.fromEntries(
       ["customer", "from", "to", "country", "continent", "site", "baseline", "priority"].map(
         (key) => [key, state[key]],
       ),
     );
+    const agenda =
+      includeAgenda && includedAgendas.has(state.customer)
+        ? customerKpis().filter((kpi) => kpi.priority)
+        : [];
+    const agendaNote = agenda.length
+      ? [
+          t("Contract KPIs for discussion"),
+          ...agenda.map((kpi) => `• ${kpi.label} · ${kpiDescription(kpi)}`),
+        ].join("\n")
+      : "";
     return {
       scope,
       included: state.included,
       titleEdits: state.titleEdits,
-      note: state.note,
+      note: [state.note, agendaNote].filter(Boolean).join("\n\n"),
       cooperation: state.cooperation,
       savings: state.savings,
       managerTexts: state.managerTexts,
@@ -972,6 +1184,11 @@
   }
   $("#open-review").addEventListener("click", async () => {
     if (state.generating) return;
+    const payload = presentationRequest();
+    if (payload.note.length > 2000) {
+      status(t("Shorten the presentation note or exclude the KPI agenda."));
+      return;
+    }
     invalidatePowerPoint();
     const viewer = window.open(`/kopperoinenp/presentation.html?lang=${language}`, "_blank");
     if (!viewer) {
@@ -979,7 +1196,7 @@
       return;
     }
     viewer.opener = null;
-    const request = JSON.stringify(presentationRequest());
+    const request = JSON.stringify(payload);
     const button = $("#open-review");
     state.generating = true;
     button.disabled = true;
@@ -1040,22 +1257,14 @@
     }
   });
   function applyLanguage() {
-    translate = globalThis.ReviewLanguage.translator(language);
-    localizePage(language);
-    for (const button of document.querySelectorAll("[data-language]"))
-      button.setAttribute("aria-pressed", String(button.dataset.language === language));
+    updateLanguage();
     updateChatToggle();
     render();
     $("#download-powerpoint").title = t(
       state.readyPresentation ? "Download PowerPoint" : "Generate the presentation first",
     );
   }
-  for (const button of document.querySelectorAll("[data-language]"))
-    button.addEventListener("click", () => {
-      language = button.dataset.language;
-      localStorage.setItem("lindstrom-language", language);
-      applyLanguage();
-    });
+  bindLanguageControls(applyLanguage);
   applyLanguage();
   const previousCustomer = localStorage.getItem("lindstrom-review-customer");
   loadCustomerReview(

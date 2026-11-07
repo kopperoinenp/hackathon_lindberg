@@ -1,13 +1,16 @@
 import { mkdir, readFile, writeFile, rename, unlink } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import path from "node:path";
+import { dataset } from "./dataset.mjs";
 import { normalizeWorkspace } from "./review-chat.mjs";
 import { PresentationError } from "./presentation-model.mjs";
 
 export function createReviewStore(directory) {
   let queue = Promise.resolve();
   function file(customer) {
-    if (!globalThis.REVIEW_DATA.customers.some((row) => row.customer_id === customer))
+    if (!dataset)
+      throw new PresentationError("A valid dataset is required to load customer reviews.", 503);
+    if (!dataset.customers.some((row) => row.customer_id === customer))
       throw new PresentationError("Unknown customer.", 404);
     return path.join(directory, `${customer}.json`);
   }

@@ -2,6 +2,111 @@
 (function (root) {
   "use strict";
   const finnish = {
+    "Checking the dataset…": "Tarkistetaan aineistoa…",
+    "Analysis unavailable": "Analyysiä ei voi aloittaa",
+    "Activate a compatible dataset and reopen the workspace.":
+      "Ota yhteensopiva aineisto käyttöön ja avaa työtila uudelleen.",
+    "Analysis is unavailable until a valid dataset is loaded.":
+      "Analyysi edellyttää yhteensopivaa aineistoa.",
+    "The dataset file is missing or could not be read.":
+      "Aineistotiedostoa ei löytynyt tai sitä ei voitu lukea.",
+    "The dataset file is not valid JSON.": "Aineistotiedosto ei ole kelvollista JSON-dataa.",
+    "Dataset source information is missing.": "Aineiston lähdetieto puuttuu.",
+    "This workspace supports synthetic datasets for 2025.":
+      "Työtila tukee vuoden 2025 synteettisiä aineistoja.",
+    "A required table is missing or invalid.": "Pakollinen taulu puuttuu tai on virheellinen.",
+    "A dataset identifier is invalid.": "Aineiston tunniste on virheellinen.",
+    "The dataset contains duplicate records.": "Aineistossa on päällekkäisiä rivejä.",
+    "The default customer is missing.": "Oletusasiakas puuttuu.",
+    "Customer metadata or country is invalid.": "Asiakkaan perustieto tai maa on virheellinen.",
+    "Site metadata or customer reference is invalid.":
+      "Toimipaikan perustieto tai asiakasviite on virheellinen.",
+    "Each customer needs at least one site.":
+      "Jokaisella asiakkaalla pitää olla vähintään yksi toimipaikka.",
+    "Required comparison baselines are missing or unsupported.":
+      "Pakollisia vertailumalleja puuttuu tai malli on tuntematon.",
+    "A numeric value is missing or invalid.": "Luku puuttuu tai on virheellinen.",
+    "A product name is missing.": "Tuotteen nimi puuttuu.",
+    "A record has an invalid customer, site or month.":
+      "Rivillä on virheellinen asiakas, toimipaikka tai kuukausi.",
+    "Scanned items exceed allocated items.":
+      "Skannattuja kappaleita on enemmän kuin kohdistettuja.",
+    "Monthly site coverage is incomplete.": "Toimipaikkojen kuukausiaineisto on vajaa.",
+    "A product or laundry reference is invalid.": "Tuote- tai pesulaviite on virheellinen.",
+    "Waste or repair detail does not reconcile.": "Jäte- tai korjauserittely ei täsmää.",
+    "Product detail does not match the monthly site totals.":
+      "Tuote-erittely ei täsmää toimipaikan kuukausisummaa vasten.",
+    "Service-cycle data is invalid or has no matching activity.":
+      "Palvelukierron tiedot ovat virheelliset tai vastaava käyttörivi puuttuu.",
+    "CUSTOMER FOCUS": "ASIAKASKOHTAINEN PAINOTUS",
+    "SHARED REVIEW": "YHTEINEN KATSAUSPOHJA",
+    "Contract KPIs and meeting agenda": "Sopimusmittarit ja palaverin agenda",
+    "Keep the shared review and highlight up to three KPIs agreed with this customer.":
+      "Yhteinen katsaus säilyy. Nosta esiin enintään kolme tämän asiakkaan kanssa sovittua mittaria.",
+    "Manage contract KPIs": "Hallitse sopimusmittareita",
+    "KPI name": "Mittarin nimi",
+    "Evidence area": "Mittarin aihealue",
+    "Actual and unit": "Toteuma ja yksikkö",
+    "Target and unit": "Tavoite ja yksikkö",
+    "Source or reporting period": "Lähde tai raportointijakso",
+    "Highlight on the meeting agenda": "Nosta palaverin agendalle",
+    "Save KPI": "Tallenna mittari",
+    "Cancel edit": "Peru muokkaus",
+    "Include highlighted KPIs in the presentation": "Lisää agendalle nostetut mittarit esitykseen",
+    "Evidence and industry context": "Näyttö ja toimialavertailu",
+    "Evidence to review with the customer": "Asiakkaan kanssa käsiteltävä näyttö",
+    "Illustrative peer comparison. Reporting year and emissions scopes are unverified.":
+      "Suuntaa antava verrokkivertailu. Raportointivuotta ja päästörajausta ei ole vahvistettu.",
+    "Customer success scorecard": "Asiakkuuden onnistumisen mittaristo",
+    "Review the overall picture with the customer.": "Käy kokonaiskuva läpi asiakkaan kanssa.",
+    "Customer experience": "Asiakaskokemus",
+    "CSAT, NPS or feedback supplied by the customer.":
+      "Asiakkaan toimittama CSAT, NPS tai palaute.",
+    "Service performance": "Palvelun suorituskyky",
+    "Contract SLA, delivery reliability, requests or garment availability.":
+      "Sopimuksen palvelutaso, toimitusvarmuus, palvelupyynnöt tai vaatteiden saatavuus.",
+    "Service adoption": "Palvelun käyttö",
+    "Active sites and textile scans from the workspace.":
+      "Työpöydän tiedot toimipaikoista ja tekstiilien skannauksista.",
+    "Operational value": "Operatiivinen arvo",
+    "Repair events and textile use from the workspace.":
+      "Työpöydän tiedot korjaustapahtumista ja tekstiilien käytöstä.",
+    "Financial value": "Taloudellinen arvo",
+    "Cost, savings or avoided cost supported by customer records.":
+      "Asiakkaan aineistoon perustuvat kustannukset, säästöt tai vältetyt kustannukset.",
+    "Sustainability value": "Vastuullisuusarvo",
+    "Laundry and delivery emissions, water and circularity.":
+      "Pesun ja toimitusten päästöt, vedenkäyttö ja kiertotalous.",
+    Improvement: "Kehittäminen",
+    "Open actions, recurring issues and progress.":
+      "Avoimet toimet, toistuvat ongelmat ja edistyminen.",
+    "Relationship and future": "Yhteistyön tulevaisuus",
+    "Customer priorities, opportunities and agreed next actions.":
+      "Asiakkaan painopisteet, mahdollisuudet ja sovitut jatkotoimet.",
+    Actual: "Toteuma",
+    Target: "Tavoite",
+    "KAM input without source": "KAM:in syöte ilman lähdettä",
+    "No contract KPIs are highlighted for this customer.":
+      "Asiakkaan agendalle ei ole nostettu sopimusmittareita.",
+    "Edit KPI": "Muokkaa mittaria",
+    "Remove KPI": "Poista mittari",
+    "Lower emissions intensity than the four-peer average (illustrative)":
+      "Pienempi päästöintensiteetti kuin neljän verrokin keskiarvo (suuntaa antava)",
+    "Four-peer average": "Neljän verrokin keskiarvo",
+    Company: "Yritys",
+    "kg emissions / € turnover": "kg päästöjä / € liikevaihtoa",
+    "Source: supplied project figures. The average is unweighted and excludes Lindström. This company comparison is separate from the customer's laundry and delivery estimates.":
+      "Lähde: projektiin annetut luvut. Keskiarvo on painottamaton ja laskettu ilman Lindströmiä. Yritysvertailu on erillinen asiakkaan pesun ja toimitusten päästöarvioista.",
+    "Enter a KPI name.": "Anna mittarin nimi.",
+    "This customer can have up to 12 contract KPIs.":
+      "Asiakkaalla voi olla enintään 12 sopimusmittaria.",
+    "Highlight up to three KPIs. Unmark another KPI first.":
+      "Agendalle mahtuu kolme mittaria. Poista ensin toinen nosto.",
+    "Contract KPI saved.": "Sopimusmittari tallennettu.",
+    "Contract KPI removed.": "Sopimusmittari poistettu.",
+    "Contract KPIs for discussion": "Käsiteltävät sopimusmittarit",
+    "Shorten the presentation note or exclude the KPI agenda.":
+      "Lyhennä esityksen muistiinpanoa tai jätä mittariagenda pois.",
     "Customer overview": "Asiakkaan perustiedot",
     "Reset dashboard": "Palauta oletusnäkymä",
     "Lindström assistant": "Lindström-apuri",
@@ -260,8 +365,10 @@
     '</h3><p>The baselines apply different water and emissions factors to the same washed weight. They represent illustrative laundry models.</p><div class="formula">Water difference: ':
       '</h3><p>Sama pesty kilomäärä, eri vedenkulutus- ja päästökertoimet. Vaihtoehdot ovat havainnollistavia pesumalleja, eivät nimettyjen kilpailijoiden mitattuja tuloksia.</p><div class="formula">Vesiero: ',
     " l<br />Emissions difference: ": " l<br />Päästöero: ",
-    ' kg CO₂e</div><p>The scope covers water used in washing and laundry and delivery emissions. Figures in the review are rounded.</p></section><section class="method-section"><h3>Sources and calculations</h3><p>Lindstrom_SinceAI_Customer_Value_Synthetic_Data_Pack.xlsx, in the repository\'s data/source folder.</p><ul><li>Customers and Sites: synthetic customer and site records.</li><li>Service_Activity: washed kilograms in the period and allocations and scans for ':
-      ' kg CO₂e</div><p>Rajaus on pesun vedenkulutus sekä pesun ja toimitusten päästöt, ei tekstiilien koko elinkaari. Pyöristetyt luvut näytetään katsauksessa. Vertailukertoimien herkkyysvaihtelut eivät vielä sisälly mockiin.</p></section><section class="method-section"><h3>Lähteet ja laskenta</h3><p>Lindstrom_SinceAI_Asiakas_Value_Synteettinen_Data_Pack.xlsx, repositorion data/source-kansiossa.</p><ul><li>Customers ja Sites: kuvitteellinen asiakkuus ja toimipaikat.</li><li>Service_Activity: valitun jakson pestyt kilot sekä ',
+    ' kg CO₂e</div><p>The scope covers water used in washing and laundry and delivery emissions. Figures in the review are rounded.</p></section><section class="method-section"><h3>Sources and calculations</h3><p>':
+      ' kg CO₂e</div><p>Rajaus on pesun vedenkulutus sekä pesun ja toimitusten päästöt. Pyöristetyt luvut näytetään katsauksessa.</p></section><section class="method-section"><h3>Lähteet ja laskenta</h3><p>',
+    "</p><ul><li>Customers and Sites: synthetic customer and site records.</li><li>Service_Activity: washed kilograms in the period and allocations and scans for ":
+      "</p><ul><li>Customers ja Sites: kuvitteellinen asiakkuus ja toimipaikat.</li><li>Service_Activity: valitun jakson pestyt kilot sekä ",
     '.</li><li>Customer_Impacts: allocated_water_l, allocated_process_kgco2e and allocated_delivery_kgco2e, summed over the period.</li><li>Repairs: number of repair events in the selected period.</li><li>Baselines: factors for the selected comparison.</li></ul></section><section class="method-section"><h3>Interpretation limits</h3><ul><li>Scan coverage highlights where to investigate actual textile use.</li><li>Repair scenarios depend on assumptions about delayed purchases. Their estimated impact is shown separately from laundry emissions.</li><li>Unique wearer counts require person identifiers.</li><li>Cost savings, request resolution and regulatory claims require further evidence.</li><li>Industry focus is an editable suggestion.</li></ul></section>':
       '.</li><li>Asiakas_Impacts: allokoitu_water_l, allocated_process_kgco2e ja allocated_delivery_kgco2e, summat valitulta jaksolta.</li><li>Repairs: korjaustapahtumien summa valitulta jaksolta. Ei yksilöllisten tekstiilien määrä.</li><li>Baselines: valitun vertailumallin kertoimet.</li></ul></section><section class="method-section"><h3>Mitä tuloksista ei voi päätellä?</h3><ul><li>Skannausosuus ei osoita tekstiilien todellista vajaakäyttöä. Se on tarkistettava havainto.</li><li>Korjaus ei automaattisesti tarkoita vältettyä hankintaa. Korjausten oletettua päästökädenjälkeä ei lasketa yhteen pesun päästöeron kanssa.</li><li>Käyttäjiä ei summata tuoteriveiltä ilman yksilöivää avainta.</li><li>Kustannussäästöihin, palvelupyyntöjen ratkaisuun ja sääntelyväitteisiin ei ole tässä riittäviä lähtötietoja.</li><li>Toimialan mukainen painotus on muokattava ehdotus, ei compliance-arvio.</li></ul></section>',
     '<p class="message pending">Applying changes…</p>': '<p class="message pending">Muokataan…</p>',
@@ -358,6 +465,8 @@
       "Palataan tuloksiin seuraavassa seurantapalaverissa. Mahdollinen säästö arvioidaan vasta hyväksytyillä lähtötiedoilla.",
     "Proposals for discussion.": "Keskusteluehdotuksia, eivät vielä sovittuja toimenpiteitä.",
     "Sources and calculations": "Lähteet ja laskenta",
+    "Customers, Sites, Service_Activity, Customer_Impacts, Repairs and Baselines.":
+      "Customers, Sites, Service_Activity, Customer_Impacts, Repairs ja Baselines.",
     "Period totals sum activity across the selected months. Allocations and scans reflect the end of ":
       "Virrat summataan valitulta jaksolta. Allokointi ja aktiiviset skannaukset ovat ",
     ". Repairs count events.":

@@ -1608,3 +1608,59 @@ main {
   font-size: 11px;
   color: #52616b;
 }
+.review-priorities {
+  margin: 24px 0;
+  padding: clamp(16px, 3vw, 28px);
+  border: 1px solid #dce2e7;
+  border-radius: 10px;
+  background: #f4f8fb;
+  overflow-wrap: anywhere;
+}
+.review-priorities h2 {
+  margin: 6px 0 10px;
+  color: #003f72;
+}
+.review-priorities details {
+  margin: 12px 0;
+}
+.review-priorities summary {
+  color: #003f72;
+  cursor: pointer;
+  font-weight: 700;
+}
+.contract-kpi-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(180px, 100%), 1fr));
+  align-items: end;
+  gap: 12px;
+  margin: 16px 0;
+}
+.contract-kpi-form label:not(.kpi-checkbox) {
+  display: grid;
+  gap: 4px;
+}
+.contract-kpi-form input:not([type="checkbox"]),
+.contract-kpi-form select {
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #b7c6d0;
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+}
+.kpi-checkbox,
+.kpi-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kpi-actions {
+  flex-wrap: wrap;
+}
+.contract-kpi-list {
+  padding-inline-start: 22px;
+}
+.contract-kpi-list li {
+  margin-block: 8px;
+}
