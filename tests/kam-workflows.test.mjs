@@ -37,7 +37,7 @@ test("KAM can edit a slide title without triggering an unrelated slide swap", ()
   kamCases.find((c) => c.id === "slide-title").check(result);
   assert.deepEqual(result.workspace.slideOrder, []);
 });
-test("swapping review slides retains approved final proposals without putting them in slideOrder", () => {
+test("swapping review slides retains approved proposals without putting them in slideOrder", () => {
   const scenario = kamCases.find((c) => c.id === "slide-swap-with-upsell");
   const current = scenario.seed();
   const result = applyChatPatch(
@@ -47,7 +47,9 @@ test("swapping review slides retains approved final proposals without putting th
   );
   scenario.check(result, current);
   const deck = buildPresentation(result.workspace);
-  assert.ok(applyPlan(deck, defaultPlan(deck)).slides.at(-1).id.startsWith("upsell-"));
+  const { slides } = applyPlan(deck, defaultPlan(deck));
+  const plan = slides.findIndex((slide) => slide.id === "plan");
+  assert.ok(slides[plan - 1].id.startsWith("upsell-"));
 });
 test("protected final proposals cannot be swapped into the evidence story", () => {
   const current = kamCases.find((c) => c.id === "slide-swap-with-upsell").seed();
