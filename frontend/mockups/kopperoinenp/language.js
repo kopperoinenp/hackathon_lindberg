@@ -103,15 +103,15 @@
     "Import failed": "Tuonti epäonnistui",
     "Choose a nonempty CSV, XLSX or JSON file up to 8 MiB.":
       "Valitse CSV-, XLSX- tai JSON-tiedosto, jonka koko on enintään 8 MiB ja jossa on sisältöä.",
-    "Local quality report ready.": "Paikallinen laaturaportti on valmis.",
+    "Local analysis ready.": "Paikallinen analyysi on valmis.",
     "The file contains no eligible data for new tools.":
       "Tiedostossa ei ole riittävän laadukasta dataa uusille työkaluille.",
     "The proposed tools did not pass validation.":
       "Ehdotetut työkalut eivät läpäisseet tarkistusta.",
-    "AI is unavailable. The local quality report is ready.":
-      "AI-palvelua ei saatu käyttöön. Paikallinen laaturaportti on valmis.",
-    "AI returned an invalid tool list. The local quality report is ready.":
-      "AI:n työkalulista oli virheellinen. Paikallinen laaturaportti on valmis.",
+    "AI is unavailable. The local analysis is ready.":
+      "AI-palvelua ei saatu käyttöön. Paikallinen analyysi on valmis.",
+    "AI returned an invalid tool list. The local analysis is ready.":
+      "AI:n työkalulista oli virheellinen. Paikallinen analyysi on valmis.",
     "Analysis ready.": "Analyysi on valmis.",
     "Data quality": "Aineiston laatu",
     "The customer identifier matches the selected customer.":
@@ -123,10 +123,18 @@
     rows: "riviä",
     "duplicate rows": "toistuvaa riviä",
     "columns with missing or mixed data": "saraketta, joissa on puuttuvia tai sekoittuneita arvoja",
-    "Validated tools": "Tarkistetut työkalut",
+    "Local analysis tools": "Paikalliset analyysityökalut",
+    "Validated AI tools": "Tarkistetut AI-työkalut",
+    Sum: "Summa",
+    Ratio: "Osuus",
+    Average: "Keskiarvo",
+    Minimum: "Pienin arvo",
+    Maximum: "Suurin arvo",
+    "Row count": "Rivimäärä",
     "tools rejected by quality checks": "työkalua hylättiin laatutarkistuksessa",
     "Suggested follow-ups": "Ehdotetut jatkotoimet",
     "Prior-year coverage is incomplete.": "Edellisen vuoden vertailuaineisto on vajaa.",
+    "Prior-year comparison": "Vertailu edellisvuoteen",
     "Review the process behind the change and track this metric in the next comparable period.":
       "Selvitä muutoksen taustalla oleva prosessi ja seuraa mittaria seuraavalla vertailukelpoisella jaksolla.",
     "Data-based suggestions": "Dataan perustuvat ehdotukset",

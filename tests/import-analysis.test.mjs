@@ -82,3 +82,88 @@ test("incomplete history, impossible ratios and duplicate records do not become 
   );
   assert.equal(duplicates.status, "no_eligible_data");
 });
+
+test("model tools compute grouped descriptive metrics and reject unsafe or misleading definitions", async () => {
+  const data = table.map((row, index) => ({
+    Month: row.Month,
+    "Washed kg": (index + 1) * 10,
+    "Total hours": 100,
+    Site: index === 4 ? "Synthetic B" : "Synthetic A",
+    AssetID: index + 1,
+    "Number 123456789": index + 1,
+  }));
+  const base = { ...recipe, operation: "mean", denominator: null, unit: "kg", groupBy: "c4" };
+  const report = await analyzeImport(
+    { Work: data },
+    {
+      ...options,
+      generate: async ({ input }) => {
+        assert.doesNotMatch(input, /2025-01|Synthetic A|AssetID|123456789/);
+        return {
+          tools: [
+            base,
+            { ...base, operation: "min" },
+            { ...base, operation: "max" },
+            { ...base, operation: "count", value: null, unit: "rows" },
+            { ...base, operation: "ratio", denominator: "c3", unit: "%" },
+            { ...base, value: "c6" },
+            { ...base, unit: "EUR" },
+            { ...base, command: "irrelevant" },
+          ],
+        };
+      },
+    },
+  );
+  assert.deepEqual(
+    report.tools.map(({ result }) => result),
+    [50, 40, 60, 3],
+  );
+  assert.deepEqual(report.tools[0].breakdowns[1].rows, [
+    { label: "Synthetic A", value: 50, rows: 2 },
+    { label: "Synthetic B", value: 50, rows: 1 },
+  ]);
+  assert.equal(report.tools[0].comparison, null);
+  assert.deepEqual(
+    report.rejected.map(({ reason }) => reason),
+    [
+      "invalid_ratio_components",
+      "incomplete_or_invalid_column",
+      "invalid_denominator_or_unit",
+      "invalid_tool_definition",
+    ],
+  );
+});
+
+test("text-only group counts and local numeric tools survive provider failures", async () => {
+  const data = {
+    Cases: [
+      { Status: "Open", TicketID: 1 },
+      { Status: "Closed", TicketID: 2 },
+      { Status: "Open", TicketID: 3 },
+    ],
+  };
+  const report = await analyzeImport(data, {
+    ...options,
+    generate: async () => {
+      throw new Error("Unavailable");
+    },
+  });
+  assert.equal(report.status, "provider_unavailable");
+  assert.equal(report.localTools[0].result, 3);
+  assert.deepEqual(
+    report.localTools[0].breakdowns[0].rows.map(({ label, rows }) => [label, rows]),
+    [
+      ["Closed", 1],
+      ["Open", 2],
+    ],
+  );
+  const invalid = await analyzeImport(
+    { Deliveries: [{ Delivered: 1 }, { Delivered: 2 }, { Delivered: 3 }] },
+    {
+      ...options,
+      generate: async () => ({ tools: "invalid" }),
+    },
+  );
+  assert.equal(invalid.status, "invalid_tool_list");
+  assert.equal(invalid.localTools[0].result, 6);
+});

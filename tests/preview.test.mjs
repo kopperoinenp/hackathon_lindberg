@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, writeFile, unlink, rmdir, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, readFile, unlink, rmdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path, { join } from "node:path";
 import { once } from "node:events";
@@ -62,6 +62,37 @@ test("a local customer can upload a file and get a separate quality report", asy
   assert.equal(report.status, "profile_only");
   assert.equal(report.customerMatch, "unverified");
   assert.deepEqual(report.quality[0].columns[0].range, { min: 10, max: 15 });
+  assert.equal(report.localTools[0].result, 37);
+  const csv = await readFile(new URL("./fixtures/imports/site-activity-fi.csv", import.meta.url));
+  const csvResponse = await fetch(url.replace("format=json", "format=csv"), {
+    ...options,
+    body: csv,
+  });
+  assert.equal(csvResponse.status, 200);
+  const csvReport = await csvResponse.json();
+  const weight = csvReport.localTools.find((tool) => tool.source.value === "Pesty kg");
+  assert.equal(weight.result, 3501);
+  assert.equal(weight.source.selectedRows, 3);
+  assert.equal(csvReport.providerSchemaSharing, false);
+  const workbook = await readFile(
+    new URL("./fixtures/imports/customer-operations.xlsx", import.meta.url),
+  );
+  const excelResponse = await fetch(url.replace("format=json", "format=xlsx"), {
+    ...options,
+    body: workbook,
+  });
+  assert.equal(excelResponse.status, 200);
+  const excelReport = await excelResponse.json();
+  assert.deepEqual(
+    excelReport.quality.map(({ name, rows }) => [name, rows]),
+    [
+      ["Pyykkipalvelu", 6],
+      ["Palvelupyynnöt", 4],
+    ],
+  );
+  const washed = excelReport.localTools.find(({ source }) => source.value === "Pesty kg");
+  assert.equal(washed.result, 3650);
+  assert.equal(washed.comparison.before, 3250);
   assert.equal((await fetch(url, { ...options, body: "invalid" })).status, 400);
   assert.equal((await fetch(url.replace("CUST001", "missing"), options)).status, 404);
   const identified = (id) => JSON.stringify({ Deliveries: [{ customer_id: id, delivered: 10 }] });

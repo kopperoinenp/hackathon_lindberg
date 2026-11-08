@@ -974,11 +974,11 @@
     if (entry.error) return "<p>" + esc(t(entry.error)) + "</p>";
     const { report } = entry;
     const descriptions = {
-      profile_only: "Local quality report ready.",
+      profile_only: "Local analysis ready.",
       no_eligible_data: "The file contains no eligible data for new tools.",
       no_valid_tools: "The proposed tools did not pass validation.",
-      provider_unavailable: "AI is unavailable. The local quality report is ready.",
-      invalid_tool_list: "AI returned an invalid tool list. The local quality report is ready.",
+      provider_unavailable: "AI is unavailable. The local analysis is ready.",
+      invalid_tool_list: "AI returned an invalid tool list. The local analysis is ready.",
       validated: "Analysis ready.",
     };
     const quality = report.quality
@@ -993,19 +993,46 @@
           `<li><strong>${esc(metric)}</strong> · ${f(comparison.before, 2)} → ${f(comparison.after, 2)} ${esc(unit)}<br /><small>${esc(source.table)} · ${esc(comparison.previousPeriods.join(", "))} → ${esc(comparison.periods.join(", "))}</small><br />${esc(t(action))}</li>`,
       )
       .join("");
-    const tools = report.tools
-      .map(
-        ({ definition, result, comparisonStatus }) =>
-          `<li>${esc(definition.name)} · ${f(result, 2)} ${esc(definition.unit)}${comparisonStatus === "incomplete_or_sparse_prior_year" ? ` · ${t("Prior-year coverage is incomplete.")}` : ""}</li>`,
-      )
-      .join("");
+    const labels = {
+      sum: "Sum",
+      ratio: "Ratio",
+      mean: "Average",
+      min: "Minimum",
+      max: "Maximum",
+      count: "Row count",
+    };
+    const renderTools = (items) =>
+      items
+        .map(({ definition, result, comparison, comparisonStatus, breakdowns = [], source }) => {
+          const groups = breakdowns
+            .map(
+              ({ column, rows }) =>
+                `<details><summary>${esc(column)}</summary><ul>${rows
+                  .map(
+                    ({ label, value, rows }) =>
+                      `<li>${esc(label)} · ${value == null ? esc(t("Unavailable")) : f(value, 2) + " " + esc(definition.unit)} <small>(${f(rows)} ${t("rows")})</small></li>`,
+                  )
+                  .join("")}</ul></details>`,
+            )
+            .join("");
+          const columns = [source.value, source.denominator].filter(Boolean).join(" / ");
+          const prior = comparison
+            ? `<br /><small>${t("Prior-year comparison")} · ${esc(comparison.previousPeriods.join(", "))} → ${esc(comparison.periods.join(", "))} · ${f(comparison.before, 2)} → ${f(comparison.after, 2)} ${esc(definition.unit)}</small>`
+            : comparisonStatus === "incomplete_or_sparse_prior_year"
+              ? `<br /><small>${t("Prior-year coverage is incomplete.")}</small>`
+              : "";
+          return `<li><strong>${esc(t(definition.name))}</strong> · ${esc(t(labels[definition.operation] ?? definition.operation))} · ${f(result, 2)} ${esc(definition.unit)}<br /><small>${esc(source.table)}${columns ? ` · ${esc(columns)}` : ""} · ${f(source.selectedRows ?? source.rows)} ${t("rows")}</small>${prior}${groups}</li>`;
+        })
+        .join("");
+    const local = renderTools(report.localTools ?? []);
+    const tools = renderTools(report.tools);
     const customerCheck =
       report.customerMatch === "matched"
         ? t("The customer identifier matches the selected customer.")
         : t(
             "The file could not be matched to a customer. Check that it belongs to the selected customer.",
           );
-    return `<p>${esc(t(descriptions[report.status]))} ${esc(customerCheck)}</p><h4>${t("Data quality")}</h4><ul>${quality}</ul>${tools ? `<h4>${t("Validated tools")}</h4><ul>${tools}</ul>` : ""}${report.rejected.length ? `<p>${f(report.rejected.length)} ${t("tools rejected by quality checks")}</p>` : ""}${suggestions ? `<h4>${t("Suggested follow-ups")}</h4><ul>${suggestions}</ul>` : ""}`;
+    return `<p>${esc(t(descriptions[report.status]))} ${esc(customerCheck)}</p><h4>${t("Data quality")}</h4><ul>${quality}</ul>${local ? `<h4>${t("Local analysis tools")}</h4><ul>${local}</ul>` : ""}${tools ? `<h4>${t("Validated AI tools")}</h4><ul>${tools}</ul>` : ""}${report.rejected.length ? `<p>${f(report.rejected.length)} ${t("tools rejected by quality checks")}</p>` : ""}${suggestions ? `<h4>${t("Suggested follow-ups")}</h4><ul>${suggestions}</ul>` : ""}`;
   }
 
   $("#data-import-form").addEventListener("submit", async (event) => {
