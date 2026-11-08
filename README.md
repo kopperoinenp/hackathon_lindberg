@@ -17,8 +17,11 @@ node scripts/preview.mjs
 Open [the local demo](http://127.0.0.1:4173/kopperoinenp/index.html).
 For a local run without provider credentials, copy [the environment example](.env.example)
 to `.env` and keep the deterministic setting. PowerPoint generation works in this mode.
-The editing chat requires an AI provider. See [backend setup](backend/README.md)
-for OpenAI configuration and the status of the Copilot adapter.
+Both assistant conversations require an AI provider. Set `PRESENTATION_PROVIDER=openai`,
+`OPENAI_API_KEY` and optionally `OPENAI_MODEL` (default `gpt-5-mini`) in the local
+`.env`, then restart the backend. Credentials stay on the server.
+`PRESENTATION_PROVIDER=copilot` uses `COPILOT_ACCESS_TOKEN`; the adapter awaits
+live tenant verification. Production authentication and token refresh are not implemented.
 
 Python 3 is needed to read CSV and XLSX uploads. Create a local environment
 with `python -m venv .venv` and install the development tools with
@@ -76,7 +79,14 @@ and `tests/`. Runtime reviews, logs and temporary outputs belong in the ignored
 
 ## Work on the demo
 
-- [Project overview](docs/project-overview.md) and [roadmap](docs/NEXT_STEPS.md)
+- [Project overview](docs/project-overview.md)
 - [Architecture](docs/architecture.md) and [local API contracts](docs/api-contract.md)
 - [Agent rules](AGENTS.md) and [development workflow](docs/development-workflow.md)
 - [Quality checks](QUALITY.md), including setup for `pnpm check`
+- [Review storage](docs/REVIEW_STORAGE.md), [imports](docs/IMPORT_ANALYSIS.md)
+  and [presentation rules](docs/PRESENTATION_STANDARD.md)
+- [Source and asset provenance](docs/references/README.md)
+
+Remaining verification includes interactive browser/PowerPoint and PDF layout
+checks, Copilot tenant testing and production authentication. The current
+buildless interface and Node backend remain the approved stack.

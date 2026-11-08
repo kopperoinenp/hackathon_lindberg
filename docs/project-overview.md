@@ -8,10 +8,11 @@ The approved interface is a single page that opens with a default review. The
 customer scope and selected content carry into the browser presentation and
 editable PowerPoint.
 
-Paulus Kopperoinen owns the roadmap in [Next steps](NEXT_STEPS.md).
+Paulus Kopperoinen owns the product roadmap. Current setup, supported features
+and remaining verification are in the [README](../README.md).
 [Agent rules](../AGENTS.md) designate kopperoinenp Codex as the repository
 integration orchestrator. Record the human owner, reviewer and file boundaries
 in the relevant task or PR before parallel work.
 
-The [roadmap](NEXT_STEPS.md) tracks missing data coverage, follow-up actions,
-customer-specific emphasis, demo verification and Copilot tenant testing.
+The maintained frontend is `frontend/mockups/kopperoinenp/`. Existing UI structure
+is approved; improvements use this interface and the current Node backend.
