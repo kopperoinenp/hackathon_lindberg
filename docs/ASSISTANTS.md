@@ -11,8 +11,9 @@ coordination, separate conversations and block action routing in chat on
 and optional lastQuery fields. Its model sees an analysis-only schema and
 instructions. It checks the query and tool catalogs first, then follows one route.
 
-- A normal lookup runs the existing data-query calculation.
-- A specialist analysis runs up to three existing analysis tools.
+- A normal lookup selects an explicit metric tool, then extracts its filters in
+  a separate step and runs the existing data-query calculation.
+- A specialist analysis selects the existing tool with the required outputs.
 - A generated tool is reused only for the same owner, customer, data and scope.
 - If no tool matches, the harness inspects the available table/column types,
   requests one declarative definition, validates it and runs it locally.
@@ -25,6 +26,10 @@ additive column and a matching unit. Snapshots, stock, rates, targets and
 intensities cannot be summed. Joins and arbitrary executable code are unsupported.
 Raw rows remain on the backend during tool creation. Column labels and types
 are sent to the configured provider.
+Uploaded numeric columns also appear as prospective tools in discovery. These
+are built and validated only after selection. Recipe fields are restricted to
+the discovered table and column IDs. The raw-column catalog describes new-tool
+inputs; existing tools retain their own separate data sources.
 
 Results include source information and a trace of catalog inspection, schema
 inspection when needed, validation and execution. The response always has an
@@ -86,3 +91,9 @@ No database schema changes are needed.
 scope isolation, invalid definitions, canonical block ordering, editor response
 boundaries and internal collaboration. Live browser tests require Computer Use
 to be enabled in Work settings. Provider calls require configured credentials.
+
+`node scripts/test-assistant-harnesses.mjs --live --repeat=2` exercises ordinary
+Finnish and English requests with empty histories and no tool names in the
+requests. It checks totals, emissions components, service duration, dashboard
+edits, period filters, titles, agent boundaries and a new uploaded-data tool.
+The local report is written to `.local/harness-live-results.json`.

@@ -2765,8 +2765,18 @@
     $("#ask-form button[type=submit]").disabled = state.asking || readOnly;
     $("#ask-form").setAttribute("aria-busy", String(state.asking));
     $("#composer").dataset.agent = state.chatTool;
+    const selectedAgent = $("#chat-data-import").hidden ? state.chatTool : "upload";
+    const agentTitle = t(
+      selectedAgent === "data"
+        ? "Data analyst"
+        : selectedAgent === "dashboard"
+          ? "Dashboard editor"
+          : "Upload files",
+    );
+    $("#composer").setAttribute("aria-label", agentTitle);
+    $("#composer .chat-dock-heading > span").textContent = agentTitle;
     for (const button of document.querySelectorAll("[data-agent-tab]"))
-      button.setAttribute("aria-pressed", String(button.dataset.agentTab === state.chatTool));
+      button.setAttribute("aria-pressed", String(button.dataset.agentTab === selectedAgent));
   }
   async function ask(question) {
     if (sharedSession?.readOnly && state.chatTool === "dashboard") return;

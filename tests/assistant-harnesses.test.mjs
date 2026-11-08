@@ -5,6 +5,7 @@ import { chatSchema, normalizeWorkspace } from "../backend/review-chat.mjs";
 import { analysisRuntime } from "../backend/analysis-runtime.mjs";
 import { requestContext, subsetDataset } from "../backend/request-context.mjs";
 import { fixtureDataset } from "../backend/dataset.mjs";
+import { calculateDashboard } from "../backend/dashboard-model.mjs";
 
 const workspace = () => normalizeWorkspace({ scope: { customer: "CUST002" }, language: "en" });
 function patch() {
@@ -16,9 +17,7 @@ function patch() {
   };
 }
 const selection = (fields) => ({
-  route: "query",
-  query: null,
-  tools: [],
+  tool: "query_emissions",
   toolId: null,
   explanation: null,
   ...fields,
@@ -31,9 +30,13 @@ test("analyst calculates a scoped answer without mutating the workspace", async 
     { message: "Compare emissions by country", workspace: current },
     {
       generate: async ({ name, schema }) => {
+        if (name === "analysis_data_query")
+          return { query: { topic: "emissions", compareBy: "country" } };
         assert.equal(name, "analysis_tool_selection");
         assert.ok(!JSON.stringify(schema).includes("slideSwap"));
-        return selection({ query: { topic: "emissions", compareBy: "country" } });
+        return selection({
+          explanation: "Country comparison",
+        });
       },
     },
   );
@@ -46,15 +49,20 @@ test("analyst calculates a scoped answer without mutating the workspace", async 
 test("a missing tool is profiled, validated, executed and reused only in its scope", async () => {
   const current = workspace();
   let generatedId;
-  const generate = async ({ name, input }) => {
+  const generate = async ({ name, input, schema }) => {
     if (name === "analysis_tool_selection")
       return selection(
-        generatedId ? { route: "existing", toolId: generatedId } : { route: "create" },
+        generatedId
+          ? { tool: "reuse_generated", toolId: generatedId }
+          : { tool: "build_generated" },
       );
     if (name === "analysis_tool_definition") {
       const { tables } = JSON.parse(input);
       const table = tables.find(({ name }) => name === "activity");
       const value = table.columns.find(({ column }) => column === "repair_count");
+      assert.ok(schema.properties.table.enum.includes(table.id));
+      assert.ok(schema.properties.value.enum.includes(value.id));
+      assert.equal(schema.properties.period.type, "null");
       return {
         table: table.id,
         name: "Repairs",
@@ -87,6 +95,36 @@ test("a missing tool is profiled, validated, executed and reused only in its sco
   assert.throws(() => analysisRuntime(other).run(generatedId), /expired/);
 });
 
+test("a new calculation without numeric sources stops before tool generation", async () => {
+  const current = workspace();
+  const data = subsetDataset(fixtureDataset, ["CUST002"]);
+  const snapshot = calculateDashboard(data, current.scope);
+  await requestContext.run(
+    {
+      user: { id: "reader", tenant_id: "empty-source-test" },
+      permissions: new Map([["CUST002", false]]),
+      data: { ...data, records: [], detail: [] },
+      prepared: { get: () => snapshot },
+    },
+    async () => {
+      let calls = 0;
+      const result = await runAnalysisHarness(
+        { message: "Calculate dispatches", workspace: current },
+        {
+          generate: async () => {
+            calls++;
+            return selection({ tool: "build_generated" });
+          },
+        },
+      );
+      assert.equal(calls, 1);
+      assert.equal(result.view, null);
+      assert.match(result.answer, /No numeric source data/);
+      assert.deepEqual(result.changed, []);
+    },
+  );
+});
+
 test("invalid generated tools fail before execution", async () => {
   await assert.rejects(
     () =>
@@ -95,7 +133,7 @@ test("invalid generated tools fail before execution", async () => {
         {
           generate: async ({ name }) =>
             name === "analysis_tool_selection"
-              ? selection({ route: "create" })
+              ? selection({ tool: "build_generated" })
               : {
                   table: "t1",
                   name: "Bad",
@@ -170,8 +208,7 @@ test("editor rejects an analysis response and coordinates missing evidence inter
         calls.push(name);
         if (name === "dashboard_edit")
           return { ...patch(), analysisRequest: "Check service performance" };
-        if (name === "analysis_tool_selection")
-          return selection({ route: "tools", tools: ["service"] });
+        if (name === "analysis_tool_selection") return selection({ tool: "service" });
         if (name === "assistant_reply") return { reply: "Service evidence is available." };
         return { ...patch(), evidenceAreas: ["performance"] };
       },

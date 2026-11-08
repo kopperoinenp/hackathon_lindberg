@@ -57,7 +57,16 @@ node scripts/check-quality.mjs
 node --test tests/assistant-harnesses.test.mjs
 ```
 
+Test ordinary Finnish and English requests against the configured AI provider,
+without example conversations or tool names:
+
+```sh
+node scripts/test-assistant-harnesses.mjs --live --repeat=2
+```
+
 The quality command runs Ruff, ESLint, Prettier and Node tests.
+The live command makes provider calls and writes its acceptance report to
+`.local/harness-live-results.json`.
 PostgreSQL integration tests are separate. See [quality setup](QUALITY.md) and
 [shared prototype](docs/POSTGRES_PROTOTYPE.md) for those prerequisites.
 

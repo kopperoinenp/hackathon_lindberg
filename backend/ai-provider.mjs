@@ -113,7 +113,7 @@ export async function generatePlan(deck, options = {}) {
     : plan;
 }
 export async function generateStructured(
-  { instructions, input, schema, name },
+  { instructions, input, schema, name, reasoningEffort = "low" },
   { env = process.env, fetchImpl = fetch, signal = AbortSignal.timeout(90000) } = {},
 ) {
   const config = providerConfig(env);
@@ -136,7 +136,7 @@ export async function generateStructured(
         store: false,
         instructions,
         input,
-        reasoning: { effort: "low" },
+        reasoning: { effort: reasoningEffort },
         max_output_tokens: 4000,
         text: {
           format: {
