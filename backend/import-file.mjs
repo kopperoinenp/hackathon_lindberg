@@ -40,9 +40,13 @@ export async function readImportFile(bytes, format) {
       await rmdir(directory);
     }
   }
+  let parsed;
   try {
-    return JSON.parse(raw.replace(/^\uFEFF/, ""));
+    parsed = JSON.parse(raw.replace(/^\uFEFF/, ""));
   } catch {
     throw new Error("Invalid table JSON.");
   }
+  if (format !== "json" && typeof parsed?.importError === "string")
+    throw new Error(parsed.importError.slice(0, 240));
+  return parsed;
 }

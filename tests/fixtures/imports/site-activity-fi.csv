@@ -1,0 +1,8 @@
+Kuukausi;Toimipaikka;Pesty kg;Varastosaldo;Palvelupyynnöt;Yhteyshenkilö
+31.1.2024;Helsinki;1 000,25;600;4;demo-helsinki@example.test
+29.2.2024;Helsinki;1 050,25;620;5;demo-helsinki@example.test
+31.3.2024;Tampere;950,00;500;3;demo-tampere@example.test
+31.1.2025;Helsinki;1 200,50;610;7;demo-helsinki@example.test
+28.2.2025;Helsinki;1 250,50;630;6;demo-helsinki@example.test
+31.3.2025;Tampere;1 050,00;530;5;demo-tampere@example.test
+Yhteensä;;6 501,50;3 490;30;

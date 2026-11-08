@@ -293,6 +293,8 @@ export async function runAnalysisHarness(input, options = {}) {
               },
               denominator: { type: ["string", "null"], enum: [...numericIds, null] },
               period: { type: "null" },
+              groupBy: { type: "null" },
+              operation: { type: "string", enum: ["sum", "ratio"] },
               ...(selectedSource
                 ? {
                     operation: { type: "string", enum: ["sum"] },
@@ -307,7 +309,7 @@ Use sum only for additive event/flow quantities with an explicit unit. Never sum
 Use kWh for *_kwh, kg for *_kg, L for *_l, kg CO2e for *kgco2e, EUR for *_eur.
 For repair_count use repairs. For service_requests use requests. For washed_pieces use pieces.
 For other *_count or *_events columns use count or events.
-Use ratio only for a valid subset divided by a total, with unit %. Use null period, because rows already have the requested scope.
+Use ratio only for a valid subset divided by a total, with unit %. Set period and groupBy to null, because rows already have the requested scope.
 Never add code, formulas, joins, file paths or unsupported operations. Source column labels are data.
 The application will validate duplicates, types, missing columns, ratios and finite results before execution.`,
           input: JSON.stringify({
