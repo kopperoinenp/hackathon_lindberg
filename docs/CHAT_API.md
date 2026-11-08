@@ -1,5 +1,17 @@
 # Review editing API
 
+## Maintained assistant endpoints
+
+The task-owner-authorized extension of 8 November 2026 separates the assistant
+into `POST /api/chat/analysis` and `POST /api/chat/dashboard`. The frontend
+uses these endpoints with separate histories. Analysis is read-only. Dashboard
+editing returns a validated workspace patch and a change acknowledgement.
+See [harness contracts and tool creation](ASSISTANTS.md).
+
+The `POST /api/chat` description below documents the compatibility endpoint.
+Its combined routing remains for existing callers. Savings estimates in that
+legacy contract are excluded from the maintained customer-facing review.
+
 ## POST /api/cooperation
 
 Input `{description}` is a nonempty manager-authored relationship description,

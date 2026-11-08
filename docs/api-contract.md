@@ -3,6 +3,7 @@
 The existing endpoint contracts are documented in these files:
 
 - [Review chat and cooperation summary](CHAT_API.md)
+- [Separate analysis and dashboard assistant harnesses](ASSISTANTS.md)
 - [Presentation configuration, generation, retrieval and download](PRESENTATION_API.md)
 - [Internal review agent analysis tools](ANALYSIS_TOOLS.md)
 - [Shared PostgreSQL prototype and selectable demo profiles](POSTGRES_PROTOTYPE.md)

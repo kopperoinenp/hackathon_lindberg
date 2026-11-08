@@ -1,8 +1,9 @@
 # Lindström customer review demo
 
 The account manager opens a customer review based on synthetic workwear data.
-It is a single page: the review supports scoped edits through chat and opens a
-browser presentation with a download option for an editable PowerPoint.
+The single-page workspace has separate data-analysis and dashboard-editing
+conversations. It creates an editable PowerPoint with the Lindström theme from
+the supplied reference and can open it in desktop PowerPoint on Windows.
 
 ## Run locally
 
@@ -18,6 +19,51 @@ For a local run without provider credentials, copy [the environment example](.en
 to `.env` and keep the deterministic setting. PowerPoint generation works in this mode.
 The editing chat requires an AI provider. See [backend setup](backend/README.md)
 for OpenAI configuration and the status of the Copilot adapter.
+
+Python 3 is needed to read CSV and XLSX uploads. Create a local environment
+with `python -m venv .venv` and install the development tools with
+`.venv/Scripts/python -m pip install -r requirements-dev.txt` on Windows.
+Set `PYTHON` if your Python executable has another location.
+
+## Use the assistants
+
+1. Select a customer and open the review.
+2. Open **Data analyst** to ask for figures, comparisons or analysis. It checks
+   the tool catalog before choosing a calculation. When needed, it inspects
+   available columns and creates a validated sum or percentage tool.
+3. Open **Dashboard editor** to add or remove blocks, change scope, edit text
+   or record next steps. It keeps the review's structure and returns a change
+   acknowledgement.
+4. Each block has **Ask**, **Edit** and a trash button. Ask opens the analyst
+   with the block title. Edit opens the editor. Required blocks have a disabled
+   trash button.
+5. **Upload files** accepts CSV, XLSX and JSON. To make uploaded data available
+   to tool creation, select schema sharing and include a matching customer ID.
+   Matching files are retained in server memory for up to 30 minutes.
+6. Use **Open presentation** to open the PPTX on this Windows machine or
+   **Download PowerPoint** to save it.
+
+The two conversations have independent message histories. Analysis leaves the
+dashboard unchanged. The editor can ask the analyst for evidence internally
+without adding messages to the analysis conversation.
+
+See [assistant behavior and limits](docs/ASSISTANTS.md) for supported calculations
+and shared-mode scope rules.
+
+## Check the project
+
+```sh
+node scripts/check-quality.mjs
+node --test tests/assistant-harnesses.test.mjs
+```
+
+The quality command runs Ruff, ESLint, Prettier and Node tests.
+PostgreSQL integration tests are separate. See [quality setup](QUALITY.md) and
+[shared prototype](docs/POSTGRES_PROTOTYPE.md) for those prerequisites.
+
+Source files belong in `backend/`, `frontend/mockups/kopperoinenp/`, `scripts/`
+and `tests/`. Runtime reviews, logs and temporary outputs belong in the ignored
+`.local/` directory. Provider credentials belong in a local `.env`.
 
 ## Work on the demo
 

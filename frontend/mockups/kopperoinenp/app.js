@@ -274,7 +274,7 @@
     nextSteps: [],
     areaTitles: {},
     areaNotes: {},
-    chat: [],
+    chats: { data: [], dashboard: [] },
     contractKpis: [],
     includeContractAgenda: false,
     approvedUpsells: [],
@@ -296,6 +296,7 @@
   let mode = "home";
   let presentationJob = null;
   let deckTimer;
+  let pendingAreaScroll;
   let deckRequest = "";
   let deckSlides = [];
   let deckFooter = "";
@@ -367,6 +368,7 @@
     storageLoading = true;
     storageReady = false;
     clearTimeout(deckTimer);
+    pendingAreaScroll = undefined;
     $("#customer-load-status").textContent = "";
     state.chatRevision += 1;
     toggleChatMenu(false);
@@ -517,12 +519,7 @@
     ["products", "Textiles in the service"],
     ["locations", "List of all locations"],
   ];
-  const basicsPresets = [
-    ["brief", "Brief", []],
-    ["standard", "Standard", ["scope", "year"]],
-    ["full", "Full", basicsSections.map(([id]) => id)],
-  ];
-  const customerBasics = () => state.customerBasics ?? basicsPresets[1][2];
+  const customerBasics = () => state.customerBasics ?? ["scope", "year"];
   function applyBasicsSelection() {
     const chosen = customerBasics();
     const overview = $("#customer-overview");
@@ -536,17 +533,6 @@
     const cards = overview.querySelector(".customer-basics");
     if (cards)
       cards.hidden = !["siteTypes", "countries", "products"].some((id) => chosen.includes(id));
-  }
-  function basicsPickerHtml() {
-    const chosen = customerBasics();
-    const same = (ids) => ids.length === chosen.length && ids.every((id) => chosen.includes(id));
-    const options = basicsPresets
-      .map(
-        ([id, label, ids]) =>
-          `<option value="${id}" ${same(ids) ? "selected" : ""}>${t(label)}</option>`,
-      )
-      .join("");
-    return `<fieldset class="area-picker meeting-advice"><legend>${t("Presentation length")}</legend><select id="basics-level" aria-label="${t("Presentation length")}">${options}</select></fieldset>`;
   }
   // Which block actually evidences a customer priority. Unlike topicAreas (default
   // block selection), topics without a direct measure in the data map to nothing.
@@ -1257,11 +1243,6 @@
     const heading = $("#customer-overview .customer-overview-heading p");
     if (heading) heading.textContent = heading.textContent.replace(` · ${state.customer}`, "");
     $("#customer-overview > p.quiet")?.remove();
-    if (state.savings !== null)
-      $("#customer-overview").insertAdjacentHTML(
-        "beforeend",
-        t`<article class="kam-savings"><span>Säästetty raha · KAM:in arvio</span><strong>${f(state.savings, 2)} €</strong><small>KAM:in antama arvio. Summaa ei ole laskettu tai todennettu tämän aineiston perusteella.</small></article>`,
-      );
   }
   function status(text) {
     $("#status").textContent = text;
@@ -1466,7 +1447,7 @@
   }
   function customerAreas() {
     const areas = state.evidenceAreas ?? defaultAreas();
-    return state.hideUsage ? areas.filter((id) => id !== "adoption") : areas;
+    return areas.filter((id) => id !== "financial" && (!state.hideUsage || id !== "adoption"));
   }
   function areaOrder(ids) {
     const rank = [...priorityAreas().map(({ id }) => id), ...evidenceAreas.map(([id]) => id)];
@@ -1871,20 +1852,10 @@
     opportunity: "adoption",
   };
   function deckInsights() {
-    const areas = deckAreas();
+    const areas = customerAreas();
     const kept = state.included.filter((id) => areas.includes(areaSlides[id]));
     if (kept.some((id) => id !== "opportunity")) return kept;
     return [...kept, state.included.find((id) => id !== "opportunity") ?? "water"];
-  }
-  function deckAreas() {
-    if (state.evidenceAreas !== null) return customerAreas();
-    const chosen = customerBasics();
-    const level = basicsPresets.find(
-      ([, , ids]) => ids.length === chosen.length && ids.every((id) => chosen.includes(id)),
-    )?.[0];
-    if (level === "brief") return [];
-    if (level !== "full") return customerAreas();
-    return evidenceAreas.map(([id]) => id).filter((id) => !(state.hideUsage && id === "adoption"));
   }
   function reviewAreas() {
     if (!context().metrics.hasData) return [];
@@ -1897,7 +1868,7 @@
       String(value)
         .replace(/<[^>]*>/g, "")
         .trim();
-    return deckAreas()
+    return customerAreas()
       .filter((id) => !["scorecard", ...Object.values(areaSlides)].includes(id))
       .filter(
         (id) =>
@@ -1992,6 +1963,7 @@
   }
   async function refreshDeck() {
     if (!context().metrics.hasData) {
+      pendingAreaScroll = undefined;
       deckRequest = "";
       $("#deck").innerHTML = `<p class="quiet">${t("No data matches the filters.")}</p>`;
       return;
@@ -2011,15 +1983,27 @@
       deckSlides = result.slides;
       deckFooter = result.footer;
       renderDeck();
+      const area = pendingAreaScroll;
+      if (area && request === JSON.stringify(presentationRequest())) {
+        pendingAreaScroll = undefined;
+        if (mode !== "prepare" || !customerAreas().includes(area)) return;
+        const slide = deckSlides.find(({ id }) => id === `area-${area}` || areaSlides[id] === area);
+        if (slide)
+          $(`[data-slide="${slide.id}"]`)?.scrollIntoView({
+            behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+            block: "start",
+          });
+      }
     } catch (error) {
       if (request === deckRequest) {
         deckRequest = "";
+        pendingAreaScroll = undefined;
         status(error.message || t("Could not create the presentation. Try again."));
       }
     }
   }
-  const fixedSlides = ["cover", "sources", "limits"];
   function slideKind(id) {
+    if (id === "area-agreedactions") return "summary";
     if (id.startsWith("area-")) return "area";
     if (id.startsWith("upsell-")) return "upsell";
     if (id === "summary" || id === "prior-goals") return "summary";
@@ -2032,11 +2016,9 @@
   }
   function renderDeck() {
     const { insightIds } = globalThis.MeetingModel;
-    const main = deckSlides.filter((slide) => slideKind(slide.id) === "main").map(({ id }) => id);
     const removable = (id) =>
       ["area", "upsell"].includes(slideKind(id)) ||
       (insightIds.includes(id) && state.included.length > 1);
-    const movable = (id) => slideKind(id) === "main" && !fixedSlides.includes(id);
     const hidden = insightIds.filter((id) => !state.included.includes(id));
     const open = new Set(
       [...document.querySelectorAll(".slide-note:not([hidden])")].map(
@@ -2047,10 +2029,9 @@
       deckSlides
         .map((slide) => {
           const { id } = slide;
-          const position = main.indexOf(id);
           const titled = !["upsell", "summary"].includes(slideKind(id));
           const noted = titled && id !== "cover";
-          return `<div class="deck-item" data-slide="${esc(id)}">${globalThis.SlideRender.html(slide, deckFooter, t, { editableTitle: titled })}<div class="deck-actions">${noted ? `<button type="button" data-slide-action="note">${t("Add text")}</button>` : ""}<button type="button" data-slide-action="ask">${t("Ask the assistant")}</button>${movable(id) && movable(main[position - 1] ?? "cover") ? `<button type="button" data-slide-action="up" aria-label="${t("Move up")}">↑</button>` : ""}${movable(id) && movable(main[position + 1] ?? "limits") ? `<button type="button" data-slide-action="down" aria-label="${t("Move down")}">↓</button>` : ""}${removable(id) ? `<button type="button" data-slide-action="remove">${t("Remove slide")}</button>` : ""}</div>${noted ? `<textarea class="slide-note" data-slide-note="${esc(id)}" maxlength="2000" aria-label="${t("Add text")}" ${open.has(id) ? "" : "hidden"}>${esc(slideNote(id))}</textarea>` : ""}</div>`;
+          return `<div class="deck-item" data-slide="${esc(id)}">${globalThis.SlideRender.html(slide, deckFooter, t, { editableTitle: false })}<div class="deck-actions"><button type="button" data-slide-action="remove" aria-label="${t("Remove slide")}" ${removable(id) ? "" : "disabled"}><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7m4-7v7" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button><button type="button" data-slide-action="ask">${t("Ask")}</button><button type="button" data-slide-action="edit">${t("Edit")}</button></div>${noted ? `<textarea class="slide-note" data-slide-note="${esc(id)}" maxlength="2000" aria-label="${t("Add text")}" ${open.has(id) ? "" : "hidden"}>${esc(slideNote(id))}</textarea>` : ""}</div>`;
         })
         .join("") +
       (hidden.length
@@ -2103,9 +2084,9 @@
       note.hidden = !note.hidden;
       if (!note.hidden) note.focus();
     }
-    if (action === "ask") {
+    if (action === "ask" || action === "edit") {
       const index = deckSlides.findIndex((slide) => slide.id === id);
-      openChatTool("dashboard");
+      openChatTool(action === "ask" ? "data" : "dashboard");
       $("#question").value = `${deckSlides[index].title}: `;
       $("#question").focus();
     }
@@ -2187,13 +2168,12 @@
   const stepLimits = { title: 160, owner: 80, due: 40 };
   const agreedSteps = () => state.nextSteps.filter((step) => step.title.trim());
   function stepText(step) {
+    const singleLine = (value) => value.trim().replace(/\s+/g, " ");
     return [
-      step.title.trim(),
-      step.owner.trim() && `${t("Owner")}: ${step.owner.trim()}`,
-      step.due.trim() && `${t("Timeline")}: ${step.due.trim()}`,
-    ]
-      .filter(Boolean)
-      .join(" · ");
+      singleLine(step.title),
+      `${t("Owner")}: ${singleLine(step.owner) || t("Not agreed yet")}`,
+      `${t("Due date")}: ${singleLine(step.due) || t("Not agreed yet")}`,
+    ].join(" · ");
   }
   // The review opening is shown to the customer: no "preparation" label or KAM agenda,
   // and the comparison point is explained in plain words.
@@ -2370,12 +2350,11 @@
   });
   function renderReviewContent() {
     renderMeetingAdvice();
-    $("#review-basics-picker").innerHTML = basicsPickerHtml();
-    const chosen = deckAreas();
+    const chosen = customerAreas();
     const evidence = context().metrics.hasData ? areaEvidence() : {};
     const kpis = customerKpis();
     const options = evidenceAreas
-      .filter(([id]) => !["scorecard", "future"].includes(id))
+      .filter(([id]) => !["scorecard", "future", "financial"].includes(id))
       .map(([id, label]) => {
         const checked =
           chosen.includes(id) &&
@@ -2518,23 +2497,22 @@
     }
   }
   document.addEventListener("change", (event) => {
-    if (event.target.id !== "basics-level") return;
-    state.customerBasics = [...basicsPresets.find(([id]) => id === event.target.value)[2]];
-    state.chatRevision += 1;
-    render();
-    $("#basics-level")?.focus();
-  });
-  document.addEventListener("change", (event) => {
     const area = event.target.dataset?.areaToggle;
     if (!area) return;
     const chosen = new Set(customerAreas().filter((id) => id === "scorecard" || id === "future"));
     for (const input of document.querySelectorAll("[data-area-toggle]:checked"))
       chosen.add(input.dataset.areaToggle);
-    if (area === "adoption" && event.target.checked) state.hideUsage = false;
+    if (event.target.checked) {
+      pendingAreaScroll = area;
+      if (area === "adoption") state.hideUsage = false;
+      const insights = Object.keys(areaSlides).filter((id) => areaSlides[id] === area);
+      if (insights.length && !insights.some((id) => state.included.includes(id)))
+        state.included = [...state.included, insights[0]];
+    } else if (pendingAreaScroll === area) pendingAreaScroll = undefined;
     state.evidenceAreas = areaOrder(chosen);
     state.chatRevision += 1;
     render();
-    $(`[data-area-toggle="${area}"]`)?.focus();
+    $(`[data-area-toggle="${area}"]`)?.focus({ preventScroll: true });
   });
   document.addEventListener(
     "toggle",
@@ -2635,14 +2613,8 @@
         return `<article><span>${label}</span><strong>${value}</strong><small>${esc(scope)}</small>${kpiComparison(history, comparable[id])}</article>`;
       })
       .join("")}</div><p class="quiet">${esc(scopeName())} · Synteettinen aineisto</p>`;
-    const savings = $(".kam-savings") || document.createElement("section");
-    if (!savings.textContent)
-      savings.innerHTML = t(
-        "<h2>Säästöarvio</h2><p>Säästöarviota ei ole annettu. Kerro apurille summa euroina.</p>",
-      );
     const modules = {
       intro: $("#story .intro"),
-      savings,
       metrics,
       results: $("#results-title")?.closest("section"),
       charts: $("#story .summary-graphics:not([data-in-block])"),
@@ -2657,9 +2629,7 @@
       const module = modules[id];
       if (!module) continue;
       module.dataset.dashboardModule = id;
-      module.hidden =
-        !selected.includes(id) ||
-        (id === "savings" && state.savings === null && selected.includes("overview"));
+      module.hidden = !selected.includes(id);
       story.append(module);
     }
   }
@@ -2737,16 +2707,40 @@
       areaNotes: state.areaNotes,
     };
   }
+  function analysisResultsHtml(results) {
+    const rows = [];
+    const collect = (value, label, depth = 0) => {
+      if (rows.length >= 40 || depth > 4) return;
+      if (typeof value === "number" && Number.isFinite(value))
+        rows.push(
+          `<tr><th scope="row">${esc(label.replace(/([a-z])([A-Z])/g, "$1 $2"))}</th><td>${f(value, 2)}</td></tr>`,
+        );
+      else if (value && typeof value === "object")
+        for (const [key, item] of Object.entries(value))
+          collect(item, [label, key].filter(Boolean).join(" · "), depth + 1);
+    };
+    for (const result of results ?? [])
+      collect(result.values ?? { result: result.result }, result.definition?.name ?? result.id);
+    return `<details class="analysis-evidence" open><summary>${t("Calculated results")}</summary><table><tbody>${rows.join("")}</tbody></table>${(results ?? []).map((result) => (result.boundary ? `<p>${esc(result.boundary)}</p>` : "")).join("")}</details>`;
+  }
   function renderChat() {
+    const messages = state.chats[state.chatTool];
     $("#chat").innerHTML =
-      state.chat
+      messages
         .map(
           (msg) =>
-            `<div class="message ${msg.user ? "user" : ""}"><p>${esc(msg.text)}</p>${msg.view ? chatResult(msg.view) : ""}${msg.followUps?.length && msg === state.chat.at(-1) ? `<div class="chat-followups">${msg.followUps.map((text) => `<button type="button" data-chat-prompt>${esc(text)}</button>`).join("")}</div>` : ""}</div>`,
+            `<div class="message ${msg.user ? "user" : ""}"><p>${esc(msg.text)}</p>${msg.view ? chatResult(msg.view) : ""}${msg.results && !msg.view ? analysisResultsHtml(msg.results) : ""}${
+              msg.followUps?.length && msg === messages.at(-1)
+                ? `<div class="chat-followups">${msg.followUps
+                    .slice(0, 1)
+                    .map((text) => `<button type="button" data-chat-prompt>${esc(text)}</button>`)
+                    .join("")}</div>`
+                : ""
+            }</div>`,
         )
         .join("") +
-      (state.asking
-        ? `<p class="message pending">${t(state.chatTool === "data" ? "Analyzing data…" : "Applying changes…")}</p>`
+      (state.asking && state.askingTool === state.chatTool
+        ? `<div class="message pending" role="status"><span>${t(state.chatTool === "data" ? "Checking tools and analyzing…" : "Applying changes…")}</span><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></div>`
         : "");
     $("#chat").scrollTop = $("#chat").scrollHeight;
     $("#chat").dataset.empty = t(
@@ -2760,44 +2754,53 @@
         : "E.g. focus on emissions or show the Turku site",
     );
     const hasPrompts = $("#chat-prompts").children.length > 0;
-    const started = state.chat.length > 0;
+    const started = messages.length > 0;
     $("#chat-prompts").hidden = started && !state.promptsOpen;
     $("#chat-prompts-toggle").hidden = !hasPrompts || !started;
     $("#chat-prompts-toggle").textContent = t(
       state.promptsOpen ? "Hide suggestions" : "Show suggestions",
     );
-    $("#question").disabled = state.asking || sharedSession?.readOnly;
-    $("#ask-form button[type=submit]").disabled = state.asking || sharedSession?.readOnly;
+    const readOnly = sharedSession?.readOnly && state.chatTool === "dashboard";
+    $("#question").disabled = state.asking || readOnly;
+    $("#ask-form button[type=submit]").disabled = state.asking || readOnly;
     $("#ask-form").setAttribute("aria-busy", String(state.asking));
+    $("#composer").dataset.agent = state.chatTool;
+    for (const button of document.querySelectorAll("[data-agent-tab]"))
+      button.setAttribute("aria-pressed", String(button.dataset.agentTab === state.chatTool));
   }
   async function ask(question) {
-    if (sharedSession?.readOnly) return;
+    if (sharedSession?.readOnly && state.chatTool === "dashboard") return;
     if (state.asking || storageLoading || switchingReview || !storageReady) return;
     const workspace = chatWorkspace(),
       snapshot = JSON.stringify(workspace),
       revision = state.chatRevision,
       chatTool = state.chatTool;
-    const history = state.chat
+    const messages = state.chats[chatTool];
+    const history = messages
       .slice(-6)
       .map((msg) => ({ role: msg.user ? "user" : "assistant", content: msg.text.slice(0, 1800) }));
-    state.chat.push({ user: true, text: question });
+    messages.push({ user: true, text: question });
     state.promptsOpen = false;
     state.asking = true;
+    state.askingTool = chatTool;
     $("#chat").hidden = false;
     renderChat();
     updateChatToggle();
     try {
-      const response = await fetch(`/api/chat?lang=${language}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: question,
-          history,
-          workspace: { ...workspace, dashboardSnapshotId: dashboardClient?.snapshotId(state) },
-          lastQuery: state.lastQuery,
-        }),
-        signal: AbortSignal.timeout(95000),
-      });
+      const response = await fetch(
+        `/api/chat/${chatTool === "data" ? "analysis" : "dashboard"}?lang=${language}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: question,
+            history,
+            workspace: { ...workspace, dashboardSnapshotId: dashboardClient?.snapshotId(state) },
+            ...(chatTool === "data" ? { lastQuery: state.lastQuery } : {}),
+          }),
+          signal: AbortSignal.timeout(95000),
+        },
+      );
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || t("The assistant request failed."));
       if (revision !== state.chatRevision || snapshot !== JSON.stringify(chatWorkspace())) {
@@ -2810,12 +2813,13 @@
       }
       if (chatTool === "data") {
         if (result.query !== undefined) state.lastQuery = result.query;
-        state.chat.push({
+        messages.push({
           user: false,
           text: result.changed.length
             ? t("Find data is read-only. Use Change the dashboard to make edits.")
             : (result.answer ?? result.message ?? t("No changes.")),
           view: result.view,
+          results: result.results,
           followUps: result.followUps ?? [],
         });
         return;
@@ -2864,39 +2868,21 @@
         "approvedUpsells",
       ])
         state[key] = next[key];
-      if (result.query !== undefined) state.lastQuery = result.query;
-      else if (result.changed.some((key) => key.startsWith("scope."))) state.lastQuery = null;
-      const onDashboard =
-        Boolean(result.view) && chatTool === "dashboard" && state.view === "summary";
-      state.queryResult = onDashboard
-        ? result.view
-        : result.changed.length
-          ? null
-          : state.queryResult;
+      if (result.changed.some((key) => key.startsWith("scope."))) state.lastQuery = null;
+      if (result.changed.length) state.queryResult = null;
       applyChatAreas(next);
       if (result.changed.some((key) => /^(titleEdits|managerTexts|areaTitles|areaNotes)/.test(key)))
         revealChatEdits(workspace);
       render();
       if (result.changed.length) await flushReviewSave();
-      state.chat.push({
+      messages.push({
         user: false,
-        text: onDashboard
-          ? `${t("The comparison is on the dashboard.")} ${result.answer}`
-          : (result.answer ??
-            result.message ??
-            (result.changed.length ? t("Done") : t("No changes."))),
-        view: onDashboard ? null : result.view,
-        followUps: result.followUps ?? [],
+        text: result.message || (result.changed.length ? t("Done") : t("No changes.")),
       });
-      if (onDashboard) $("#query-result").scrollIntoView({ behavior: "smooth", block: "start" });
       if (result.changed.length && !result.view) {
         status(t("Done"));
 
-        const target = $(
-          !$("#customer-overview").hidden && result.changed.includes("savings")
-            ? "#customer-overview"
-            : "#story",
-        );
+        const target = $("#story");
         target.classList.remove("dashboard-updated");
         requestAnimationFrame(() => target.classList.add("dashboard-updated"));
         target.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -2912,7 +2898,7 @@
           : error.name === "TypeError"
             ? t("Could not reach the assistant. Try again shortly.")
             : error.message;
-      state.chat.push({ user: false, text: text });
+      messages.push({ user: false, text: text });
     } finally {
       state.asking = false;
       renderChat();
@@ -2936,7 +2922,7 @@
       hint: "Period, focus and visible content",
       prompts: [
         "Show Q2",
-        "Compare water by quarter",
+        "Add a service performance block",
         "Focus on emissions",
         "Restore the default dashboard",
       ],
@@ -2962,10 +2948,11 @@
     if (storageLoading || switchingReview) return;
     const uploading = id === "upload";
     if (!uploading) state.chatTool = id;
-    state.promptsOpen = true;
+    state.promptsOpen = false;
     $("#chat-data-import").hidden = !uploading;
     $("#toggle-chat").setAttribute("aria-controls", uploading ? "chat-data-import" : "chat");
     $("#chat-prompts").innerHTML = (chatTools[id].prompts ?? [])
+      .slice(0, 2)
       .map((text) => `<button type="button" data-chat-prompt>${esc(t(text))}</button>`)
       .join("");
     toggleChatMenu(false);
@@ -2994,6 +2981,8 @@
     const button = event.target.closest("[data-chat-tool]");
     if (button) openChatTool(button.dataset.chatTool);
   });
+  for (const button of document.querySelectorAll("[data-agent-tab]"))
+    button.addEventListener("click", () => openChatTool(button.dataset.agentTab));
   $("#chat-prompts-toggle").addEventListener("click", () => {
     state.promptsOpen = !state.promptsOpen;
     renderChat();
@@ -3107,10 +3096,12 @@
   // Reuses the file made for the current selection and makes a new one when needed.
   async function currentPresentation() {
     invalidatePowerPoint();
-    if (state.readyPresentation) {
-      const available = await fetch(`/api/presentations/${state.readyPresentation.id}`);
-      if (available.ok) return state.readyPresentation;
-      invalidatePowerPoint(true);
+    const cached = state.readyPresentation;
+    if (cached) {
+      const available = await fetch(`/api/presentations/${cached.id}`);
+      invalidatePowerPoint();
+      if (available.ok && state.readyPresentation === cached) return cached;
+      if (state.readyPresentation === cached) invalidatePowerPoint(true);
     }
     const ready = await startPresentation();
     if (!ready) throw new Error(t("Could not create the presentation. Try again."));
@@ -3149,9 +3140,16 @@
         ? customerKpis().filter((kpi) => kpi.priority)
         : [];
     const steps = includeAgenda ? agreedSteps() : [];
-    const stepsNote = steps.length
-      ? [t("Agreed next steps"), ...steps.map((step) => `• ${stepText(step)}`)].join("\n")
-      : "";
+    const areas = includeAgenda ? reviewAreas() : [];
+    // Carry saved action text through the existing review-area payload.
+    if (steps.length)
+      areas.push({
+        id: "agreedactions",
+        title: t("Agreed next steps"),
+        headline: "",
+        points: [],
+        note: steps.map(stepText).join("\n"),
+      });
     const agendaNote = agenda.length
       ? [
           t("Contract KPIs for discussion"),
@@ -3165,14 +3163,14 @@
         : {}),
       included: deckInsights(),
       titleEdits: state.titleEdits,
-      note: [state.note, stepsNote, agendaNote].filter(Boolean).join("\n\n"),
+      note: [state.note, agendaNote].filter(Boolean).join("\n\n"),
       cooperation: state.cooperation,
-      savings: state.savings,
+      ...(!includeAgenda ? { savings: state.savings } : {}),
       managerTexts: state.managerTexts,
       approvedUpsells: state.approvedUpsells,
       slideOrder: state.slideOrder,
       hideUsage: state.hideUsage,
-      reviewAreas: includeAgenda ? reviewAreas() : [],
+      reviewAreas: areas,
       language,
     };
   }
@@ -3194,11 +3192,9 @@
       if (!response.ok)
         throw new Error(result.error || t("Could not create the presentation. Try again."));
       if (request !== JSON.stringify(presentationRequest())) return null;
-      const viewUrl = `/kopperoinenp/presentation.html?id=${encodeURIComponent(result.id)}&lang=${language}`;
       state.readyPresentation = {
         id: result.id,
         downloadUrl: result.downloadUrl,
-        viewUrl,
         request: JSON.stringify(presentationRequest()),
         expires: Date.now() + result.expiresInSeconds * 1000,
       };
@@ -3222,26 +3218,24 @@
       status(t("Shorten the presentation note or exclude the KPI agenda."));
       return;
     }
-    const viewer = window.open(`/kopperoinenp/presentation.html?lang=${language}`, "_blank");
-    if (!viewer) {
-      status(t("Allow the presentation to open in a new tab and try again."));
-      return;
-    }
-    viewer.opener = null;
     const button = $("#open-review");
     state.generating = true;
     button.disabled = true;
     button.textContent = t("Preparing…");
     try {
+      await flushReviewSave().catch(() => {});
       const ready = await currentPresentation();
-      if (!viewer.closed) viewer.location.replace(ready.viewUrl);
+      const response = await fetch(`/api/presentations/${ready.id}/open?lang=${language}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      status(t("Sent to PowerPoint"));
     } catch (error) {
       const message = error.message || t("Could not create the presentation. Try again.");
       status(message);
-      if (!viewer.closed)
-        viewer.location.replace(
-          `/kopperoinenp/presentation.html?lang=${language}&error=${encodeURIComponent(message)}`,
-        );
     } finally {
       state.generating = false;
       button.textContent = t("Open presentation");

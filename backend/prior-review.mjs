@@ -5,6 +5,7 @@ export const priorReview = {
   year: 2024,
   goals: [
     {
+      metric: "water",
       label: "Water per kg washed",
       actual: 6.938476,
       target: 7,
@@ -13,6 +14,7 @@ export const priorReview = {
       lower: true,
     },
     {
+      metric: "emissions",
       label: "Emissions per kg washed",
       actual: 0.085601,
       target: 0.08,
@@ -51,8 +53,8 @@ export function priorGoalsSlide(customerId, t) {
     id: "prior-goals",
     kind: "text",
     layout: "goals",
-    kicker: t("Previous review"),
-    title: `${t("Goals and results")} ${priorReview.year}`,
+    kicker: t`A look back at the ${priorReview.year} goals`,
+    title: t("Goals and results"),
     boundary: t("The figures cover all Apex sites in 2024. The targets are fictional examples."),
     kpis,
     paragraphs: kpis.map(
