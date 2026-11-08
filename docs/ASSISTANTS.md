@@ -26,10 +26,14 @@ additive column and a matching unit. Snapshots, stock, rates, targets and
 intensities cannot be summed. Joins and arbitrary executable code are unsupported.
 Raw rows remain on the backend during tool creation. Column labels and types
 are sent to the configured provider.
-Uploaded numeric columns also appear as prospective tools in discovery. These
-are built and validated only after selection. Recipe fields are restricted to
+Complete additive columns in uploads with at least three unique rows also appear
+as prospective tools in discovery, with their supported units. Snapshots,
+unknown units, incomplete columns and duplicate rows do not produce sum candidates.
+These tools are built and validated only after selection. Recipe fields are restricted to
 the discovered table and column IDs. The raw-column catalog describes new-tool
 inputs; existing tools retain their own separate data sources.
+Matching generated sums are offered for reuse rather than as another new tool.
+Repeating the same validated definition does not consume an additional tool slot.
 
 Results include source information and a trace of catalog inspection, schema
 inspection when needed, validation and execution. The response always has an
@@ -96,4 +100,5 @@ to be enabled in Work settings. Provider calls require configured credentials.
 Finnish and English requests with empty histories and no tool names in the
 requests. It checks totals, emissions components, service duration, dashboard
 edits, period filters, titles, agent boundaries and a new uploaded-data tool.
+It also checks country/month follow-ups and reuse of the uploaded-data calculation.
 The local report is written to `.local/harness-live-results.json`.

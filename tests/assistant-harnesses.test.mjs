@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { runAnalysisHarness, runDashboardHarness } from "../backend/assistant-harnesses.mjs";
 import { chatSchema, normalizeWorkspace } from "../backend/review-chat.mjs";
-import { analysisRuntime } from "../backend/analysis-runtime.mjs";
+import { analysisRuntime, rememberAnalysisImport } from "../backend/analysis-runtime.mjs";
 import { requestContext, subsetDataset } from "../backend/request-context.mjs";
 import { fixtureDataset } from "../backend/dataset.mjs";
 import { calculateDashboard } from "../backend/dashboard-model.mjs";
@@ -24,7 +24,7 @@ const selection = (fields) => ({
 });
 
 test("analyst calculates a scoped answer without mutating the workspace", async () => {
-  const current = workspace();
+  const current = { ...workspace(), language: "fi" };
   const before = structuredClone(current);
   const result = await runAnalysisHarness(
     { message: "Compare emissions by country", workspace: current },
@@ -43,6 +43,7 @@ test("analyst calculates a scoped answer without mutating the workspace", async 
   assert.deepEqual(result.workspace, before);
   assert.deepEqual(result.changed, []);
   assert.ok(result.view.rows.length);
+  assert.equal(result.view.language, "en");
   assert.equal(result.trace.at(-1).tool, "dataQuery");
 });
 
@@ -166,6 +167,111 @@ test("snapshot sums and invented units are refused by the runtime", () => {
   assert.throws(
     () => runtime.create({ ...definition, value: repairs.id, unit: "EUR" }),
     /failed validation/,
+  );
+});
+
+test("uploaded sum discovery excludes unusable columns and reuses the validated tool", async () => {
+  await requestContext.run(
+    {
+      user: { id: "reader", tenant_id: "discovery-test" },
+      permissions: new Map([["CUST002", false]]),
+      data: subsetDataset(fixtureDataset, ["CUST002"]),
+    },
+    async () => {
+      rememberAnalysisImport(
+        "CUST002",
+        {
+          Logistics: [10, 20, 30].map((count, i) => ({
+            customer_id: "CUST002",
+            month: `2025-0${i + 1}`,
+            dispatch_count: count,
+            allocated_pieces: 100,
+            service_rate: 0.9,
+            unknown_metric: 4,
+            incomplete_kg: i ? 5 : null,
+            staff_id_count: i + 1,
+          })),
+        },
+        { customerMatch: "matched", providerSchemaSharing: true },
+      );
+      let createdId,
+        definitions = 0;
+      const generate = async ({ name, input, schema }) => {
+        if (name === "analysis_tool_selection") {
+          const facts = JSON.parse(input);
+          if (createdId) {
+            assert.deepEqual(facts.sourceTools, []);
+            const tool = facts.generatedCatalog.find(({ id }) => id === createdId);
+            assert.equal(tool.source.value, "dispatch_count");
+            assert.ok(schema.properties.toolId.enum.includes(createdId));
+            return selection({ tool: "reuse_generated", toolId: createdId });
+          }
+          assert.equal(facts.sourceTools.length, 1);
+          return selection({ tool: facts.sourceTools[0].id });
+        }
+        if (name === "analysis_tool_definition") {
+          definitions++;
+          const table = JSON.parse(input).tables.find(({ name }) => name === "upload_Logistics");
+          const column = table.columns.find(({ column }) => column === "dispatch_count");
+          assert.deepEqual(schema.properties.value.enum, [column.id]);
+          assert.deepEqual(schema.properties.operation.enum, ["sum"]);
+          assert.ok(schema.properties.unit.enum.includes("count"));
+          return {
+            table: table.id,
+            value: column.id,
+            name: "Dispatches",
+            operation: "sum",
+            denominator: null,
+            period: null,
+            unit: "count",
+          };
+        }
+        return { reply: "60 dispatches." };
+      };
+      const first = await runAnalysisHarness(
+        { message: "Montako lähetystä?", workspace: workspace() },
+        { generate },
+      );
+      createdId = first.results[0].id;
+      assert.equal(first.view.language, "fi");
+      const again = await runAnalysisHarness(
+        { message: "Run that again", workspace: workspace() },
+        { generate },
+      );
+      assert.equal(again.view.rows[0].value, 60);
+      assert.equal(again.trace[1].stage, "reuse");
+      assert.equal(definitions, 1);
+    },
+  );
+});
+
+test("repeating an existing definition remains valid at the generated-tool limit", async () => {
+  await requestContext.run(
+    {
+      user: { id: "reader", tenant_id: "tool-limit-test" },
+      permissions: new Map([["CUST002", false]]),
+      data: subsetDataset(fixtureDataset, ["CUST002"]),
+    },
+    async () => {
+      const runtime = analysisRuntime(workspace());
+      const table = runtime.schema.find(({ name }) => name === "activity");
+      const value = table.columns.find(({ column }) => column === "repair_count").id;
+      const recipe = {
+        table: table.id,
+        value,
+        operation: "sum",
+        denominator: null,
+        period: null,
+        unit: "repairs",
+      };
+      const first = runtime.create({ ...recipe, name: "Repairs 0" });
+      for (let i = 1; i < 8; i++) runtime.create({ ...recipe, name: `Repairs ${i}` });
+      assert.equal(runtime.create({ ...recipe, name: "Repairs 0" }).id, first.id);
+      assert.throws(
+        () => runtime.create({ ...recipe, name: "Another repair tool" }),
+        /eight generated tools/,
+      );
+    },
   );
 });
 

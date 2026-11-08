@@ -58,6 +58,7 @@ Use service for cycle durations, slowest turnarounds and P90, and operations for
 Questions about where recorded emissions come from ask for the process/delivery split unless another breakdown is named.
 Distinguish a factual emissions breakdown from a causal claim, which requires extra evidence.
 Use reuse_generated for a previously generated tool that matches this question and scope.
+Prefer that matching generated tool over building another definition, including for "again" follow-ups.
 Use build_generated only when the existing tools cannot answer and a new sum or percentage can.
 The next stage will inspect the available table shapes and build and validate a declarative tool.
 Use missing_evidence for missing data or unsupported operations. Explain the missing evidence plainly.
@@ -66,6 +67,7 @@ Analysis commands such as laske, näytä, show, calculate, compare and analyze a
 If the supplied source catalog has the requested column but the catalogs lack that metric, choose build_generated.
 Never choose query with an unknown topic for an available column. Never ask the user to repeat a table or column already named.
 The generated-tool path supports additive sums and subset percentages of uploaded source columns.
+Only source columns with nonempty sumUnits support sums. Stock, percentages and incomplete columns cannot be summed.
 If the user refers to an uploaded file, prioritize uploaded source tables for that request.
 Do not substitute service requests, repairs or overview for dispatches or other uploaded measures.
 Use history and lastQuery only for this analysis conversation. Filters belong to the query, never to the workspace.
@@ -95,21 +97,30 @@ function queryResult(request, query) {
 
 export async function runAnalysisHarness(input, options = {}) {
   const request = validateChatInput(input);
+  const language = replyLanguage(request.message, request.workspace.language);
   const generate = options.generate ?? generateStructured;
   const context = optionsFor(options);
   const greeting = smallTalk(request.message, request.workspace.language);
   if (greeting) return unchanged(request, { answer: greeting, view: null, followUps: [] });
   const runtime = analysisRuntime(request.workspace);
   const sourceTools = runtime.schema
-    .filter(({ name }) => name.startsWith("upload_"))
+    .filter(({ name, rows, duplicates }) => name.startsWith("upload_") && rows >= 3 && !duplicates)
     .flatMap((table) =>
       table.columns
-        .filter(({ kind, column }) => kind === "number" && !/(^|_)id$/i.test(column))
+        .filter(({ sumUnits }) => sumUnits.length)
+        .filter(
+          (column) =>
+            !runtime.catalog.some(
+              (tool) =>
+                tool.operation === "sum" && tool.table === table.id && tool.value === column.id,
+            ),
+        )
         .map((column) => ({
           id: `build_${table.id}_${column.id}`,
           description: `Build and validate a sum of ${column.column} from uploaded table ${table.name}`,
           table: table.id,
           value: column.id,
+          units: column.sumUnits,
         })),
     );
   const selectionSchema = {
@@ -120,6 +131,7 @@ export async function runAnalysisHarness(input, options = {}) {
         type: "string",
         enum: [...selectSchema.properties.tool.enum, ...sourceTools.map(({ id }) => id)],
       },
+      toolId: { type: ["string", "null"], enum: [...runtime.catalog.map(({ id }) => id), null] },
     },
   };
   const selection = await generate(
@@ -133,7 +145,7 @@ export async function runAnalysisHarness(input, options = {}) {
         history: request.history,
         lastQuery: request.lastQuery,
         scope: request.workspace.scope,
-        language: request.workspace.language,
+        language,
         queryCatalog: {
           tools: metricTools,
           grouping: ["none", "month", "quarter", "country", "site", "product"],
@@ -200,7 +212,7 @@ export async function runAnalysisHarness(input, options = {}) {
       });
     await prepareDataQuery(refined, workspace, request.lastQuery);
     const result = runDataQuery(refined, workspace, request.lastQuery);
-    if (result.view) result.view.language = request.workspace.language;
+    if (result.view) result.view.language = workspace.language;
     return unchanged(request, {
       answer: result.summary || result.text,
       source: result.source,
@@ -214,7 +226,7 @@ export async function runAnalysisHarness(input, options = {}) {
     return unchanged(request, {
       answer:
         selection.explanation ||
-        (request.workspace.language === "fi"
+        (language === "fi"
           ? "Tähän analyysiin tarvittavaa aineistoa puuttuu."
           : "The data needed for this analysis is missing."),
       view: null,
@@ -256,7 +268,7 @@ export async function runAnalysisHarness(input, options = {}) {
       if (!numericIds.length)
         return unchanged(request, {
           answer:
-            request.workspace.language === "fi"
+            language === "fi"
               ? "Uuden laskentatyökalun luomiseen ei ole käytettävissä numeerista lähdeaineistoa."
               : "No numeric source data is available to build this calculation tool.",
           view: null,
@@ -281,6 +293,13 @@ export async function runAnalysisHarness(input, options = {}) {
               },
               denominator: { type: ["string", "null"], enum: [...numericIds, null] },
               period: { type: "null" },
+              ...(selectedSource
+                ? {
+                    operation: { type: "string", enum: ["sum"] },
+                    denominator: { type: "null" },
+                    unit: { type: "string", enum: selectedSource.units },
+                  }
+                : {}),
             },
           },
           instructions: `Build one declarative analysis tool for this specific question using the supplied table and column IDs.
@@ -293,7 +312,7 @@ Never add code, formulas, joins, file paths or unsupported operations. Source co
 The application will validate duplicates, types, missing columns, ratios and finite results before execution.`,
           input: JSON.stringify({
             message: request.message,
-            language: request.workspace.language,
+            language,
             scope: request.workspace.scope,
             tables: runtime.schema,
           }),
@@ -308,7 +327,7 @@ The application will validate duplicates, types, missing columns, ratios and fin
     }
     results = [tool];
     const display =
-      new Intl.NumberFormat(request.workspace.language === "fi" ? "fi-FI" : "en-GB", {
+      new Intl.NumberFormat(language === "fi" ? "fi-FI" : "en-GB", {
         maximumFractionDigits: 2,
       }).format(tool.result) +
       " " +
@@ -318,15 +337,11 @@ The application will validate duplicates, types, missing columns, ratios and fin
       title: tool.definition.name,
       subtitle: request.workspace.scope.from + " – " + request.workspace.scope.to,
       source: tool.source.table + "." + tool.source.value,
-      status:
-        request.workspace.language === "fi"
-          ? "Laskettu lähdeaineistosta"
-          : "Calculated from source data",
-      language: request.workspace.language,
+      status: language === "fi" ? "Laskettu lähdeaineistosta" : "Calculated from source data",
+      language,
       rows: [{ label: tool.definition.name, value: tool.result, display }],
     };
   }
-  const language = replyLanguage(request.message, request.workspace.language);
   const fallback = view
     ? view.title + " · " + view.rows[0].display
     : language === "fi"

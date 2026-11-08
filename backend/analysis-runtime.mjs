@@ -9,22 +9,31 @@ const recipes = new Map();
 const lifetime = 30 * 60 * 1000;
 const nonAdditive =
   /allocated_pieces|active_assets_scanned|wearers|inventory|stock|snapshot|percent|pct|ratio|rate|median|average|intensity|target|factor|baseline/i;
+function sumUnitsFor(column) {
+  if (
+    nonAdditive.test(column) ||
+    /(^|[\s_-])(id|identifier|code|koodi|tunnus)([\s_-]|$)/i.test(column)
+  )
+    return [];
+  return (
+    [
+      [/(?:^|_)kwh$|energy_kwh|electricity_kwh/i, ["kWh"]],
+      [/kgco2e|co2e_kg/i, ["kg CO2e", "kg CO₂e"]],
+      [/(?:^|_)kg$|washed_kg/i, ["kg"]],
+      [/(?:^|_)l$|water_l|litres/i, ["l", "L", "litres"]],
+      [/repair_count/i, ["repairs", "korjausta", "kpl"]],
+      [/service_requests/i, ["requests", "palvelupyyntöä", "kpl"]],
+      [/washed_pieces/i, ["pieces", "pesua", "kpl"]],
+      [/(?:^|_)eur$/i, ["EUR", "€"]],
+      [/(?:^|_)(count|events)$/i, ["events", "kpl", "count"]],
+    ].find(([pattern]) => pattern.test(column))?.[1] ?? []
+  );
+}
 function validateAdditiveColumn(profiles, definition) {
   const table = profiles.find(({ id }) => id === definition?.table);
   const column = table?.columns.find(({ id }) => id === definition.value)?.column ?? "";
   if (definition.operation !== "sum") return;
-  const units = [
-    [/(?:^|_)kwh$|energy_kwh|electricity_kwh/i, ["kWh"]],
-    [/kgco2e|co2e_kg/i, ["kg CO2e", "kg CO₂e"]],
-    [/(?:^|_)kg$|washed_kg/i, ["kg"]],
-    [/(?:^|_)l$|water_l|litres/i, ["l", "L", "litres"]],
-    [/repair_count/i, ["repairs", "korjausta", "kpl"]],
-    [/service_requests/i, ["requests", "palvelupyyntöä", "kpl"]],
-    [/washed_pieces/i, ["pieces", "pesua", "kpl"]],
-    [/(?:^|_)eur$/i, ["EUR", "€"]],
-    [/(?:^|_)(count|events)$/i, ["events", "kpl", "count"]],
-  ].find(([pattern]) => pattern.test(column))?.[1];
-  if (nonAdditive.test(column) || !units?.includes(definition.unit))
+  if (!sumUnitsFor(column).includes(definition.unit))
     throw new PresentationError(
       "The column is not an additive quantity with a supported unit.",
       422,
@@ -98,9 +107,25 @@ export function analysisRuntime(workspace) {
       name,
       rows: rows.length,
       duplicates,
-      columns: columns.map(({ id, column, kind, missing }) => ({ id, column, kind, missing })),
+      columns: columns.map(({ id, column, kind, missing }) => ({
+        id,
+        column,
+        kind,
+        missing,
+        sumUnits: kind === "number" && !missing ? sumUnitsFor(column) : [],
+      })),
     })),
-    catalog: [...entry.definitions].map(([id, definition]) => ({ id, ...definition })),
+    catalog: [...entry.definitions].map(([id, definition]) => {
+      const table = profiles.find(({ id }) => id === definition.table);
+      return {
+        id,
+        ...definition,
+        source: {
+          table: table.name,
+          value: table.columns.find(({ id }) => id === definition.value).column,
+        },
+      };
+    }),
     run(id) {
       const definition = entry.definitions.get(id);
       if (!definition)
@@ -119,7 +144,7 @@ export function analysisRuntime(workspace) {
           422,
         );
       }
-      if (entry.definitions.size >= 8)
+      if (!entry.definitions.has(result.id) && entry.definitions.size >= 8)
         throw new PresentationError("This scope already has eight generated tools.", 429);
       entry.definitions.set(result.id, structuredClone(definition));
       return result;

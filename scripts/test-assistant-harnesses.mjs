@@ -141,6 +141,46 @@ for (let iteration = 0; iteration < repeats; iteration++) {
     }
   }
 }
+let previousQuery = null;
+const followupHistory = [];
+for (const [message, country, comparison] of [
+  ["Paljonko vettä on kulunut yhteensä?", null, "none"],
+  ["Entä Ruotsissa?", "Sweden", "none"],
+  ["Ja kuukausittain?", "Sweden", "month"],
+]) {
+  try {
+    const workspace = current();
+    const result = await runAnalysisHarness({
+      message,
+      workspace,
+      history: followupHistory,
+      lastQuery: previousQuery,
+    });
+    assert.deepEqual(result.workspace, workspace);
+    assert.equal(result.query.topic, "water");
+    assert.equal(result.query.measure, "total");
+    assert.equal(result.query.compareBy, comparison);
+    if (country) assert.equal(result.query.country, country);
+    assert.ok(result.view.rows.length);
+    previousQuery = result.query;
+    followupHistory.push(
+      { role: "user", content: message },
+      { role: "assistant", content: result.answer.slice(0, 1800) },
+    );
+    observations.push({ agent: "analysis", message, context: "follow-up", passed: true });
+    console.log("PASS follow-up", message);
+  } catch (error) {
+    observations.push({
+      agent: "analysis",
+      message,
+      context: "follow-up",
+      passed: false,
+      reason: error.message,
+    });
+    console.log("FAIL follow-up", message, error.message);
+    break;
+  }
+}
 const uploaded = {
   Logistics: [
     { customer_id: "CUST002", month: "2025-01", dispatch_count: 10 },
@@ -155,6 +195,7 @@ const profile = await analyzeImport(uploaded, {
   generate: async () => ({ tools: [] }),
 });
 rememberAnalysisImport("CUST002", uploaded, profile);
+let uploadStage = "Uploaded dispatch count without column names";
 try {
   const result = await runAnalysisHarness({
     message: "Monta lähetystä oli yhteensä siinä lisäämässäni tiedostossa?",
@@ -174,10 +215,27 @@ try {
     passed: true,
   });
   console.log("PASS uploaded data tool creation without naming a column or tool");
+  uploadStage = "Reuse uploaded calculation from ordinary follow-up";
+  const repeated = await runAnalysisHarness({
+    message: "Voitko laskea sen uudelleen?",
+    workspace: current(),
+    history: [
+      { role: "user", content: "Monta lähetystä oli yhteensä siinä lisäämässäni tiedostossa?" },
+      { role: "assistant", content: result.answer.slice(0, 1800) },
+    ],
+  });
+  assert.equal(repeated.view.rows[0].value, 60);
+  assert.ok(repeated.trace.some(({ stage }) => stage === "reuse"));
+  observations.push({
+    agent: "analysis",
+    message: "Reuse uploaded calculation from ordinary follow-up",
+    passed: true,
+  });
+  console.log("PASS generated tool reused for an ordinary follow-up");
 } catch (error) {
   observations.push({
     agent: "analysis",
-    message: "Uploaded dispatch count without column names",
+    message: uploadStage,
     passed: false,
     reason: error.message,
   });
