@@ -1,7 +1,7 @@
 import "../frontend/mockups/kopperoinenp/language.js";
 import { dataset as data } from "./dataset.mjs";
 import { demoCooperation2025 } from "./demo-cooperation.mjs";
-import { priorGoalsSlide } from "./prior-review.mjs";
+import { priorGoalsSlide, priorReview } from "./prior-review.mjs";
 import { requestContext } from "./request-context.mjs";
 import "../frontend/mockups/kopperoinenp/model.js";
 import "../frontend/mockups/kopperoinenp/story-model.js";
@@ -36,10 +36,59 @@ const defaults = {
   baseline: "B_LOCAL",
   priority: "neutral",
 };
+const agreedActionsArea = "agreedactions";
+const agreedActionsSlide = `area-${agreedActionsArea}`;
 function periodLabel({ from, to }) {
   if (from === to) return from;
   const year = from.slice(0, 4);
   return from === `${year}-01` && to === `${year}-12` ? year : `${from}–${to}`;
+}
+function usageRecommendation(usage, t, f) {
+  const { stock, repair, wash } = usage;
+  if (stock) {
+    return {
+      finding: t`${stock.site}: average monthly washes for ${stock.product} fell from ${f(stock.beforeWashes)} to ${f(stock.afterWashes)} between ${periodLabel(stock.before)} and ${periodLabel(stock.after)}. Average stock stayed near ${f(stock.afterStock)} items.`,
+      investigation: t(
+        "This is a place to check whether textile stock still matches staffing and workload.",
+      ),
+      steps: [
+        t`At ${stock.site}, check staffing, workload and seasonal changes for ${stock.product}.`,
+        t("Ask Lindström to compare the stock and size mix with current needs."),
+        t("If stock exceeds the need, trial a smaller allocation and track availability and cost."),
+      ],
+    };
+  }
+  if (repair) {
+    return {
+      finding: t`${repair.site}: ${repair.product} had ${f(repair.rate, 1)} repairs per 100 washes versus ${f(repair.peerRate, 1)} at ${repair.peer}, across ${repair.months} matching months.`,
+      investigation: t(
+        "This identifies where to inspect wear, garment fit and work conditions before choosing a change.",
+      ),
+      steps: [
+        t`At ${repair.site}, review the recurring repair reasons for ${repair.product}.`,
+        t(
+          "Compare garment age and work conditions with the other site and agree a trial with Lindström.",
+        ),
+        t("Track time in use after repair and repeated repairs for the same textile group."),
+      ],
+    };
+  }
+  if (wash) {
+    return {
+      finding: t`${wash.site}: ${wash.product} averaged ${f(wash.rate, 2)} washes per allocated item per month versus ${f(wash.peerRate, 2)} at ${wash.peer}. It was lower in ${wash.lowerMonths} of ${wash.months} matching months.`,
+      investigation: t(
+        "Check whether stock levels, work patterns or wash routines explain the difference.",
+      ),
+      steps: [
+        t`At ${wash.site}, check the stock and wash routines for ${wash.product} against actual use.`,
+        t(
+          "Review the difference with Lindström and confirm the hygiene and availability requirements.",
+        ),
+        t("If stock exceeds demand, trial a smaller allocation and monitor availability and cost."),
+      ],
+    };
+  }
+  return null;
 }
 function validAreaStats(stats) {
   return (
@@ -241,29 +290,103 @@ export function buildPresentation(input) {
         : t("All sites");
   const footer = t`Synthetic data · ${scopeName} · ${period} · Baseline: ${baseline}`;
   const difference = (delta, pct) => `${delta >= 0 ? "−" : "+"}${f(Math.abs(pct))} %`;
+  const { from, to, country, continent, site, priority } = request.scope;
+  const wholeYear =
+    from === "2025-01" &&
+    to === "2025-12" &&
+    [country, continent, site].every((part) => part === "all");
+  const comparableGoals =
+    wholeYear && request.scope.customer === priorReview.customerId ? priorReview.goals : [];
+  const intensity = (metrics, key) => (metrics?.kg ? metrics[key] / metrics.kg : null);
+  const previous = snapshot
+    ? snapshot.comparisons.yoy
+    : globalThis.ReviewAnalysisTools.periodComparison(data, request.scope, "yoy");
+  const earlier = snapshot
+    ? snapshot.previous?.ctx.metrics
+    : previous &&
+      globalThis.WorkspaceModel.buildContext(data, { ...request.scope, ...previous.previousPeriod })
+        .metrics;
+  const previousLabel = previous && periodLabel(previous.previousPeriod);
+  const gap = comparableGoals
+    .filter(({ metric }) => metric && (priority === "neutral" || priority === metric))
+    .map((goal) => ({ ...goal, current: intensity(m, goal.metric) }))
+    .filter(({ current, target }) => current > target)
+    .sort((a, b) => b.current / b.target - a.current / a.target)[0];
+  const gapFinding = gap
+    ? t`${t(gap.label)}: ${f(gap.current, gap.digits)} ${gap.unit}. This is ${f((gap.current / gap.target - 1) * 100, 1)} % above the 2024 example target of ${f(gap.target, gap.digits)} ${gap.unit}.`
+    : null;
+  const deliveryEmissions =
+    gap?.metric === "emissions"
+      ? snapshot
+        ? snapshot.tools.find(({ id }) => id === "footprint")?.values?.deliveryKgCo2e
+        : ctx.rows.reduce((total, row) => total + row.allocated_delivery_kgco2e, 0)
+      : null;
+  const deliveryShare =
+    deliveryEmissions == null || !m.emissions ? null : deliveryEmissions / m.emissions;
+  const pickupTrial = deliveryShare != null && deliveryShare >= 0.5;
   const repairRate = (metrics) => (metrics?.washed ? (metrics.repairs / metrics.washed) * 100 : 0);
   const cycle = snapshot
     ? snapshot.finding
     : globalThis.WorkspaceModel.serviceCycleFinding(data, request.scope);
-  const finding = cycle
-    ? t`${cycle.site}: 90% of service cycles finished within ${f(cycle.actual, 1)} h. The median for other sites was ${f(cycle.reference, 1)} h.`
-    : m.washed
-      ? t`The selected period had ${f(repairRate(m), 1)} repairs per 100 washes.`
-      : t("The selected period has too little wash data to compare repair rates.");
-  const investigation = cycle
-    ? t("Check whether delays cluster around pickup or return before changing the schedule.")
-    : t("Compare repair rates by site and textile type, then check which repair reasons recur.");
-  const nextSteps = cycle
-    ? [
-        t`Review a sample of the longest cycles at ${cycle.site}.`,
-        t("If a recurring delay is confirmed, assign an owner to test a change at that handoff."),
-        t("Compare the time within which 90% of cycles finish before and after the trial."),
-      ]
-    : [
-        t("Review the repair reasons for the textile types with the highest repair rates."),
-        t("If a wear pattern recurs, assign an owner to test a change in handling or care."),
-        t("Track repairs per 100 washes for the same textile types after the trial."),
-      ];
+  const localRecommendation =
+    gap || cycle
+      ? null
+      : usageRecommendation(
+          snapshot?.usage ?? globalThis.WorkspaceModel.usageFindings(data, request.scope),
+          t,
+          f,
+        );
+  const finding =
+    gapFinding ??
+    (cycle
+      ? t`${cycle.site}: 90% of service cycles finished within ${f(cycle.actual, 1)} h. The median for other sites was ${f(cycle.reference, 1)} h.`
+      : (localRecommendation?.finding ??
+        (m.washed
+          ? t`${f(m.repairs)} repairs were recorded. Check where repairs keep textiles in use and where the same problems recur.`
+          : t("Review the repair records alongside garment usage before setting a target."))));
+  const investigation = gap
+    ? pickupTrial
+      ? t`Deliveries account for ${f(deliveryShare * 100)} % of modelled emissions. Check whether any extra pickups could go on regular rounds.`
+      : t(
+          "Check whether any textiles are washed sooner than needed under your hygiene rules. Lindström can check the laundry process separately.",
+        )
+    : cycle
+      ? t(
+          "Check whether used textiles are ready at the agreed pickup time. Lindström can check where delays occur between pickup and return.",
+        )
+      : (localRecommendation?.investigation ??
+        t(
+          "Check where wear recurs at your sites. The garment fit, work task and repair records can help narrow down what to test.",
+        ));
+  const nextSteps = gap
+    ? pickupTrial
+      ? [
+          t("At one site, list extra pickups and why they were needed."),
+          t(
+            "Ask Lindström which routine pickups could be combined without affecting availability.",
+          ),
+          t("Together, trial the change and track extra pickups and delivery emissions per kg."),
+        ]
+      : [
+          t(
+            "Choose one textile group and check how often it is sent to wash against your hygiene rules.",
+          ),
+          t("Ask Lindström to check the laundry process for the same textile group."),
+          t("Agree on one change and compare the impact per kg over a comparable period."),
+        ]
+    : cycle
+      ? [
+          t`At ${cycle.site}, check when textiles were ready on days with long service cycles.`,
+          t("Ask Lindström to compare those times with the recorded pickup and return."),
+          t("Compare the time within which 90% of cycles finish before and after the trial."),
+        ]
+      : (localRecommendation?.steps ?? [
+          t("At one site, ask users where garments wear out or need repeat repairs."),
+          t("Review fit, handling and repair reasons with Lindström and test one change."),
+          t(
+            "Track how long repaired textiles stay in use and compare repair costs with replacement costs.",
+          ),
+        ]);
   const slides = {
     cover: {
       id: "cover",
@@ -371,11 +494,12 @@ export function buildPresentation(input) {
         values: (ctx.series?.repairs ?? globalThis.WorkspaceModel.series(ctx, "repairs")).map(
           (p) => p.value,
         ),
-        unit: "items",
+        unit: "Recorded repairs",
+        name: t("Recorded repairs by month"),
       },
       source: t("Repair records"),
       boundary: t(
-        "Repairs keep textiles in use longer. Counting them per 100 washes helps compare periods with different wash volumes.",
+        "A repair can keep a textile in service and defer the need for a replacement. Track time in service after repair and compare the costs of repair and replacement to assess the benefit.",
       ),
     },
     opportunity: {
@@ -407,7 +531,7 @@ export function buildPresentation(input) {
     plan: {
       id: "plan",
       kind: "text",
-      title: t("Where the service could improve"),
+      title: t("What you can improve with Lindström"),
       paragraphs: [finding, investigation, ...nextSteps],
       boundary: t("Agree on an owner and a follow-up date so each priority can be tracked."),
     },
@@ -448,15 +572,6 @@ export function buildPresentation(input) {
     }
   const delta = (value) => f(Math.abs(value));
   const kpi = (value, label, change = null) => ({ value, label, ...change });
-  const previous = snapshot
-    ? snapshot.comparisons.yoy
-    : globalThis.ReviewAnalysisTools.periodComparison(data, request.scope, "yoy");
-  const earlier = snapshot
-    ? snapshot.previous?.ctx.metrics
-    : previous &&
-      globalThis.WorkspaceModel.buildContext(data, { ...request.scope, ...previous.previousPeriod })
-        .metrics;
-  const previousLabel = previous && periodLabel(previous.previousPeriod);
   const change = (now, before, better = null) => {
     if (now == null || !before || !previousLabel) return null;
     const percent = Number((((now - before) / before) * 100).toFixed(1));
@@ -480,24 +595,21 @@ export function buildPresentation(input) {
     lead: t("Key results and shared priorities for 2026."),
     kpis: [],
   });
-  const { service } =
+  const { service, repairScenarios } =
     snapshot?.detail ?? globalThis.WorkspaceModel.analyzeDetails(data, request.scope);
-  const { from, to, country, continent, site } = request.scope;
-  const wholeYear =
-    from === "2025-01" &&
-    to === "2025-12" &&
-    [country, continent, site].every((part) => part === "all");
   const cooperation = wholeYear ? demoCooperation2025.get(request.scope.customer) : null;
+  const environmentalMetric = priority === "water" ? "water" : "emissions";
+  const environmentalValue = intensity(m, environmentalMetric);
+  const environmentalUnit = environmentalMetric === "water" ? "L/kg" : "kg CO₂e/kg";
+  const environmentalDigits = environmentalMetric === "water" ? 2 : 4;
   Object.assign(slides.overview, {
     layout: "kpis",
     kicker: t("The service in numbers"),
     kpis: [
-      kpi(f(m.sites), t("Sites")),
-      kpi(f(m.allocated), t("Textiles in service"), yearChange("allocated", "higher")),
-      kpi(`${f(m.kg / 1000)} t`, t("Washed"), yearChange("kg", "higher")),
       kpi(
         service.latePct == null ? "—" : `${f(100 - service.latePct, 1)} %`,
         t("On-time service cycles"),
+        { delta: t("Contract target unavailable") },
       ),
       kpi(
         cooperation ? `${f(cooperation.invoicedEur)} €` : "—",
@@ -511,7 +623,18 @@ export function buildPresentation(input) {
         t("User feedback"),
         cooperation ? { delta: t`${f(cooperation.responses)} survey responses` } : null,
       ),
+      kpi(
+        environmentalValue == null
+          ? "—"
+          : `${f(environmentalValue, environmentalDigits)} ${environmentalUnit}`,
+        t(environmentalMetric === "water" ? "Water per kg washed" : "Emissions per kg washed"),
+      ),
     ],
+    fine: [
+      [t("Sites"), f(m.sites)],
+      [t("Textiles in service"), f(m.allocated), yearChange("allocated")?.delta],
+      [t("Washed"), `${f(m.kg / 1000)} t`, yearChange("kg")?.delta],
+    ].map((parts) => parts.filter(Boolean).join(" · ")),
     boundary: t(
       cooperation
         ? "Timeliness comes from recorded service cycles. Costs and survey results are fictional full-year examples."
@@ -538,14 +661,30 @@ export function buildPresentation(input) {
         ? t`${f(Math.abs(c.emissionsDifference) / 1000, 1)} t CO₂e less than the comparison`
         : t`${f(Math.abs(c.emissionsDifference) / 1000, 1)} t CO₂e more than the comparison`,
   });
+  const deferred = repairScenarios?.find(({ factor }) => factor === 0.5)?.replacements;
+  const estimatedReplacements =
+    deferred >= 1
+      ? new Intl.NumberFormat(t("en-GB"), { maximumSignificantDigits: 2 }).format(
+          Math.round(deferred),
+        )
+      : null;
   Object.assign(slides.repairs, {
     layout: "hero",
     kicker: t("Textile care"),
-    hero: f(repairRate(m), 1),
-    lead: t("Repairs per 100 washes"),
-    trend: change(repairRate(m), repairRate(earlier)),
-    kpis: [kpi(f(m.repairs), t("Repairs"), yearChange("repairs"))],
+    hero: estimatedReplacements ? `≈${estimatedReplacements}` : f(m.repairs),
+    lead: estimatedReplacements
+      ? t("Potential replacements deferred in a 50% scenario")
+      : t("Recorded repairs in the selected period"),
+    kpis: estimatedReplacements ? [kpi(f(m.repairs), t("Recorded repairs"))] : [],
   });
+  if (m.washed) slides.repairs.paragraphs.push(t`${f(repairRate(m), 1)} repairs per 100 washes.`);
+  if (estimatedReplacements) {
+    const assumption = t(
+      "The scenario uses half of the dataset’s estimated replacement deferrals.",
+    );
+    slides.repairs.boundary = `${assumption} ${slides.repairs.boundary}`;
+    slides.repairs.paragraphs.push(`${slides.repairs.hero} ${slides.repairs.lead}. ${assumption}`);
+  }
   slides.water.chart.type = "compare";
   slides.emissions.chart.type = "compare";
   slides.repairs.chart.type = "columns";
@@ -615,6 +754,20 @@ export function buildPresentation(input) {
   ]);
   const areaSlides = request.reviewAreas
     .map((area) => {
+      if (area.id === agreedActionsArea) {
+        const actions = area.note.split("\n").filter((line) => line.trim());
+        return {
+          id: agreedActionsSlide,
+          kind: "text",
+          layout: "actions",
+          kicker: t("Customer agreement"),
+          title: t("Agreed next steps"),
+          fine: actions,
+          paragraphs: actions,
+          added: [],
+          boundary: t("Review these actions at the next customer meeting."),
+        };
+      }
       const stats = area.stats.filter((stat) => visible(`${stat.value} ${stat.label}`));
       return {
         id: `area-${area.id}`,
@@ -644,15 +797,17 @@ export function buildPresentation(input) {
         slide.hero ||
         slide.chart ||
         slide.added.length ||
+        (slide.layout === "actions" && slide.fine.length) ||
         (slide.lead && slide.paragraphs.length > 1),
     );
   const summaryPoints = [
     c.waterDifference > 0 && c.emissionsDifference > 0
       ? t`What worked: ${slides.water.value} water and ${slides.emissions.value} emissions against the comparison.`
       : t`What worked: ${f(m.repairs)} repairs kept textiles in use.`,
-    request.hideUsage
-      ? t("What to improve: choose one area for the coming period.")
-      : t`What to improve: ${f(focus.unscanned)} textiles without a scan at ${focus.site_name}.`,
+    gapFinding ??
+      (request.hideUsage
+        ? t("What to improve: choose one area for the coming period.")
+        : t`What to improve: ${f(focus.unscanned)} textiles without a scan at ${focus.site_name}.`),
     t("What we agree today: one improvement, an owner and a follow-up date."),
   ];
   const summary = {
@@ -707,7 +862,16 @@ function withReviewAreas(slides, areas) {
   const plan = slides.findIndex((slide) => slide.id === "plan");
   const at = plan < 0 ? slides.findIndex((slide) => slide.id === "sources") : plan;
   const place = at < 0 ? slides.length : at;
-  return [...slides.slice(0, place), ...areas, ...slides.slice(place)];
+  const agreed = areas.filter(({ id }) => id === agreedActionsSlide);
+  const supporting = areas.filter(({ id }) => id !== agreedActionsSlide);
+  const afterPlan = plan < 0 ? place : place + 1;
+  return [
+    ...slides.slice(0, place),
+    ...supporting,
+    ...slides.slice(place, afterPlan),
+    ...agreed,
+    ...slides.slice(afterPlan),
+  ];
 }
 function withOpening(slides, summary, goals) {
   const place = slides.findIndex((slide) => slide.id === "cover") + 1;

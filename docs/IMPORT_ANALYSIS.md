@@ -61,5 +61,8 @@ Selaimen tuonti käyttää paikallista reittiä
 Pyyntö sisältää tiedoston tavut (`application/octet-stream`, enintään 8 MiB).
 Vastaus on sama analyysiraportti kuin komentorivillä. Reitti käsittelee yhden
 tuonnin kerrallaan. Muiden HTTP-reittien sopimukset säilyvät.
-Tuodut työkalut näkyvät raportissa. Niiden käyttö chatissa ja varsinaisilla
-KPI-korteilla on erillinen integraatiovaihe.
+Tuodut työkalut näkyvät raportissa. Jos käyttäjä sallii skeeman jakamisen ja
+asiakastunniste täsmää, analyysiharnessi voi muodostaa tiedoston sarakkeista
+uuden validoidun laskentatyökalun. Tiedosto säilyy palvelimen muistissa enintään
+30 minuuttia. Suodatukset edellyttävät vastaavia aika-, maa- tai
+toimipaikkasarakkeita. Katso [analyysiharnessin rajat](ASSISTANTS.md).

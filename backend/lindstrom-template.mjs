@@ -7,7 +7,7 @@ const referenceUrl = new URL(
   import.meta.url,
 );
 export const templateStandard = Object.freeze({
-  version: "lindstrom-reference-2026-11-06-v1",
+  version: "lindstrom-reference-2026-11-06-v2",
   sha256: "5d1f801c45f05db83b583bc5a14b940805b8ce9631674de9031425ffee7aa18f",
   width: 10,
   height: 5.625,
@@ -40,8 +40,10 @@ async function reference() {
 export async function applyLindstromTemplate(bytes) {
   const source = await reference(),
     zip = await JSZip.loadAsync(bytes);
-  const master = "ppt/slideMasters/slideMaster1.xml",
-    layout = "ppt/slideLayouts/slideLayout19.xml";
+  // The reference has several masters. Master 5 carries the Lindström palette
+  // and Libre Franklin theme, and its Empty layout leaves room for review content.
+  const master = "ppt/slideMasters/slideMaster5.xml",
+    layout = "ppt/slideLayouts/slideLayout120.xml";
   const copied = new Set(),
     queue = [master, layout];
   let masterLayoutId;

@@ -55,6 +55,11 @@
   width: 100%;
   height: auto;
 }
+.card-chart-label {
+  margin: 0;
+  color: #4f5d68;
+  font-weight: 700;
+}
 .card-kpis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
@@ -88,7 +93,26 @@
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
 }
 .layout-kpis .card-kpis dd {
-  font-size: 40px;
+  font-size: clamp(24px, 3.4vw, 36px);
+}
+.card-kpi-background {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin: 18px 0 0;
+  padding: 0;
+  color: #4f5d68;
+  font-size: 14px;
+  list-style: none;
+}
+.card-agreed-actions {
+  margin: 0;
+  padding-left: 24px;
+}
+.card-agreed-actions li {
+  padding: 10px 4px;
+  border-bottom: 1px solid #e1e8ee;
+  line-height: 1.5;
 }
 .layout-cover {
   border: 0;

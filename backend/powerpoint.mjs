@@ -200,6 +200,17 @@ export async function renderPowerPoint(deck) {
           tile(kpi, 0.6 + (i % 3) * 4.05, 2.15 + Math.floor(i / 3) * 1.85, 3.8, 1.65, false),
         );
       else item.kpis.forEach((kpi, i) => tile(kpi, 0.6 + i * 3.05, 2.6, 2.85, 2.3, false));
+      if (item.fine?.length)
+        slide.addText(item.fine.join("   |   "), {
+          x: 0.6,
+          y: 5.15,
+          w: 11.8,
+          h: 0.45,
+          fontSize: 13,
+          color: "4F5D68",
+          margin: 0,
+          fit: "shrink",
+        });
     } else if (layout === "steps") {
       const top = item.lead ? 3.15 : 2.3;
       if (item.lead) {
@@ -213,7 +224,7 @@ export async function renderPowerPoint(deck) {
           margin: 0,
           fit: "shrink",
         });
-        slide.addText(t("Next steps"), {
+        slide.addText(t("Proposed next steps"), {
           x: 0.6,
           y: 2.76,
           w: 11.8,
@@ -256,6 +267,18 @@ export async function renderPowerPoint(deck) {
           fit: "shrink",
           valign: "top",
         });
+      });
+    } else if (layout === "actions") {
+      slide.addText(item.fine.map((text, index) => `${index + 1}. ${text}`).join("\n\n"), {
+        x: 0.6,
+        y: 2.15,
+        w: 11.6,
+        h: 3.65,
+        fontSize: 18,
+        color: "33475A",
+        margin: 0,
+        valign: "top",
+        fit: "shrink",
       });
     } else if (layout === "notes") {
       slide.addText((item.fine ?? []).join("\n\n"), {
@@ -363,9 +386,12 @@ export async function renderPowerPoint(deck) {
           [{ name: t(item.chart.unit), labels: item.chart.labels, values: item.chart.values }],
           {
             ...quiet,
+            showTitle: Boolean(item.chart.name),
+            title: item.chart.name,
+            titleFontSize: 15,
             barDir: "col",
             barGapWidthPct: 35,
-            chartColors: [templateStandard.green],
+            chartColors: [templateStandard.blue],
           },
         );
       } else if (type === "donut") {

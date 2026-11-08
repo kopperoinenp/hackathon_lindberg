@@ -11,6 +11,13 @@ review story. The review agent can request scoped analysis through defined tools
 The backend validates its proposed edits before returning them to the browser.
 The presentation service generates editable PPTX files with PptxGenJS.
 
+The maintained chat uses separate analysis and dashboard-editing harnesses in
+`backend/assistant-harnesses.mjs`. Analysis selects existing tools or creates
+validated declarative calculations through `backend/analysis-runtime.mjs`.
+The editor applies the existing validated patch contract and can request
+analysis internally. Their conversation histories and UI tabs are separate.
+See [assistant behavior](ASSISTANTS.md).
+
 Provider configuration and credentials stay on the backend. OpenAI is supported,
 and the Microsoft 365 Copilot adapter awaits live tenant verification.
 Deterministic mode supports local presentation generation. See

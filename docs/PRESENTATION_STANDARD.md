@@ -14,7 +14,7 @@ ei väite automaattisesti mitatusta puheajasta tai tarkka diakiintiö.
 
 | Vaihe             | Esityksen sisältö                                         | Koodissa lukittu sääntö                                  |
 | ----------------- | --------------------------------------------------------- | -------------------------------------------------------- |
-| Asiakasyhteys     | Asiakas, ajanjakso, rajaus                                | Kansidia oletuksena ensimmäisenä                               |
+| Asiakasyhteys     | Asiakas, ajanjakso, rajaus                                | Kansidia oletuksena ensimmäisenä                         |
 | Katso taakse      | Palvelun käyttö ja huolto: kuusi yhteistä perustietoa     | Perustietodia aina mukana ennen nostoja                  |
 | Osoita arvo       | Vesi, pesun ja toimitusten päästöt, korjaukset            | AI voi järjestää vain valitut tulosnostot                |
 | Rakenna luottamus | Lähde, yksikkö, synteettisyys, vertailu ja tulkinnan raja | Näytetään tuloksen yhteydessä; laskenta ei tule mallilta |
@@ -55,8 +55,9 @@ kirjoittama muistiinpano säilyy erillisenä eikä sitä lähetetä mallille.
 
 ## Lindström-pohja
 
-PPTX käyttää lähteen masteria 1, tyhjää asettelua 19, niihin liittyvää teemaa ja
-alkuperäistä logoresurssia. Käyttämättömiä lähdedioja tai lähteen asiakkaaseen
+PPTX käyttää lähteen masteria 5, tyhjää asettelua 120, Lindström-väripaletin ja
+Libre Franklin -fontit sisältävää teemaa sekä alkuperäistä logoresurssia.
+Käyttämättömiä lähdedioja tai lähteen asiakkaaseen
 liittymätöntä tekstiä ei kopioida. Alkuperäinen referenssitiedosto säilyy muuttumattomana.
 
 - Koko: 10 × 5,625 tuumaa, 16:9; 9144000 × 5143500 EMU.

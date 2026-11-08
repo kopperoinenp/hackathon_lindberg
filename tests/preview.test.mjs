@@ -307,7 +307,7 @@ test("preview redirects to the mock and serves every relative asset", async (t) 
     presentation.slides.map((slide) => slide.id),
   );
   assert.equal(preview.standard.story, "customer-value-story-v2");
-  assert.equal(preview.standard.template, "lindstrom-reference-2026-11-06-v1");
+  assert.equal(preview.standard.template, "lindstrom-reference-2026-11-06-v2");
   const download = await fetch(`${origin}${presentation.downloadUrl}`);
   assert.equal(download.status, 200);
   assert.match(download.headers.get("content-type"), /presentationml/);

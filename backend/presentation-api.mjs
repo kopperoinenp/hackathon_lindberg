@@ -8,7 +8,10 @@ import {
 } from "./presentation-model.mjs";
 import { generatePlan, providerConfig } from "./ai-provider.mjs";
 import { renderPowerPoint } from "./powerpoint.mjs";
+import { openPowerPoint } from "./open-powerpoint.mjs";
 import { runReviewChat } from "./review-chat.mjs";
+import { runAnalysisHarness, runDashboardHarness } from "./assistant-harnesses.mjs";
+import { rememberAnalysisImport } from "./analysis-runtime.mjs";
 import { assessCooperation } from "./cooperation.mjs";
 import { templateStandard } from "./lindstrom-template.mjs";
 import { createReviewStore } from "./review-store.mjs";
@@ -120,16 +123,15 @@ export async function handlePresentationApi(request, response, url) {
       try {
         const bytes = await readBytes(request, importLimit);
         try {
-          json(
-            response,
-            200,
-            await analyzeImport(await readImportFile(bytes, format), {
-              customer,
-              customerName: selected.customer_name,
-              otherCustomers: dataset.customers.filter((row) => row !== selected),
-              allowSchemaSharing: url.searchParams.get("shareSchema") === "1",
-            }),
-          );
+          const tables = await readImportFile(bytes, format);
+          const report = await analyzeImport(tables, {
+            customer,
+            customerName: selected.customer_name,
+            otherCustomers: dataset.customers.filter((row) => row !== selected),
+            allowSchemaSharing: url.searchParams.get("shareSchema") === "1",
+          });
+          rememberAnalysisImport(customer, tables, report);
+          json(response, 200, report);
         } catch (error) {
           throw new PresentationError(error.message || "The file could not be analyzed.");
         }
@@ -169,8 +171,12 @@ export async function handlePresentationApi(request, response, url) {
       }
       return true;
     }
-    if (url.pathname === "/api/chat" && request.method === "POST") {
-      if (context && ![...context.permissions.values()].some(Boolean))
+    const chatRoute = ["/api/chat", "/api/chat/analysis", "/api/chat/dashboard"].includes(
+      url.pathname,
+    );
+    if (chatRoute && request.method === "POST") {
+      const editing = url.pathname !== "/api/chat/analysis";
+      if (editing && context && ![...context.permissions.values()].some(Boolean))
         throw new PresentationError("This prototype profile is read-only.", 403);
       if (chatBusy)
         throw new PresentationError(
@@ -183,11 +189,17 @@ export async function handlePresentationApi(request, response, url) {
         const result = await withPreparedDashboard(
           input?.workspace,
           async () => {
-            const reply = await runReviewChat(input);
+            const handler =
+              url.pathname === "/api/chat/analysis"
+                ? runAnalysisHarness
+                : url.pathname === "/api/chat/dashboard"
+                  ? runDashboardHarness
+                  : runReviewChat;
+            const reply = await handler(input);
             const dashboard = requestContext.getStore()?.prepared?.reference;
             return dashboard ? { ...reply, dashboard } : reply;
           },
-          { write: true },
+          { write: editing },
         );
         json(response, 200, result);
       } finally {
@@ -195,13 +207,25 @@ export async function handlePresentationApi(request, response, url) {
       }
       return true;
     }
-    const match = url.pathname.match(/^\/api\/presentations\/([a-f0-9-]{36})(\/download)?$/);
-    if (match && request.method === "GET") {
+    const match = url.pathname.match(/^\/api\/presentations\/([a-f0-9-]{36})(\/download|\/open)?$/);
+    if (match) {
+      const opening = match[2] === "/open";
+      if (request.method !== (opening ? "POST" : "GET"))
+        throw new PresentationError("Method not allowed.", 405);
       const file = files.get(match[1]);
       if (!file)
         throw new PresentationError("The presentation has expired. Generate it again.", 404);
       if (file.owner !== owner) throw new PresentationError("No access to this presentation.", 403);
       assertAccess(file.deck.request.scope.customer);
+      if (opening) {
+        await readJson(request);
+        file.opening ??= openPowerPoint(file).finally(() => {
+          delete file.opening;
+        });
+        await file.opening;
+        json(response, 200, { opened: true });
+        return true;
+      }
       if (!match[2]) {
         json(response, 200, {
           customer: file.deck.customer,
@@ -301,7 +325,7 @@ export async function handlePresentationApi(request, response, url) {
     const message =
       error instanceof PresentationError
         ? error.message
-        : url.pathname === "/api/chat"
+        : url.pathname.startsWith("/api/chat")
           ? "Could not process the assistant request."
           : "Could not create the PowerPoint.";
     json(response, error instanceof PresentationError ? error.status : 500, {

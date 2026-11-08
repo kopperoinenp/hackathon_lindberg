@@ -6,7 +6,7 @@
       /[&<>"']/g,
       (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char],
     );
-  const colors = { ink: "#003f72", muted: "#647b8d", soft: "#dbe5ec", accent: "#7ab800" };
+  const colors = { ink: "#003f72", muted: "#647b8d", soft: "#dbe5ec" };
   function compare({ labels, values, unit }, f) {
     const max = Math.max(...values, 1);
     const bars = values
@@ -18,18 +18,17 @@
       .join("");
     return `<svg viewBox="0 0 640 240" role="img" aria-label="${esc(labels.join(", "))}">${bars}</svg>`;
   }
-  function columns({ labels, values }) {
+  function columns({ labels, values, name }, f) {
     const max = Math.max(...values, 1);
-    const top = values.indexOf(Math.max(...values));
     const width = 600 / values.length;
     const bars = values
       .map((value, index) => {
         const height = Math.max((value / max) * 190, 4);
         const x = index * width + 6;
-        return `<rect x="${x}" y="${210 - height}" width="${width - 14}" height="${height}" rx="6" fill="${index === top ? colors.ink : colors.accent}"/><text x="${x + (width - 14) / 2}" y="236" text-anchor="middle" font-size="16" fill="${colors.muted}">${esc(labels[index])}</text>`;
+        return `<rect x="${x}" y="${210 - height}" width="${width - 14}" height="${height}" rx="6" fill="${colors.ink}"><title>${esc(labels[index])}: ${esc(f(value))}</title></rect><text x="${x + (width - 14) / 2}" y="236" text-anchor="middle" font-size="16" fill="${colors.muted}">${esc(labels[index])}</text>`;
       })
       .join("");
-    return `<svg viewBox="0 0 610 244" role="img" aria-label="${esc(labels.join(", "))}">${bars}</svg>`;
+    return `${name ? `<p class="card-chart-label">${esc(name)}</p>` : ""}<svg viewBox="0 0 610 244" role="img" aria-label="${esc(name ?? labels.join(", "))}">${bars}</svg>`;
   }
   function donut({ labels, values }, f) {
     const total = values.reduce((sum, value) => sum + value, 0) || 1;
@@ -94,7 +93,8 @@
     const bodies = {
       cover: () =>
         `${item.lead ? `<p class="card-lead">${esc(item.lead)}</p>` : ""}${tiles(item.kpis)}`,
-      kpis: () => tiles(item.kpis),
+      kpis: () =>
+        `${tiles(item.kpis)}${item.fine?.length ? `<ul class="card-kpi-background">${item.fine.map((text) => `<li>${esc(text)}</li>`).join("")}</ul>` : ""}`,
       goals: () =>
         `<dl class="card-goals">${item.kpis
           .map(
@@ -105,7 +105,9 @@
       hero: () =>
         `<div class="card-grid"><div>${item.hero ? `<strong class="card-hero">${esc(item.hero)}</strong>` : ""}${item.lead ? `<p class="card-lead">${esc(item.lead)}</p>` : ""}${change(item.trend)}${tiles(item.kpis)}</div>${item.chart ? `<div class="card-chart">${chart(item, t)}</div>` : ""}</div>`,
       steps: () =>
-        `${item.lead ? `<div class="card-findings"><p class="card-lead">${esc(item.lead)}</p>${(item.fine ?? []).map((text) => `<p>${esc(text)}</p>`).join("")}</div><h3 class="card-steps-heading">${esc(t("Next steps"))}</h3>` : ""}<ol class="card-steps">${(item.steps ?? []).map((step) => `<li>${esc(step)}</li>`).join("")}</ol>`,
+        `${item.lead ? `<div class="card-findings"><p class="card-lead">${esc(item.lead)}</p>${(item.fine ?? []).map((text) => `<p>${esc(text)}</p>`).join("")}</div><h3 class="card-steps-heading">${esc(t("Proposed next steps"))}</h3>` : ""}<ol class="card-steps">${(item.steps ?? []).map((step) => `<li>${esc(step)}</li>`).join("")}</ol>`,
+      actions: () =>
+        `<ol class="card-agreed-actions">${item.fine.map((text) => `<li>${esc(text)}</li>`).join("")}</ol>`,
       notes: () =>
         (item.fine ?? []).map((text) => `<p class="card-fine">${esc(text)}</p>`).join(""),
     };

@@ -18,9 +18,14 @@ snapshot across all six Apex sites. The goal thresholds are fictional.
 The current overview shows the on-time share of recorded service cycles.
 It also shows fictional annual invoice totals and survey results for the demo
 accounts. These figures appear only for whole-customer, full-year 2025 reviews.
+The overview leads with timeliness, cost, user feedback and environmental
+intensity. Activity volumes appear separately. Comparable misses against the
+archived example targets can drive the proposed follow-up for Apex. Actions
+saved through the assistant appear after the proposal in both the browser and
+PowerPoint, with the saved owner and due date.
 
 Chat edits immediately update dashboard headings, metric selections, manager
-comments, meeting goals and savings estimates. The page
+comments and meeting goals. The page
 scrolls to the changed section and briefly highlights it; chat lists the changes.
 Slide commentary is mirrored in the matching dashboard card. The customer name
 stays factual even when the overview slide heading is customized. These edits
@@ -81,6 +86,8 @@ the same selected washed kg times the chosen synthetic baseline coefficients.
 Scan coverage is not proof of idle stock. Repair events are not distinct garments
 or verified avoided purchases. No repair handprint is added to process/logistics
 differences. Financial savings and unique wearer counts are not fabricated.
+The repair slide uses half of the modelled replacement deferrals when product
+detail is available. Recorded repairs are shown separately from this scenario.
 
 Rebuild the fixture with `python frontend/mockups/kopperoinenp/extract_fixture.py
 data/source/Lindstrom_SinceAI_Customer_Value_Synthetic_Data_Pack.xlsx` (one command).
@@ -101,10 +108,10 @@ briefing form or required goals. Previously saved browser briefings are ignored.
 Users can adjust emphasis through the AI editing chat or detailed analysis controls.
 Every insight explains its relevance; all calculations remain deterministic.
 
-`Open presentation` prepares the current review and opens it in a separate browser tab.
-The adjacent icon downloads the genuine editable PowerPoint. The viewer shows
-one slide at a time with arrows and a download icon, using the same validated
-content as the PPTX. Content/scope changes invalidate an older download link.
+`Open presentation` prepares the current review and opens its editable PPTX in
+desktop PowerPoint on the local Windows machine. The adjacent icon saves the same
+PPTX. Both use the slide master and theme from the supplied Lindström reference.
+Content or scope changes invalidate an older download link.
 Ready unchanged reviews are reused for ten minutes without another model call.
 
 The current interface is approved as the product baseline (docs/UI_BASELINE.md).
@@ -137,3 +144,5 @@ from the same validated rows.
   Scenario estimates are separate from laundry and delivery emissions.
 - Unique wearer and verified financial/commercial comparisons require additional
   source data. Detailed metrics currently appear in the analyst tab.
+
+Adding an evidence area with a sidebar pill scrolls to its block after the preview is ready. The role selector remains available. Financial-value pills and manager-entered euro savings are excluded from the customer-facing review.

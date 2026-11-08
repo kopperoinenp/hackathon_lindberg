@@ -8,7 +8,7 @@ test("review settings open beside the customer review", async () => {
     "utf8",
   );
   const editor = page.indexOf('id="review-editor"');
-  const settings = page.indexOf('id="review-basics-picker"');
+  const settings = page.indexOf('id="review-area-picker"');
   const explore = page.indexOf('id="analysis-panel"');
   const analysisEnd = page.indexOf('id="analysis-content"');
   assert.ok(editor > analysisEnd && settings > editor, "Settings are in the review panel");
@@ -54,6 +54,6 @@ test("approval is the main action and teammates' sections stay reachable", async
   assert.doesNotMatch(page, /approve-review|back-today|customer-profile-kpis|relationship-status/);
   const editor = page.indexOf('id="review-editor"');
   assert.doesNotMatch(page, /id="upsell-proposals"/);
-  for (const id of ["review-area-picker", "review-basics-picker"])
+  for (const id of ["review-area-picker"])
     assert.ok(page.indexOf(`id="${id}"`) > editor, `${id} is in the panel`);
 });

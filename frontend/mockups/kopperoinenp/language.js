@@ -262,6 +262,74 @@
     "Add to plan": "Lisää suunnitelmaan",
     "Added to plan": "Lisätty suunnitelmaan",
     "Agreed next steps": "Sovitut jatkotoimet",
+    "Proposed next steps": "Ehdotetut jatkotoimet",
+    "Customer agreement": "Asiakkaan kanssa sovittu",
+    ": average monthly washes for ": ": tekstiiliryhmän ",
+    " fell from ": " keskimääräiset pesut kuukaudessa vähenivät luvusta ",
+    " to ": " lukuun ",
+    " between ": " jaksojen ",
+    " and ": " ja ",
+    ". Average stock stayed near ": " välillä. Keskimääräinen tekstiilikanta pysyi noin ",
+    " items.": " kappaleessa.",
+    "This is a place to check whether textile stock still matches staffing and workload.":
+      "Tässä kohteessa kannattaa selvittää, vastaako tekstiilikanta yhä henkilöstömäärää ja työmäärää.",
+    "At ": "Kohteessa ",
+    ", check staffing, workload and seasonal changes for ":
+      " selvittäkää henkilöstömäärä, työmäärä ja kausivaihtelu tekstiiliryhmälle ",
+    "Ask Lindström to compare the stock and size mix with current needs.":
+      "Pyytäkää Lindströmiä vertaamaan tekstiilikantaa ja kokojakaumaa nykyiseen tarpeeseen.",
+    "If stock exceeds the need, trial a smaller allocation and track availability and cost.":
+      "Jos kanta ylittää tarpeen, kokeilkaa pienempää määrää ja seuratkaa saatavuutta sekä kustannuksia.",
+    " had ": " kirjattiin ",
+    " repairs per 100 washes versus ": " korjausta sataa pesua kohti. Vertailuluku on ",
+    " at ": " kohteessa ",
+    ", across ": ". Vertailussa on ",
+    " matching months.": " yhteistä kuukautta.",
+    "This identifies where to inspect wear, garment fit and work conditions before choosing a change.":
+      "Tässä kohteessa kannattaa tutkia kulumista, vaatteiden istuvuutta ja työoloja ennen muutoksen valintaa.",
+    ", review the recurring repair reasons for ":
+      " käykää läpi toistuvat korjaussyyt tekstiiliryhmälle ",
+    "Compare garment age and work conditions with the other site and agree a trial with Lindström.":
+      "Verratkaa vaatteiden ikää ja työoloja toiseen kohteeseen ja sopikaa kokeilu Lindströmin kanssa.",
+    "Track time in use after repair and repeated repairs for the same textile group.":
+      "Seuratkaa saman tekstiiliryhmän käyttöaikaa korjauksen jälkeen ja uusintakorjauksia.",
+    " averaged ": " keskimäärin ",
+    " washes per allocated item per month versus ":
+      " pesua kohdistettua tekstiiliä kohti kuukaudessa. Vertailuluku on ",
+    ". It was lower in ": ". Luku oli pienempi ",
+    "Check whether stock levels, work patterns or wash routines explain the difference.":
+      "Selvittäkää, selittävätkö tekstiilikanta, työn luonne tai pesukäytännöt eroa.",
+    ", check the stock and wash routines for ":
+      " tarkistakaa tekstiilikanta ja pesukäytännöt ryhmälle ",
+    " against actual use.": " suhteessa todelliseen käyttöön.",
+    "Review the difference with Lindström and confirm the hygiene and availability requirements.":
+      "Käykää ero läpi Lindströmin kanssa ja varmistakaa hygienia- ja saatavuusvaatimukset.",
+    "If stock exceeds demand, trial a smaller allocation and monitor availability and cost.":
+      "Jos kanta ylittää tarpeen, kokeilkaa pienempää määrää ja seuratkaa saatavuutta sekä kustannuksia.",
+    "Due date": "Määräpäivä",
+    "Not agreed yet": "Ei vielä sovittu",
+    "Review these actions at the next customer meeting.":
+      "Käykää nämä toimet läpi seuraavassa asiakastapaamisessa.",
+    "Contract target unavailable": "Sopimustavoite puuttuu",
+    ". This is ": ". Tulos on ",
+    " % above the 2024 example target of ": " % yli vuoden 2024 esimerkkitavoitteen ",
+    "Deliveries account for ": "Kuljetusten osuus on ",
+    " % of modelled emissions. Check whether any extra pickups could go on regular rounds.":
+      " % mallinnetuista päästöistä. Selvittäkää, voisiko ylimääräisiä noutoja hoitaa vakiokierroilla.",
+    "At one site, list extra pickups and why they were needed.":
+      "Listatkaa yhdeltä toimipaikalta ylimääräiset noudot ja niiden syyt.",
+    "Ask Lindström which routine pickups could be combined without affecting availability.":
+      "Kysykää Lindströmiltä, mitä noutoja voi yhdistää tekstiilien saatavuutta heikentämättä.",
+    "Together, trial the change and track extra pickups and delivery emissions per kg.":
+      "Kokeilkaa muutosta yhdessä. Seuratkaa ylimääräisiä noutoja ja kuljetuspäästöjä pestyä kiloa kohti.",
+    "Check whether any textiles are washed sooner than needed under your hygiene rules. Lindström can check the laundry process separately.":
+      "Selvittäkää, meneekö tekstiilejä pesuun aiemmin kuin hygieniasäännöt edellyttävät. Lindström voi tarkistaa pesuprosessin erikseen.",
+    "Choose one textile group and check how often it is sent to wash against your hygiene rules.":
+      "Valitkaa yksi tekstiiliryhmä ja verratkaa pesutiheyttä hygieniasääntöihinne.",
+    "Ask Lindström to check the laundry process for the same textile group.":
+      "Pyytäkää Lindströmiä tarkistamaan saman tekstiiliryhmän pesuprosessi.",
+    "Agree on one change and compare the impact per kg over a comparable period.":
+      "Sopikaa yhdestä muutoksesta ja verratkaa vaikutusta pestyä kiloa kohti vastaavalla jaksolla.",
     "Next steps shown in section 03": "Osiossa 03 näytettävät jatkotoimet",
     "Only the steps written here are shown to the customer. Keep to one to three.":
       "Asiakkaalle näytetään vain tähän kirjoitetut toimet. Pidä määrä yhdestä kolmeen.",
@@ -270,11 +338,9 @@
     "Next steps will be agreed together in this meeting.":
       "Jatkotoimet sovitaan yhdessä tässä tapaamisessa.",
     "List of all locations": "Kaikkien sijaintien lista",
-    Brief: "Lyhyt",
-    Standard: "Perus",
-    Full: "Laaja",
     Context: "Tausta",
-    "Previous review": "Edellinen katselmus",
+    "A look back at the ": "Katsaus vuoden ",
+    " goals": " tavoitteisiin",
     "On-time service cycles": "Ajallaan valmistuneet palvelukierrot",
     "Service costs": "Palvelun kustannukset",
     "User feedback": "Käyttäjäpalaute",
@@ -299,8 +365,18 @@
       "Samalla pesumäärällä nähdään, paljonko vettä eri pesulamallit käyttävät.",
     "The estimate compares the climate impact of washing and delivery at the same wash volume.":
       "Arvio vertaa pesun ja kuljetusten ilmastovaikutuksia samalla pesumäärällä.",
-    "Repairs keep textiles in use longer. Counting them per 100 washes helps compare periods with different wash volumes.":
-      "Korjaukset pidentävät tekstiilien käyttöikää. Korjaukset sataa pesua kohti auttavat vertaamaan jaksoja, joiden pesumäärät eroavat.",
+    "A repair can keep a textile in service and defer the need for a replacement. Track time in service after repair and compare the costs of repair and replacement to assess the benefit.":
+      "Korjaus voi pitää tekstiilin käytössä ja siirtää uusimistarvetta. Hyötyä voi arvioida seuraamalla käyttöaikaa korjauksen jälkeen ja vertaamalla korjaus- ja uusimiskustannuksia.",
+    "Potential replacements deferred in a 50% scenario":
+      "Mahdollisesti siirtyvät uusimiset 50 %:n skenaariossa",
+    "The scenario uses half of the dataset’s estimated replacement deferrals.":
+      "Skenaario käyttää puolta aineiston arviosta siirtyvistä uusimisista.",
+    "Recorded repairs in the selected period": "Valitulla jaksolla kirjatut korjaukset",
+    "Recorded repairs by month": "Kirjatut korjaukset kuukausittain",
+    " repairs were recorded. Check where repairs keep textiles in use and where the same problems recur.":
+      " korjausta kirjattiin. Selvittäkää, missä korjaukset pitävät tekstiilit käytössä ja missä samat ongelmat toistuvat.",
+    "Review the repair records alongside garment usage before setting a target.":
+      "Käykää korjaustiedot ja tekstiilien käyttö läpi ennen tavoitteen asettamista.",
     "Scan coverage helps identify sites where textile circulation is worth reviewing.":
       "Skannauskattavuus auttaa tunnistamaan toimipaikat, joissa tekstiilien kiertoa kannattaa tutkia.",
     "Agree on an owner and a follow-up date so each priority can be tracked.":
@@ -323,7 +399,7 @@
       "Käykää ensin läpi onnistumiset ja sopikaa sitten, mitä kehitetään ja miten sitä seurataan.",
     "Use the customer evidence to decide whether the proposed service is worth exploring.":
       "Arvioikaa asiakaskohtaisten havaintojen perusteella, kannattaako ehdotettua palvelua tutkia tarkemmin.",
-    "Where the service could improve": "Missä palvelua voisi tehostaa",
+    "What you can improve with Lindström": "Mitä voitte kehittää Lindströmin kanssa",
     "Improvement opportunities": "Kehitysmahdollisuudet",
     ": 90% of service cycles finished within ": ": 90 % palvelukierroista valmistui ajassa ",
     " h. The median for other sites was ": " h. Muiden toimipaikkojen mediaani oli ",
@@ -331,23 +407,22 @@
     " repairs per 100 washes.": " korjausta sataa pesua kohden.",
     "The selected period has too little wash data to compare repair rates.":
       "Valitulla jaksolla on liian vähän pesudataa korjausasteiden vertailuun.",
-    "Check whether delays cluster around pickup or return before changing the schedule.":
-      "Selvittäkää, painottuvatko viiveet noutoon vai palautukseen ennen aikataulun muuttamista.",
-    "Compare repair rates by site and textile type, then check which repair reasons recur.":
-      "Vertailkaa korjausasteita toimipaikoittain ja tekstiilityypeittäin ja selvittäkää, mitkä korjaussyyt toistuvat.",
-    "Review a sample of the longest cycles at ":
-      "Käykää läpi otos pisimmistä palvelukierroista kohteessa ",
-    "If a recurring delay is confirmed, assign an owner to test a change at that handoff.":
-      "Jos viive toistuu samassa vaiheessa, nimetkää vastuuhenkilö kokeilemaan siihen muutosta.",
+    "Check whether used textiles are ready at the agreed pickup time. Lindström can check where delays occur between pickup and return.":
+      "Tarkistakaa, ovatko käytetyt tekstiilit valmiina sovittuna noutoaikana. Lindström voi selvittää, missä viive syntyy noudon ja palautuksen välillä.",
+    "Check where wear recurs at your sites. The garment fit, work task and repair records can help narrow down what to test.":
+      "Selvittäkää, missä kuluminen toistuu toimipaikoillanne. Vaatteen istuvuus, työtehtävä ja korjaushistoria auttavat valitsemaan, mitä kokeilla.",
+    ", check when textiles were ready on days with long service cycles.":
+      " selvittäkää, milloin tekstiilit olivat noutovalmiina päivinä, jolloin palvelukierto oli pitkä.",
+    "Ask Lindström to compare those times with the recorded pickup and return.":
+      "Pyytäkää Lindströmiä vertaamaan näitä aikoja kirjattuun noutoon ja palautukseen.",
     "Compare the time within which 90% of cycles finish before and after the trial.":
       "Verratkaa aikaa, jossa 90 % palvelukierroista valmistuu, ennen kokeilua ja sen jälkeen.",
-    "Review the repair reasons for the textile types with the highest repair rates.":
-      "Käykää läpi korjaussyyt niissä tekstiilityypeissä, joissa korjausaste on korkein.",
-    "If a wear pattern recurs, assign an owner to test a change in handling or care.":
-      "Jos sama kuluminen toistuu, nimetkää vastuuhenkilö kokeilemaan muutosta käsittelyyn tai huoltoon.",
-    "Track repairs per 100 washes for the same textile types after the trial.":
-      "Seuratkaa kokeilun jälkeen samojen tekstiilityyppien korjauksia sataa pesua kohden.",
-    "Presentation length": "Esityksen laajuus",
+    "At one site, ask users where garments wear out or need repeat repairs.":
+      "Kysykää yhden toimipaikan käyttäjiltä, mistä vaatteet kuluvat tai mitä kohtia joudutaan korjaamaan toistuvasti.",
+    "Review fit, handling and repair reasons with Lindström and test one change.":
+      "Käykää Lindströmin kanssa läpi istuvuus, käsittely ja korjaussyyt ja kokeilkaa yhtä muutosta.",
+    "Track how long repaired textiles stay in use and compare repair costs with replacement costs.":
+      "Seuratkaa, kuinka kauan korjatut tekstiilit pysyvät käytössä, ja verratkaa korjaus- ja uusimiskustannuksia.",
     "Repairs per 100 washes": "Korjausta 100 pesua kohden",
     "Customise the review": "Muokkaa katsausta",
     Close: "Sulje",
@@ -622,6 +697,21 @@
     "Customer review": "Asiakaskatsaus",
     Customer: "Asiakas",
     "Open presentation": "Avaa esitys",
+    Ask: "Kysy",
+    Edit: "Muokkaa",
+    "Data analyst": "Data-analyytikko",
+    "Dashboard editor": "Dashboardin muokkaaja",
+    "Choose assistant": "Valitse apuri",
+    "Calculated results": "Laskentatulokset",
+    "Checking tools and analyzing…": "Tarkistan työkalut ja analysoin…",
+    "Add a service performance block": "Lisää palvelun suorituskyvyn blokki",
+    "Sent to PowerPoint": "Esitys lähetettiin PowerPointiin",
+    "Use Download PowerPoint to open this file on your device.":
+      "Avaa tiedosto laitteellasi Lataa PowerPoint -painikkeen kautta.",
+    "PowerPoint was not found. Use Download PowerPoint to save the file.":
+      "PowerPointia ei löytynyt. Tallenna tiedosto Lataa PowerPoint -painikkeella.",
+    "PowerPoint could not start. Use Download PowerPoint to save the file.":
+      "PowerPoint ei käynnistynyt. Tallenna tiedosto Lataa PowerPoint -painikkeella.",
     "Download PowerPoint": "Lataa PowerPoint",
     Customers: "Asiakkaat",
     "Generate the presentation first": "Luo esitys ensin",

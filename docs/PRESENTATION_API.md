@@ -57,8 +57,8 @@ baselines/priorities are accepted. A site must belong to its customer.
 max 150 characters each. `note`: plain text, max 2000 characters. Body max 32 KiB.
 
 201 JSON (200 when the same completed request is reused): `{id, provider, model, slides:[{id,title}], downloadUrl,
-expiresInSeconds:600}`. The UI opens the finished presentation in a new browser tab. The viewer loads
-its validated content from `GET /api/presentations/{id}`. It invalidates the download link when scope/content changes. A response
+expiresInSeconds:600}`. The UI opens the finished presentation using the local
+PowerPoint endpoint. It invalidates the cached file when scope or content changes. A response
 for a changed request is not applied. Native charts/figures stay deterministic.
 
 ## GET /api/presentations/{id}
@@ -74,6 +74,16 @@ type. Slides include editable native text/charts with embedded chart workbooks,
 source references, synthetic-data labels and presenter notes with provenance.
 Downloads remain in server memory for 10 minutes; at most 8 files of at most 5 MiB
 are retained. Restarting the service removes them.
+
+## POST /api/presentations/{id}/open
+
+Accepts a JSON body (`{}`). The same owner and customer checks apply as for the
+download. On Windows with desktop PowerPoint installed, the local server writes
+the same editable PPTX to a Windows temporary folder and passes the file to
+PowerPoint. A 200 response (`{opened:true}`) confirms that PowerPoint was launched
+with the file path. On other platforms or if PowerPoint cannot start, the user
+can save the file via Download PowerPoint. Use Save As in PowerPoint to keep a
+permanent copy of the temporary file.
 
 ## Errors and operational limits
 

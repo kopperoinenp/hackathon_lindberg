@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import JSZip from "jszip";
 import {
   buildPresentation,
@@ -39,6 +40,26 @@ test("export recalculates scoped values from the fixture and retains mandatory e
   );
   assert.throws(() => validateRequest({ ...request, included: [] }));
   assert.throws(() => buildPresentation({ ...request, scope: { from: "2025-09", to: "2025-02" } }));
+});
+
+test("agreed actions follow the proposal in the preview and the editable PowerPoint", async () => {
+  const action = "Check delivery emissions · Owner: Alex · Due date: 15 December";
+  const base = buildPresentation({
+    ...request,
+    language: "en",
+    reviewAreas: [
+      { id: "agreedactions", title: "Agreed next steps", headline: "", points: [], note: action },
+    ],
+  });
+  const deck = applyPlan(base, defaultPlan(base));
+  const planIndex = deck.slides.findIndex(({ id }) => id === "plan");
+  const agreed = deck.slides[planIndex + 1];
+  assert.equal(agreed.title, "Agreed next steps");
+  assert.deepEqual(agreed.fine, [action]);
+  assert.ok(!deck.slides[planIndex].paragraphs.includes(action));
+  const zip = await JSZip.loadAsync(await renderPowerPoint(deck));
+  const xml = await zip.file(`ppt/slides/slide${planIndex + 2}.xml`).async("string");
+  assert.ok(xml.includes(action));
 });
 test("AI can rank approved insights and choose headlines but cannot change facts or explicit edits", () => {
   const base = buildPresentation(request),
@@ -135,17 +156,37 @@ test("PowerPoint export contains editable chart data, sources, notes and scope",
   assert.match(xml, /2025-01/);
   assert.match(xml, /About the figures/);
   assert.match(xml, /Sovitaan seuranta/);
-  assert.match(xml, /Counting them per 100 washes helps compare periods/);
-  assert.match(xml, /Where the service could improve/);
-  assert.match(xml, /Track repairs per 100 washes for the same textile types/);
+  assert.match(xml, /Potential replacements deferred in a 50% scenario/);
+  assert.match(xml, /What you can improve with Lindström/);
+  assert.ok(xml.includes(deck.slides.find(({ id }) => id === "plan").steps[0]));
   const types = await zip.file("[Content_Types].xml").async("string");
   for (const match of types.matchAll(/<Override\b[^>]*PartName="([^"]+)"/g))
     assert.ok(zip.file(match[1].slice(1)), `Missing OOXML part: ${match[1]}`);
-  assert.ok(zip.file("ppt/slideMasters/lindstrom-slideMaster1.xml"));
-  assert.ok(zip.file("ppt/slideLayouts/lindstrom-slideLayout19.xml"));
-  const theme = await zip.file("ppt/theme/lindstrom-theme1.xml").async("string");
-  assert.match(theme, /Libre Franklin Black/);
-  assert.match(theme, /Libre Franklin/);
+  assert.ok(zip.file("ppt/slideMasters/lindstrom-slideMaster5.xml"));
+  assert.ok(zip.file("ppt/slideLayouts/lindstrom-slideLayout120.xml"));
+  const reference = await JSZip.loadAsync(
+    await readFile(
+      new URL(
+        "../docs/references/Lindstrom_SinceAI_Managerial_Dashboard_REFERENCE.pptx",
+        import.meta.url,
+      ),
+    ),
+  );
+  assert.deepEqual(
+    await zip.file("ppt/theme/lindstrom-theme5.xml").async("nodebuffer"),
+    await reference.file("ppt/theme/theme5.xml").async("nodebuffer"),
+  );
+  assert.match(
+    await zip.file("ppt/slideMasters/_rels/lindstrom-slideMaster5.xml.rels").async("string"),
+    /Target="\.\.\/theme\/lindstrom-theme5\.xml"/,
+  );
+  for (const slide of slides) {
+    const rels = slide.replace("slides/", "slides/_rels/") + ".rels";
+    assert.match(
+      await zip.file(rels).async("string"),
+      /Target="\.\.\/slideLayouts\/lindstrom-slideLayout120\.xml"/,
+    );
+  }
   const chartXml = await zip.file(charts[0]).async("string");
   assert.match(chartXml, /<c:externalData/);
   assert.ok(

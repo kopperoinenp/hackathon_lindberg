@@ -108,7 +108,6 @@
       <aside id="review-editor" aria-label="Review settings" hidden>
         <section class="review-priorities review-content" aria-label="Customise the review">
           <div id="meeting-advice"></div>
-          <div id="review-basics-picker"></div>
           <div id="review-area-picker"></div>
           <details id="more-settings">
             <summary>More settings</summary>
@@ -154,6 +153,13 @@
         ><button id="toggle-chat" class="text-button" aria-expanded="false" aria-controls="chat">
           Show conversation
         </button>
+      </div>
+      <div class="agent-tabs" role="group" aria-label="Choose assistant">
+        <button type="button" data-agent-tab="data" aria-pressed="true">Data analyst</button>
+        <button type="button" data-agent-tab="dashboard" aria-pressed="false">
+          Dashboard editor
+        </button>
+        <button type="button" data-agent-tab="upload" aria-pressed="false">Upload files</button>
       </div>
       <section id="chat-data-import" aria-labelledby="data-import-title" hidden>
         <h2 id="data-import-title">Upload files</h2>
