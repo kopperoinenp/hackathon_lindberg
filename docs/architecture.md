@@ -21,7 +21,7 @@ See [assistant behavior](ASSISTANTS.md).
 Provider configuration and credentials stay on the backend. OpenAI is supported,
 and the Microsoft 365 Copilot adapter awaits live tenant verification.
 Deterministic mode supports local presentation generation. See
-[backend setup](../backend/README.md) and [analysis tools](ANALYSIS_TOOLS.md).
+[setup](../README.md) and [analysis tools](ANALYSIS_TOOLS.md).
 
 React with TypeScript and Python with FastAPI remain proposals.
 The optional [PostgreSQL prototype](POSTGRES_PROTOTYPE.md) persists shared customer

@@ -1540,7 +1540,7 @@
     const word = { better: t("improved"), worse: t("weakened"), neutral: "" }[tone];
     return `<small class="yoy yoy-${tone}">${arrow} ${amount} ${points ? t("pp") : "%"} ${t("vs")} ${esc(label)}${word ? ` · ${word}` : ""}</small>`;
   }
-  // Financial data is expected as data.financials rows (see docs/FINANCIAL_DATA.md).
+  // Legacy financial calculations read optional data.financials rows.
   // Field names live here so they can follow the final workbook columns.
   const financialFields = {
     table: "financials",
